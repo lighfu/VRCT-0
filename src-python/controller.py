@@ -10,7 +10,7 @@ import time
 from device_manager import device_manager
 from config import config, ConfigValidationError
 from model import model
-from utils import removeLog, printLog, errorLogging, isConnectedNetwork, isValidIpAddress, isWildcardBindAddress, isAvailableWebSocketServer
+from utils import removeLog, printLog, errorLogging, errorLog, isConnectedNetwork, isValidIpAddress, isWildcardBindAddress, isAvailableWebSocketServer
 from errors import ErrorCode, VRCTError
 from models.transcription.transcription_openai_compatible import TRANSCRIPTION_MODEL_KEYWORDS, TRANSCRIPTION_API_ENGINES
 from models.translation.translation_providers import TRANSLATION_PROVIDER_REGISTRY, CONNECTION_PROVIDER_REGISTRY
@@ -944,6 +944,8 @@ class Controller:
         def downloaded(self) -> None:
             if model.checkSudachiFullDict() is True:
                 config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"] = True
+                if config.SUDACHI_DICT_TYPE == "full":
+                    model.restartTransliteration()
                 self.run(200, self.run_mapping["downloaded_sudachi_dict"], "full")
             else:
                 error_response = VRCTError.create_error_response(
@@ -3569,7 +3571,14 @@ class Controller:
 
     @staticmethod
     def updateDownloadedSudachiDict() -> None:
-        config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"] = model.checkSudachiFullDict()
+        is_full_available = model.checkSudachiFullDict()
+        config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"] = is_full_available
+        if is_full_available is False and config.SUDACHI_DICT_TYPE == "full":
+            errorLog(
+                "SUDACHI_DICT_TYPE was 'full' but the full dictionary is not available; "
+                "resetting SUDACHI_DICT_TYPE to 'core'."
+            )
+            config.SUDACHI_DICT_TYPE = "core"
 
     @staticmethod
     def messageFormatter(format_type:str, translation:list, message:str) -> str:

@@ -58,7 +58,7 @@ from models.clipboard.clipboard import Clipboard
 from models.ocr import OcrPipeline
 from models.ocr.ocr_languages import SELECTABLE_LANGUAGES as OCR_SELECTABLE_LANGUAGES, isSupported as isSupportedOcrLanguage
 from models.telemetry import Telemetry
-from utils import errorLogging, setupLogger, printLog
+from utils import errorLogging, errorLog, setupLogger, printLog
 from errors import AudioPipelineError, AudioPipelineFailure, ERROR_METADATA, ErrorCode
 
 TRANSCRIPT_STOP_JOIN_TIMEOUT = 15
@@ -1546,8 +1546,13 @@ class Model:
         return repeat_flag
 
     def _transliterationDictPath(self):
-        if config.SUDACHI_DICT_TYPE == "full" and checkSudachiFullDict(config.PATH_LOCAL):
-            return sudachiFullDictPath(config.PATH_LOCAL)
+        if config.SUDACHI_DICT_TYPE == "full":
+            if checkSudachiFullDict(config.PATH_LOCAL):
+                return sudachiFullDictPath(config.PATH_LOCAL)
+            errorLog(
+                "SUDACHI_DICT_TYPE is 'full' but the full dictionary is not downloaded; "
+                "falling back to the standard (core) Sudachi dictionary."
+            )
         return None
 
     def startTransliteration(self):

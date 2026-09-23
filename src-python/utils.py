@@ -743,5 +743,21 @@ def errorLogging() -> None:
         # As a last resort, print the traceback to stdout
         print(traceback.format_exc(), flush=True)
 
+
+def errorLog(message: str) -> None:
+    """Log a plain message (no active exception) to the same error log as errorLogging().
+
+    Use this for expected-but-noteworthy failure/fallback conditions where calling
+    errorLogging() outside an except block would just record "NoneType: None".
+    """
+    global error_logger
+    if error_logger is None:
+        error_logger = setupLogger("error", "error.log", logging.ERROR)
+
+    try:
+        error_logger.error(message)
+    except Exception:
+        print(message, flush=True)
+
 if __name__ == "__main__":
     print(getComputeDeviceList())

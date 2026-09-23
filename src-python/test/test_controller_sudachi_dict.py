@@ -31,7 +31,7 @@ class SudachiDictEndpointTests(unittest.TestCase):
             with self.subTest(run_mapping=key):
                 self.assertIn(key, mainloop.run_mapping)
 
-    def test_default_type_is_core(self) -> None:
+    def test_selectable_types_include_core_and_full(self) -> None:
         self.assertIn(config.SUDACHI_DICT_TYPE, ["core", "full"])
         self.assertEqual(config.SELECTABLE_SUDACHI_DICT_TYPE_LIST, ["core", "full"])
         self.assertTrue(config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["core"])
@@ -49,12 +49,24 @@ class SudachiDictEndpointTests(unittest.TestCase):
 
     def test_downloaded_marks_full_available(self) -> None:
         run = MagicMock()
+        config.SUDACHI_DICT_TYPE = "core"
         with patch.object(controller_module, "model") as mock_model:
             mock_model.checkSudachiFullDict.return_value = True
             handler = Controller.DownloadSudachiDict(mainloop.run_mapping, run)
             handler.downloaded()
         self.assertTrue(config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"])
         run.assert_called_once_with(200, "/run/downloaded_sudachi_dict", "full")
+        mock_model.restartTransliteration.assert_not_called()
+
+    def test_downloaded_restarts_transliteration_when_type_is_full(self) -> None:
+        run = MagicMock()
+        config.SUDACHI_DICT_TYPE = "full"
+        with patch.object(controller_module, "model") as mock_model:
+            mock_model.checkSudachiFullDict.return_value = True
+            handler = Controller.DownloadSudachiDict(mainloop.run_mapping, run)
+            handler.downloaded()
+        self.assertTrue(config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"])
+        mock_model.restartTransliteration.assert_called_once()
 
     def test_failed_download_reports_error_code(self) -> None:
         run = MagicMock()
@@ -72,3 +84,19 @@ class SudachiDictEndpointTests(unittest.TestCase):
             mock_model.checkSudachiFullDict.return_value = False
             Controller.updateDownloadedSudachiDict()
         self.assertFalse(config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"])
+
+    def test_update_downloaded_resets_type_to_core_when_full_missing(self) -> None:
+        config.SUDACHI_DICT_TYPE = "full"
+        with patch.object(controller_module, "model") as mock_model:
+            mock_model.checkSudachiFullDict.return_value = False
+            Controller.updateDownloadedSudachiDict()
+        self.assertFalse(config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"])
+        self.assertEqual(config.SUDACHI_DICT_TYPE, "core")
+
+    def test_update_downloaded_keeps_full_type_when_available(self) -> None:
+        config.SUDACHI_DICT_TYPE = "full"
+        with patch.object(controller_module, "model") as mock_model:
+            mock_model.checkSudachiFullDict.return_value = True
+            Controller.updateDownloadedSudachiDict()
+        self.assertTrue(config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"])
+        self.assertEqual(config.SUDACHI_DICT_TYPE, "full")
