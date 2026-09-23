@@ -31,7 +31,6 @@ hf-xet==1.1.2
 setuptools==80.8.0
 openai==1.109.1  # used directly by the LLM translation clients (was a langchain-openai transitive dep)
 google-genai==1.45.0
-grpcio==1.83.1  # >=1.83.0: google-auth PQC support (min requirement from 2026-10)
 SudachiPy==0.6.10
 SudachiDict-core==20250825
 SudachiDict-full==20250825
