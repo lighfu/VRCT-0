@@ -24,6 +24,8 @@ _RUN_MAPPING = {
     "selected_lmstudio_model": "/run/selected_lmstudio_model",
     "selectable_ollama_model_list": "/run/selectable_ollama_model_list",
     "selected_ollama_model": "/run/selected_ollama_model",
+    "selectable_ai_cli_model_list": "/run/selectable_ai_cli_model_list",
+    "selected_ai_cli_model": "/run/selected_ai_cli_model",
 }
 
 
@@ -306,6 +308,37 @@ class OllamaConnectionEndpointTests(_ConnectionEndpointTestMixin, unittest.TestC
     SET_MODEL_MOCK = "setTranslatorOllamaModel"
     UPDATE_CLIENT_MOCK = "updateTranslatorOllamaClient"
     EXPECTED_CONNECT_KWARGS = {}
+
+
+class AiCliConnectionEndpointTests(_ConnectionEndpointTestMixin, unittest.TestCase):
+    ENGINE_KEY = "AI_CLI"
+    CHECK_METHOD = "checkTranslatorAiCliConnection"
+    MODEL_METHOD = "setTranslatorAiCliModel"
+    MODEL_LIST_ATTR = "SELECTABLE_AI_CLI_MODEL_LIST"
+    MODEL_ATTR = "SELECTED_AI_CLI_MODEL"
+    AUTHENTICATE_MOCK = "authenticationTranslatorAiCli"
+    GET_MODEL_LIST_MOCK = "getTranslatorAiCliModelList"
+    SET_MODEL_MOCK = "setTranslatorAiCliModel"
+    UPDATE_CLIENT_MOCK = "updateTranslatorAiCliClient"
+    EXPECTED_CONNECT_KWARGS = {}
+
+    # SELECTED_AI_CLI_MODEL は CLI ごとのモデルを持つ辞書から算出する property なので、
+    # 親クラスの「_SELECTED_X_MODEL を保存して戻す」ではなく辞書と CLI を保存して戻す。
+    def setUp(self) -> None:
+        self._orig_models = dict(config.SELECTED_AI_CLI_MODELS)
+        self._orig_tool = config.SELECTED_AI_CLI_TOOL
+        self._orig_status = dict(config._SELECTABLE_TRANSLATION_ENGINE_STATUS)
+        self._orig_model_list = list(config.SELECTABLE_AI_CLI_MODEL_LIST)
+        self.controller = Controller.__new__(Controller)
+        self.controller.run_mapping = _RUN_MAPPING
+        self.controller.run = lambda *a, **k: None
+        self.controller.updateTranslationEngineAndEngineList = lambda: None
+
+    def tearDown(self) -> None:
+        config.SELECTABLE_TRANSLATION_ENGINE_STATUS = self._orig_status
+        config.SELECTABLE_AI_CLI_MODEL_LIST = self._orig_model_list
+        config.SELECTED_AI_CLI_TOOL = self._orig_tool
+        config.SELECTED_AI_CLI_MODELS = self._orig_models
 
 
 if __name__ == "__main__":

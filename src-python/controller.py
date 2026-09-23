@@ -106,6 +106,12 @@ _ENGINE_MODEL_BINDINGS = {
         "set_model": "setTranslatorOllamaModel",
         "update_client": "updateTranslatorOllamaClient",
     },
+    "AI_CLI": {
+        "authenticate": "authenticationTranslatorAiCli",
+        "get_model_list": "getTranslatorAiCliModelList",
+        "set_model": "setTranslatorAiCliModel",
+        "update_client": "updateTranslatorAiCliClient",
+    },
 }
 
 
@@ -463,6 +469,7 @@ class Controller:
         self._stopServiceForShutdown(model.stopWatchdog, "watchdog")
         # 翻訳の常設プール。非デーモンスレッドなので、止めないと
         # インタプリタ終了時の atexit join で終了が止まりうる。
+        self._stopServiceForShutdown(model.closeTranslatorAiCli, "AI CLI sessions")
         self._stopServiceForShutdown(model.stopTranslationExecutor, "translation executor")
         try:
             # A setting changed in the last few seconds may still be sitting
@@ -3181,6 +3188,64 @@ class Controller:
     def setTranslatorOllamaModel(self, data, *args, **kwargs) -> dict:
         return self._setTranslationEngineModel("Ollama", data)
 
+    def getTranslatorAiCliConnection(self, *args, **kwargs) -> dict:
+        return {"status":200, "result":model.getTranslatorAiCliConnected()}
+
+    def checkTranslatorAiCliConnection(self, *args, **kwargs) -> dict:
+        return self._checkTranslationEngineConnection("AI_CLI", connect_kwargs={})
+
+    def getTranslatorAiCliModelList(self, *args, **kwargs) -> dict:
+        return self._getTranslationEngineModelList("AI_CLI")
+
+    def getTranslatorAiCliModel(self, *args, **kwargs) -> dict:
+        return self._getTranslationEngineModel("AI_CLI")
+
+    def setTranslatorAiCliModel(self, data, *args, **kwargs) -> dict:
+        return self._setTranslationEngineModel("AI_CLI", data)
+
+    @staticmethod
+    def getSelectableAiCliToolList(*args, **kwargs) -> dict:
+        return {"status":200, "result":config.SELECTABLE_AI_CLI_TOOL_LIST}
+
+    @staticmethod
+    def getSelectedAiCliTool(*args, **kwargs) -> dict:
+        return {"status":200, "result":config.SELECTED_AI_CLI_TOOL}
+
+    def setSelectedAiCliTool(self, data, *args, **kwargs) -> dict:
+        tool = str(data)
+        if tool not in config.SELECTABLE_AI_CLI_TOOL_LIST:
+            return VRCTError.create_error_response(
+                ErrorCode.CONNECTION_AI_CLI_FAILED,
+                data=config.SELECTED_AI_CLI_TOOL,
+            )
+        config.SELECTED_AI_CLI_TOOL = tool
+        model.setTranslatorAiCliTool(tool)
+        # CLI を替えたらモデル一覧と選択モデルを取り直し、接続状態を UI に知らせる。
+        result = self._checkTranslationEngineConnection("AI_CLI", connect_kwargs={})
+        self.run(200, self.run_mapping["ai_cli_connection"], result.get("status") == 200)
+        return {"status":200, "result":config.SELECTED_AI_CLI_TOOL}
+
+    @staticmethod
+    def _checkAiCliAtStartup() -> tuple:
+        """起動時の AI CLI の確認。(status, model_list, selected_model) を返す。
+
+        CLI が 1 つも無ければ使えない扱いにする (init() の `case _:` に落ちると
+        ネット接続だけで使える扱いになってしまう)。
+        """
+        tools = model.getTranslatorAiCliInstalledTools()
+        config.SELECTABLE_AI_CLI_TOOL_LIST = tools
+        if not tools:
+            return False, None, None
+        if config.SELECTED_AI_CLI_TOOL not in tools:
+            config.SELECTED_AI_CLI_TOOL = tools[0]
+        if model.authenticationTranslatorAiCli() is not True:
+            return False, None, None
+        model_list = model.getTranslatorAiCliModelList()
+        if len(model_list) == 0:
+            return False, model_list, None
+        selected = config.SELECTED_AI_CLI_MODEL if config.SELECTED_AI_CLI_MODEL in model_list else model_list[0]
+        return True, model_list, selected
+
 
     @staticmethod
     def setCtranslate2WeightType(data, *args, **kwargs) -> dict:
@@ -4800,6 +4865,8 @@ class Controller:
                             if len(model_list) > 0:
                                 selected_model = config.SELECTED_OLLAMA_MODEL if config.SELECTED_OLLAMA_MODEL in model_list else model_list[0]
                                 status = True
+                    case "AI_CLI":
+                        status, model_list, selected_model = Controller._checkAiCliAtStartup()
                     case _:
                         status = connected_network is True
             except Exception as e:
@@ -4851,6 +4918,8 @@ class Controller:
             if engine == "Ollama" and not status:
                 config.SELECTABLE_OLLAMA_MODEL_LIST = []
                 config.SELECTED_OLLAMA_MODEL = None
+            if engine == "AI_CLI" and not status:
+                config.SELECTABLE_AI_CLI_MODEL_LIST = []
 
             # モデルリストと選択モデルの設定
             if model_list is not None and status:
@@ -4895,6 +4964,13 @@ class Controller:
                         config.SELECTED_OLLAMA_MODEL = selected_model
                         model.setTranslatorOllamaModel(selected_model)
                         model.updateTranslatorOllamaClient()
+                    case "AI_CLI":
+                        config.SELECTABLE_AI_CLI_MODEL_LIST = model_list
+                        config.SELECTED_AI_CLI_MODEL = selected_model
+                        model.setTranslatorAiCliModel(selected_model)
+                        # 常駐セッションは、AI CLI がどこかのタブで翻訳エンジンに選ばれているときだけ起動しておく。
+                        if "AI_CLI" in config.SELECTED_TRANSLATION_ENGINES.values():
+                            model.updateTranslatorAiCliClient()
 
             printLog(f"{engine} check completed")
 

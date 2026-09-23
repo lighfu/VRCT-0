@@ -663,6 +663,10 @@ def _allowed_in_populated(list_attr_name: str):
     return _inner
 
 
+# AI CLI の CLI 名。models/translation/ai_cli/catalog.py の TOOLS と同じ並び。
+AI_CLI_TOOLS = ("codex", "claude", "agy")
+
+
 class Config:
     """Application configuration singleton.
 
@@ -824,6 +828,8 @@ class Config:
     SELECTABLE_LMSTUDIO_MODEL_LIST = ManagedProperty('SELECTABLE_LMSTUDIO_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
     SELECTABLE_OPENAI_COMPATIBLE_MODEL_LIST = ManagedProperty('SELECTABLE_OPENAI_COMPATIBLE_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
     SELECTABLE_OLLAMA_MODEL_LIST = ManagedProperty('SELECTABLE_OLLAMA_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
+    SELECTABLE_AI_CLI_TOOL_LIST = ManagedProperty('SELECTABLE_AI_CLI_TOOL_LIST', type_=list, serialize=False, mutable_tracking=True)
+    SELECTABLE_AI_CLI_MODEL_LIST = ManagedProperty('SELECTABLE_AI_CLI_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
     SELECTABLE_GROQ_WHISPER_MODEL_LIST = ManagedProperty('SELECTABLE_GROQ_WHISPER_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
     SELECTABLE_OPENAI_WHISPER_MODEL_LIST = ManagedProperty('SELECTABLE_OPENAI_WHISPER_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
     SELECTABLE_CUSTOM_WHISPER_MODEL_LIST = ManagedProperty('SELECTABLE_CUSTOM_WHISPER_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
@@ -991,6 +997,19 @@ class Config:
     SELECTED_LMSTUDIO_MODEL = ManagedProperty('SELECTED_LMSTUDIO_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_LMSTUDIO_MODEL_LIST'))
     SELECTED_OPENAI_COMPATIBLE_MODEL = ManagedProperty('SELECTED_OPENAI_COMPATIBLE_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_OPENAI_COMPATIBLE_MODEL_LIST'))
     SELECTED_OLLAMA_MODEL = ManagedProperty('SELECTED_OLLAMA_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_OLLAMA_MODEL_LIST'))
+    SELECTED_AI_CLI_TOOL = ManagedProperty('SELECTED_AI_CLI_TOOL', type_=str, allowed=lambda v, inst: v in AI_CLI_TOOLS)
+    SELECTED_AI_CLI_MODELS = ManagedProperty('SELECTED_AI_CLI_MODELS', type_=dict)
+
+    @property
+    def SELECTED_AI_CLI_MODEL(self):
+        """選んでいる CLI のモデル。CLI ごとの値は SELECTED_AI_CLI_MODELS に保存する。"""
+        return self.SELECTED_AI_CLI_MODELS.get(self.SELECTED_AI_CLI_TOOL) or None
+
+    @SELECTED_AI_CLI_MODEL.setter
+    def SELECTED_AI_CLI_MODEL(self, value):
+        models = dict(self.SELECTED_AI_CLI_MODELS)
+        models[self.SELECTED_AI_CLI_TOOL] = value or ""
+        self.SELECTED_AI_CLI_MODELS = models
     SELECTED_GROQ_WHISPER_MODEL = ManagedProperty('SELECTED_GROQ_WHISPER_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_GROQ_WHISPER_MODEL_LIST'))
     SELECTED_OPENAI_WHISPER_MODEL = ManagedProperty('SELECTED_OPENAI_WHISPER_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_OPENAI_WHISPER_MODEL_LIST'))
     SELECTED_CUSTOM_WHISPER_MODEL = ManagedProperty('SELECTED_CUSTOM_WHISPER_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_CUSTOM_WHISPER_MODEL_LIST'))
@@ -1096,6 +1115,8 @@ class Config:
         self._SELECTABLE_LMSTUDIO_MODEL_LIST = []
         self._SELECTABLE_OPENAI_COMPATIBLE_MODEL_LIST = []
         self._SELECTABLE_OLLAMA_MODEL_LIST = []
+        self._SELECTABLE_AI_CLI_TOOL_LIST = []
+        self._SELECTABLE_AI_CLI_MODEL_LIST = []
         self._SELECTABLE_GROQ_WHISPER_MODEL_LIST = []
         self._SELECTABLE_OPENAI_WHISPER_MODEL_LIST = []
         self._SELECTABLE_CUSTOM_WHISPER_MODEL_LIST = []
@@ -1230,6 +1251,8 @@ class Config:
         self._OPENAI_COMPATIBLE_URL = "https://api.openai.com/v1"
         self._SELECTED_OPENAI_COMPATIBLE_MODEL = None
         self._SELECTED_OLLAMA_MODEL = None
+        self._SELECTED_AI_CLI_TOOL = "claude"
+        self._SELECTED_AI_CLI_MODELS = {"codex": "", "claude": "haiku", "agy": ""}
         self._SELECTED_GROQ_WHISPER_MODEL = None
         self._SELECTED_OPENAI_WHISPER_MODEL = None
         self._SELECTED_CUSTOM_WHISPER_MODEL = None

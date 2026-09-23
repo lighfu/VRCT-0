@@ -114,6 +114,9 @@ run_mapping = {
     "selected_openai_compatible_model":"/run/selected_openai_compatible_model",
     "selectable_ollama_model_list":"/run/selectable_ollama_model_list",
     "selected_ollama_model":"/run/selected_ollama_model",
+    "selectable_ai_cli_model_list":"/run/selectable_ai_cli_model_list",
+    "selected_ai_cli_model":"/run/selected_ai_cli_model",
+    "ai_cli_connection":"/run/ai_cli_connection",
     "selectable_groq_whisper_model_list":"/run/selectable_groq_whisper_model_list",
     "selected_groq_whisper_model":"/run/selected_groq_whisper_model",
     "selectable_openai_whisper_model_list":"/run/selectable_openai_whisper_model_list",
@@ -343,6 +346,15 @@ mapping = {
     "/get/data/selectable_ollama_model_list": {"status": True, "variable":controller.getTranslatorOllamaModelList},
     "/get/data/selected_ollama_model": {"status": True, "variable":controller.getTranslatorOllamaModel},
     "/set/data/selected_ollama_model": {"status": True, "variable":controller.setTranslatorOllamaModel},
+
+    "/get/data/connected_ai_cli": {"status": True, "variable":controller.getTranslatorAiCliConnection},
+    "/run/ai_cli_connection": {"status": True, "variable":controller.checkTranslatorAiCliConnection},
+    "/get/data/selectable_ai_cli_model_list": {"status": True, "variable":controller.getTranslatorAiCliModelList},
+    "/get/data/selected_ai_cli_model": {"status": True, "variable":controller.getTranslatorAiCliModel},
+    "/set/data/selected_ai_cli_model": {"status": True, "variable":controller.setTranslatorAiCliModel},
+    "/get/data/selectable_ai_cli_tool_list": {"status": True, "variable":controller.getSelectableAiCliToolList},
+    "/get/data/selected_ai_cli_tool": {"status": True, "variable":controller.getSelectedAiCliTool},
+    "/set/data/selected_ai_cli_tool": {"status": True, "variable":controller.setSelectedAiCliTool},
 
     # Transliteration
     "/get/data/convert_message_to_romaji": {"status": True, "variable":controller.getConvertMessageToRomaji},

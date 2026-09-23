@@ -186,6 +186,7 @@ class ShutdownStopsOscWebsocketObsOverlayTests(unittest.TestCase):
                 mock_model.stopWebSocketServer,
                 mock_model.shutdownOverlay,
                 mock_model.stopWatchdog,
+                mock_model.closeTranslatorAiCli,
                 mock_model.stopTranslationExecutor,
             ],
         )
@@ -197,6 +198,7 @@ class ShutdownStopsOscWebsocketObsOverlayTests(unittest.TestCase):
                 "WebSocket server",
                 "Overlay",
                 "watchdog",
+                "AI CLI sessions",
                 "translation executor",
             ],
         )
