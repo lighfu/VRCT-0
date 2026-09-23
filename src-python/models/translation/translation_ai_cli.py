@@ -19,9 +19,10 @@ try:
     from .ai_cli.base import AiCliError
     from .ai_cli.claude_session import ClaudeSession
     from .ai_cli.codex_session import CodexSession
-    from .translation_languages import translation_lang, loadTranslationLanguages
+    from .translation_languages import translation_lang
     from .translation_llm_common import buildSystemPrompt
     from .translation_utils import loadTranslatePromptConfig
+    from utils import errorLogging
 except ImportError:
     import sys
     from os import path as os_path
@@ -31,9 +32,10 @@ except ImportError:
     from models.translation.ai_cli.base import AiCliError
     from models.translation.ai_cli.claude_session import ClaudeSession
     from models.translation.ai_cli.codex_session import CodexSession
-    from models.translation.translation_languages import translation_lang, loadTranslationLanguages
+    from models.translation.translation_languages import translation_lang
     from models.translation.translation_llm_common import buildSystemPrompt
     from models.translation.translation_utils import loadTranslatePromptConfig
+    from utils import errorLogging
 
 SESSION_CLASSES = {"codex": CodexSession, "claude": ClaudeSession, "agy": AgySession}
 BASE_INSTRUCTIONS = "You are a translation engine. Output only the translation of the given text."
@@ -44,15 +46,13 @@ class AICliClient:
         prompt_config = loadTranslatePromptConfig(root_path, "translation_ai_cli.yml")
         self.prompt_template = prompt_config["system_prompt"]
         self.history_cfg = prompt_config.get("history", {"use_history": False})
-        if "AI_CLI" not in translation_lang:
-            # config.Config() が先に初期化されていない (単体テストなど) 場合のフォールバック。
-            loadTranslationLanguages(path=root_path or ".", force=False)
         self.supported_languages = list(translation_lang["AI_CLI"]["source"].keys())
         self.workspace = workspace or os.path.join(root_path or ".", "ai_cli_workspace")
         self.tool: Optional[str] = None
         self.model: Optional[str] = None
         self._context_history: list[dict] = []
         self._session = None
+        self._shut_down = False
         self._lock = threading.Lock()
 
     def getInstalledTools(self) -> list[str]:
@@ -65,9 +65,12 @@ class AICliClient:
         if tool not in self.getInstalledTools():
             return False
         if tool != self.tool:
-            self.close()
-            self.tool = tool
-            self.model = None
+            with self._lock:
+                self.tool = tool
+                self.model = None
+                old, self._session = self._session, None
+            if old is not None:
+                old.shutdown()
         return True
 
     def getModelList(self) -> list[str]:
@@ -80,8 +83,11 @@ class AICliClient:
         if model not in self.getModelList():
             return False
         if model != self.model:
-            self.close()
-            self.model = model
+            with self._lock:
+                self.model = model
+                old, self._session = self._session, None
+            if old is not None:
+                old.shutdown()
         return True
 
     def authenticationCheck(self) -> bool:
@@ -92,6 +98,8 @@ class AICliClient:
 
     def _ensureSession(self):
         with self._lock:
+            if self._shut_down:
+                raise AiCliError("AI CLI client was shut down")
             if self.tool is None or not self.model:
                 raise AiCliError("AI CLI tool or model is not selected")
             if self._session is None:
@@ -110,7 +118,10 @@ class AICliClient:
             try:
                 self._ensureSession().start()
             except Exception:
-                pass  # 起動に失敗しても、次の翻訳でもう一度試してエラーを返す
+                # 起動に失敗しても、次の翻訳でもう一度試してエラーを返す。
+                # shutdown 後もここに来る (_ensureSession が AiCliError を送出する) が、
+                # その場合は何もしない。
+                errorLogging()
         threading.Thread(target=warmUp, name="ai-cli-warmup", daemon=True).start()
 
     def translate(self, text: str, input_lang: str, output_lang: str) -> str:
@@ -122,13 +133,24 @@ class AICliClient:
         return self._ensureSession().translate(prompt)
 
     def close(self) -> None:
-        """今のセッションを恒久的に終える (session.shutdown())。
+        """今のセッションを終える (再起動可能): setTool()/setModel() から使う。
 
-        session.close() だと、既にこのセッションを掴んでいる warm-up スレッドが
-        後から respawn してしまい、孤児プロセスが残る可能性があるため shutdown() を使う。
+        session.close() ではなく session.shutdown() (恒久停止) を呼ぶ。
+        session.close() (再起動可能な kill) だと、既にこのセッションを掴んでいる
+        warm-up スレッドが後から respawn してしまい、孤児プロセスが残る可能性が
+        あるため。AICliClient 自体はまだ生きているので、次の translate()/
+        updateClient() は新しいセッションを普通に作り直す。
         """
         with self._lock:
             session = self._session
             self._session = None
+        if session is not None:
+            session.shutdown()
+
+    def shutdown(self) -> None:
+        """クライアント自体を恒久的に終える。以後 translate()/updateClient() は何もしない。"""
+        with self._lock:
+            self._shut_down = True
+            session, self._session = self._session, None
         if session is not None:
             session.shutdown()
