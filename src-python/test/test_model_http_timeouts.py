@@ -64,7 +64,7 @@ class DownloadSetupTimeoutTests(unittest.TestCase):
         mock_get.return_value = mock_response
 
         with patch("builtins.open", MagicMock()):
-            Model._downloadSetup()
+            Model._downloadSetup("https://example.invalid/VRCT_setup.exe")
 
         mock_get.assert_called_once()
         self.assertEqual(mock_get.call_args.kwargs.get("timeout"), _HTTP_TIMEOUT)

@@ -1776,10 +1776,12 @@ class Model:
             errorLogging()
         return result
 
-    # setup.exe と一緒に CI が公開する SHA-256 サイドカーアセットのファイル名
-    # サフィックス。release.yml 側で <installer名>.sha256 という名前で
-    # 追加アップロードしている前提。
-    _SHA256_ASSET_SUFFIX = ".sha256"
+    # setup.exe と一緒に CI が公開する SHA-256 サイドカーアセットのファイル名。
+    # release.yml は VRCT.zip.sha256 / VRCT_cuda.zip.sha256 も同じ release に
+    # アセットとして公開しているため、単純な ".sha256" 拡張子一致では別
+    # ファイルのハッシュを誤って採用しかねない。setup.exe (固定ファイル名)
+    # のものだけを厳密に名前一致させる。
+    _SHA256_ASSET_NAME = "VRCT_setup.exe.sha256"
     # ".sha256" サイドカー (数十バイトの小さなファイル) の取得リトライ回数。
     # これ1つの一時的な通信失敗で更新全体を止めてしまわないための保険。
     # setup.exe 本体の _downloadSetup (5回) より軽い処理なので控えめに3回。
@@ -1840,7 +1842,7 @@ class Model:
             for asset in assets
             if isinstance(asset, dict)
             and isinstance(asset.get("name"), str)
-            and asset["name"].endswith(Model._SHA256_ASSET_SUFFIX)
+            and asset["name"] == Model._SHA256_ASSET_NAME
             and isinstance(asset.get("browser_download_url"), str)
         ]
         if not sidecar_urls:
@@ -1873,7 +1875,7 @@ class Model:
         return None
 
     @staticmethod
-    def _downloadSetup(expected_sha256: Optional[str] = None) -> bool:
+    def _downloadSetup(setup_url: str, expected_sha256: Optional[str] = None) -> bool:
         # try to download at most 5 times
         program_name = "VRCT_setup.exe"
         current_directory = config.PATH_LOCAL
@@ -1883,7 +1885,7 @@ class Model:
         min_valid_size = 1024 * 1024
         for _ in range(5):
             try:
-                res = requests_get(config.SETUP_DOWNLOAD_URL, stream=True, timeout=_HTTP_TIMEOUT)
+                res = requests_get(setup_url, stream=True, timeout=_HTTP_TIMEOUT)
                 res.raise_for_status()
                 downloaded_size = 0
                 hasher = hashlib.sha256()
@@ -1933,6 +1935,17 @@ class Model:
         #   - ".sha256" が公開されているのに取得できなかった
         #     (SetupSha256Unavailable)。サイズチェックのみへは格下げしない。
         release = Model._resolveReleaseForVersion(target_version)
+        # ダウンロードするファイルとハッシュ検証の対象を同じ release に
+        # 揃える: release から解決できた version (release["name"]) を
+        # 最優先し、release が解決できなかった場合のみ target_version /
+        # 自インストーラの現在バージョンにフォールバックする。
+        if isinstance(release, dict) and isinstance(release.get("name"), str):
+            resolved_version = release["name"]
+        elif target_version is not None:
+            resolved_version = target_version
+        else:
+            resolved_version = config.VERSION
+        setup_url = config.setupDownloadUrlForVersion(resolved_version)
         try:
             expected_sha256 = Model._fetchExpectedSha256(release)
         except SetupSha256Unavailable:
@@ -1948,7 +1961,7 @@ class Model:
                 "Setup file SHA-256 could not be verified (no .sha256 asset found for "
                 f"{target_version or 'the latest release'}); falling back to size-only validation"
             )
-        return Model._downloadSetup(expected_sha256)
+        return Model._downloadSetup(setup_url, expected_sha256)
 
     @staticmethod
     def updateSoftware(target_version: Optional[str] = None):

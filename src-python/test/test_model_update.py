@@ -117,14 +117,14 @@ class TestModelUpdate(unittest.TestCase):
         os_exit: Mock,
     ) -> None:
         wrong_hash = "0" * 64
-        sha_asset_url = "https://example.invalid/VRCT_9.9.9_x64-setup.exe.sha256"
+        sha_asset_url = "https://example.invalid/VRCT_setup.exe.sha256"
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
                 return _make_json_response({
                     "name": "9.9.9",
                     "assets": [{
-                        "name": "VRCT_9.9.9_x64-setup.exe.sha256",
+                        "name": "VRCT_setup.exe.sha256",
                         "browser_download_url": sha_asset_url,
                     }],
                 })
@@ -152,14 +152,14 @@ class TestModelUpdate(unittest.TestCase):
         psutil_process: Mock,
         os_exit: Mock,
     ) -> None:
-        sha_asset_url = "https://example.invalid/VRCT_9.9.9_x64-setup.exe.sha256"
+        sha_asset_url = "https://example.invalid/VRCT_setup.exe.sha256"
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
                 return _make_json_response({
                     "name": "9.9.9",
                     "assets": [{
-                        "name": "VRCT_9.9.9_x64-setup.exe.sha256",
+                        "name": "VRCT_setup.exe.sha256",
                         "browser_download_url": sha_asset_url,
                     }],
                 })
@@ -190,14 +190,14 @@ class TestModelUpdate(unittest.TestCase):
         # sidecar at all (which may fall back to the size-only check): here a
         # checksum WAS published and we could not obtain it, so tampering
         # cannot be ruled out and the installer must not be launched.
-        sha_asset_url = "https://example.invalid/VRCT_9.9.9_x64-setup.exe.sha256"
+        sha_asset_url = "https://example.invalid/VRCT_setup.exe.sha256"
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
                 return _make_json_response({
                     "name": "9.9.9",
                     "assets": [{
-                        "name": "VRCT_9.9.9_x64-setup.exe.sha256",
+                        "name": "VRCT_setup.exe.sha256",
                         "browser_download_url": sha_asset_url,
                     }],
                 })
@@ -232,7 +232,7 @@ class TestModelUpdate(unittest.TestCase):
         # A transient failure on the tiny ".sha256" request must not sink an
         # otherwise-valid update: the first attempt fails, the retry returns
         # the correct digest, and the install proceeds.
-        sha_asset_url = "https://example.invalid/VRCT_9.9.9_x64-setup.exe.sha256"
+        sha_asset_url = "https://example.invalid/VRCT_setup.exe.sha256"
         sidecar_attempts = {"n": 0}
 
         def fake_get(url, *args, **kwargs):
@@ -240,7 +240,7 @@ class TestModelUpdate(unittest.TestCase):
                 return _make_json_response({
                     "name": "9.9.9",
                     "assets": [{
-                        "name": "VRCT_9.9.9_x64-setup.exe.sha256",
+                        "name": "VRCT_setup.exe.sha256",
                         "browser_download_url": sha_asset_url,
                     }],
                 })
@@ -256,6 +256,79 @@ class TestModelUpdate(unittest.TestCase):
         Model.updateCudaSoftware()
 
         self.assertEqual(sidecar_attempts["n"], 2)
+        popen.assert_called_once()
+        os_exit.assert_called_once_with(0)
+
+    @patch("model.os_exit")
+    @patch("model.psutil_Process")
+    @patch("model.Popen")
+    @patch("model.requests_get")
+    def test_downloads_setup_from_resolved_release_version_not_target_arg(
+        self,
+        requests_get: Mock,
+        popen: Mock,
+        psutil_process: Mock,
+        os_exit: Mock,
+    ) -> None:
+        # The resolved GitHub Release's own "name" (its actual version) must
+        # drive the setup.exe download URL, not merely the target_version
+        # argument the caller passed in -- they can legitimately differ (e.g.
+        # target_version left as None so the "latest" release is resolved).
+        expected_setup_url = config.setupDownloadUrlForVersion("9.9.9")
+        downloaded_urls = []
+
+        def fake_get(url, *args, **kwargs):
+            if url == config.GITHUB_URL:
+                return _make_json_response({"name": "9.9.9", "assets": []})
+            downloaded_urls.append(url)
+            return _make_download_response(self.payload)
+
+        requests_get.side_effect = fake_get
+
+        Model.updateCudaSoftware()
+
+        self.assertIn(expected_setup_url, downloaded_urls)
+        popen.assert_called_once()
+        os_exit.assert_called_once_with(0)
+
+    @patch("model.os_exit")
+    @patch("model.psutil_Process")
+    @patch("model.Popen")
+    @patch("model.requests_get")
+    def test_picks_setup_sha256_asset_among_other_sha256_assets(
+        self,
+        requests_get: Mock,
+        popen: Mock,
+        psutil_process: Mock,
+        os_exit: Mock,
+    ) -> None:
+        # release.yml also publishes VRCT.zip.sha256 / VRCT_cuda.zip.sha256 on
+        # the same release, listed here before the setup.exe sidecar. Only
+        # the exact "VRCT_setup.exe.sha256" asset must be used.
+        zip_sha_url = "https://example.invalid/VRCT.zip.sha256"
+        cuda_zip_sha_url = "https://example.invalid/VRCT_cuda.zip.sha256"
+        setup_sha_url = "https://example.invalid/VRCT_setup.exe.sha256"
+
+        def fake_get(url, *args, **kwargs):
+            if url == config.GITHUB_URL:
+                return _make_json_response({
+                    "name": "9.9.9",
+                    "assets": [
+                        {"name": "VRCT.zip.sha256", "browser_download_url": zip_sha_url},
+                        {"name": "VRCT_cuda.zip.sha256", "browser_download_url": cuda_zip_sha_url},
+                        {"name": "VRCT_setup.exe.sha256", "browser_download_url": setup_sha_url},
+                    ],
+                })
+            if url == zip_sha_url or url == cuda_zip_sha_url:
+                raise AssertionError(f"must not fetch the wrong .sha256 asset: {url}")
+            if url == setup_sha_url:
+                return _make_text_response(self.actual_sha256)
+            return _make_download_response(self.payload)
+
+        requests_get.side_effect = fake_get
+
+        Model.updateCudaSoftware()
+
         popen.assert_called_once()
         os_exit.assert_called_once_with(0)
 

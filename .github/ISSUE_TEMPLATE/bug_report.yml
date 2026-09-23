@@ -12,7 +12,7 @@ body:
     id: debug-tips
     attributes:
       label: Debug Tips
-      description: To improve debug efficiency, please read [Issues of README](https://github.com/misyaguziya/VRCT/issues) first.
+      description: To improve debug efficiency, please read [Issues of README](https://github.com/lighfu/VRCT-0/issues) first.
       options:
         - label: I'm sure I've read this project's Issues of README.
           required: true

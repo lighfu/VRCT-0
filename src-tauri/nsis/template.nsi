@@ -732,8 +732,7 @@ Section Install
 
   !addplugindir "..\..\..\..\nsis\plugins\x86-unicode"
   ; 指定のURLからファイルをダウンロード
-  !define SOFTWARE_RELEASE_REPO "ms-software/VRCT"
-  !define SOFTWARE_RELEASE_REPO_BETA "ms-software/VRCT-beta"
+  !define SOFTWARE_RELEASE_GITHUB_REPO "lighfu/VRCT-0"
   !define SOFTWARE_DOWNLOAD_FILENAME "VRCT.zip"
   !define SOFTWARE_DOWNLOAD_FILENAME_GPU "VRCT_cuda.zip"
 
@@ -758,9 +757,7 @@ Section Install
   Var /GLOBAL dl_percent
   Var /GLOBAL dl_xfersize
   Var /GLOBAL release_revision
-  Var /GLOBAL release_repo
   Var /GLOBAL effective_version
-  Var /GLOBAL beta_marker_pos
   Var /GLOBAL req_dl_mb
   Var /GLOBAL req_extract_mb
   Var /GLOBAL dl_total
@@ -818,38 +815,19 @@ Section Install
     ${EndIf}
   ${EndIf}
 
-  ; Pin to a specific released version's HF tag (e.g. "/VERSION=3.4.2" -> tag
+  ; Pin to a specific released version's tag (e.g. "/VERSION=3.4.2" -> tag
   ; "v3.4.2", or typed into the release-channel page) when requested for
-  ; rollback; otherwise fetch the latest from the selected channel's "main".
+  ; rollback; otherwise target this installer's own version. GitHub Releases'
+  ; "latest" excludes prereleases, and the updater always passes /VERSION
+  ; anyway, so there is no "fetch whatever is newest" case left to support.
   ${If} $TargetVersion != ""
-    StrCpy $release_revision "v$TargetVersion"
     StrCpy $effective_version $TargetVersion
-
-    ; Beta versions (e.g. "3.5.0-beta.1") are published to a separate HF repo,
-    ; not the production one -- an explicit pinned version routes by its own
-    ; string, regardless of which channel radio button is selected, since a
-    ; given tag only ever exists in one of the two repos.
-    ${StrLoc} $beta_marker_pos $effective_version "-beta" ">"
-    ${If} $beta_marker_pos == ""
-      ${StrLoc} $beta_marker_pos $effective_version "-rc" ">"
-    ${EndIf}
-    ${If} $beta_marker_pos == ""
-      StrCpy $release_repo "${SOFTWARE_RELEASE_REPO}"
-    ${Else}
-      StrCpy $release_repo "${SOFTWARE_RELEASE_REPO_BETA}"
-    ${EndIf}
   ${Else}
-    ; No specific version pinned -- fetch the latest from whichever channel
-    ; the user picked on the release-channel page.
-    StrCpy $release_revision "main"
-    ${If} $SelectedChannel == "beta"
-      StrCpy $release_repo "${SOFTWARE_RELEASE_REPO_BETA}"
-    ${Else}
-      StrCpy $release_repo "${SOFTWARE_RELEASE_REPO}"
-    ${EndIf}
+    StrCpy $effective_version "${VERSION}"
   ${EndIf}
+  StrCpy $release_revision "v$effective_version"
 
-  StrCpy $cmder_dl "https://huggingface.co/$release_repo/resolve/$release_revision/$file_name"
+  StrCpy $cmder_dl "https://github.com/${SOFTWARE_RELEASE_GITHUB_REPO}/releases/download/$release_revision/$file_name"
   DetailPrint "Got URL : $cmder_dl"
 
   ; New releases publish a SHA-256 sidecar next to each package. Download it
@@ -966,7 +944,7 @@ Section Install
   ${EndIf}
 
   ; Download + extract is retried as a single unit: a transfer the downloader
-  ; reports as OK can still be truncated (the HuggingFace CDN does this on
+  ; reports as OK can still be truncated (GitHub's release CDN does this on
   ; multi-GB files), which only surfaces when the unpack fails. So on ANY
   ; failure (download error, or an unpack that yields no ${MAINBINARYNAME}.exe)
   ; we wipe the archive and pull a completely fresh copy.

@@ -500,22 +500,24 @@ git push origin v3.5.0-beta.1
 | 項目 | 本番版 (`v3.5.0`) | β版 (`v3.5.0-beta.1`) |
 |---|---|---|
 | GitHub Release | `prerelease: false` | `prerelease: true` |
-| Hugging Face公開先 | `ms-software/VRCT` | `ms-software/VRCT-beta` |
-| インストーラー(setup.exe)の既定ダウンロード元 | `ms-software/VRCT` | `ms-software/VRCT-beta`(バージョン文字列の `-beta`/`-rc` から自動判定、または `/CHANNEL=` 指定) |
 
-> **事前準備**: β用のHugging Faceリポジトリ `ms-software/VRCT-beta` は
-> CIでは自動作成されないため、初回は手動で作成しておく必要があります。
+このフォークでは配布元は常にこのリポジトリ(`lighfu/VRCT-0`)の GitHub
+Releases 一本のみで、本番/β版で公開先を分けることはしません(旧 upstream の
+Hugging Face 2リポジトリ構成は廃止)。
 
 ### チャンネル切り替え・旧バージョンへのロールバック
 
-GitHub Releasesで配布されるsetup.exeは、実行時にHugging Faceから本体一式を
-ダウンロードするダウンローダー形式です。そのため、通常はGitHub Releasesの
-古いバージョンのsetup.exeを取得しても、その時点の最新版がインストールされてしまいます。
+GitHub Releasesで配布されるsetup.exeは、実行時に同じリポジトリのGitHub
+Releaseから本体一式(`VRCT.zip` / `VRCT_cuda.zip`)をダウンロードする
+ダウンローダー形式です。ダウンロード先はタグ `v<バージョン>` の
+Release固定で、`/VERSION=` を指定しない場合はこのsetup.exe自身の
+`${VERSION}` をそのままターゲットとして使います(GitHubの「Latest
+release」はprereleaseを含まないため使わない)。
 
 チャンネル・バージョンの指定はGUI画面ではなく `/CHANNEL=` `/VERSION=` の
 CLI引数でのみ行えます(setup.exe自体はどのバージョン・チャンネルのものでも
 構いません)。setup.exeを単体でダブルクリックした場合はこれらの引数が付かない
-ため、CPU/GPU選択のみでビルド元チャンネルの最新版がインストールされます
+ため、CPU/GPU選択のみでこのsetup.exe自身のバージョンがインストールされます
 (GUI上に選択肢を増やさないための意図的な設計です)。VRCT本体のUpdaterタブ
 からの更新はこれらの引数を自動的に付与して起動します。
 
@@ -524,13 +526,9 @@ VRCT_setup.exe /CHANNEL=beta
 VRCT_setup.exe /VERSION=3.4.2
 ```
 
-`/VERSION=` を指定した場合は、そのバージョン文字列に `-beta` または `-rc` が
-含まれるかどうかで自動的にダウンロード元リポジトリ(`ms-software/VRCT` /
-`ms-software/VRCT-beta`)を判定します(`/CHANNEL=` の指定より優先されます)。
-`/VERSION=` を指定しない場合は `/CHANNEL=`(省略時はこのsetup.exe自身が
-ビルドされたチャンネル)の最新版をダウンロードします。指定したバージョンが
-Hugging Face上に存在しない場合はダウンロードに失敗し、インストールが
-中断されます。
+`/VERSION=` を指定した場合は、`v<バージョン>` タグのGitHub Releaseから
+本体一式をダウンロードします。指定したバージョンのReleaseがGitHub上に
+存在しない場合はダウンロードに失敗し、インストールが中断されます。
 
 ### リリースパッケージの内容
 

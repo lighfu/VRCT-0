@@ -680,10 +680,10 @@ class Config:
     _debounce_time: int = 2
     _file_lock: threading.Lock = threading.Lock()
 
-    # Hugging Face repos hosting the NSIS setup.exe per release channel; see
-    # docs/readme_build.md "β版リリース" and .github/workflows/release.yml.
-    _HF_REPO_STABLE = "ms-software/VRCT"
-    _HF_REPO_BETA = "ms-software/VRCT-beta"
+    # このフォークの GitHub リポジトリ (owner/repo)。GitHub Releases の
+    # API/ダウンロード URL は全てここから組み立てる。
+    # docs/readme_build.md "β版リリース" と .github/workflows/release.yml を参照。
+    SOFTWARE_RELEASE_GITHUB_REPO = "lighfu/VRCT-0"
 
     # VERSION に含まれていれば beta チャンネル扱いとする接尾辞。NSIS
     # インストーラの .onInit (template.nsi) が ${VERSION} に対して行って
@@ -707,10 +707,13 @@ class Config:
     GROQ_WHISPER_BASE_URL = "https://api.groq.com/openai/v1"
     OPENAI_WHISPER_BASE_URL = "https://api.openai.com/v1"
 
-    @property
-    def SETUP_DOWNLOAD_URL(self) -> str:
-        repo = self._HF_REPO_BETA if self.SELECTED_RELEASE_CHANNEL == "beta" else self._HF_REPO_STABLE
-        return f"https://huggingface.co/{repo}/resolve/main/VRCT_setup.exe"
+    def setupDownloadUrlForVersion(self, version: str) -> str:
+        # 更新対象として解決済みの release の version (tag "v{version}") に
+        # 対応する setup.exe の URL。ハッシュ検証と実際にダウンロードする
+        # ファイルを同じ release に揃えるため、呼び出し側は必ず
+        # Model._resolveReleaseForVersion() 等で解決した release の
+        # version を渡すこと。
+        return f"https://github.com/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases/download/v{version}/VRCT_setup.exe"
 
     def __new__(cls):
         if cls._instance is None:
@@ -1024,8 +1027,8 @@ class Config:
         self._PATH_CONFIG = os_path.join(self._PATH_LOCAL, "config.json")
         self._PATH_LOGS = os_path.join(self._PATH_LOCAL, "logs")
         os_makedirs(self._PATH_LOGS, exist_ok=True)
-        self._GITHUB_URL = "https://api.github.com/repos/misyaguziya/VRCT/releases/latest"
-        self._GITHUB_RELEASES_LIST_URL = "https://api.github.com/repos/misyaguziya/VRCT/releases"
+        self._GITHUB_URL = f"https://api.github.com/repos/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases/latest"
+        self._GITHUB_RELEASES_LIST_URL = f"https://api.github.com/repos/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases"
         # VRCT 3.4.2 fails to start (fixed in 3.4.3); exclude it from version
         # selection/update detection instead of letting users install it.
         self._MIN_SUPPORTED_VERSION = "3.4.3"
