@@ -246,9 +246,11 @@ Rust を導入して `npm run build` を実行した（CPU 版、develop `b87f7e
 | 展開後 | 約 1.5GB | 811.8MB |
 
   フォーク元の値はテンプレートのコメントに残っている概算で、同じ条件で測った値ではない。
-- 注意: インストーラーのダウンロード元は Hugging Face の `ms-software/VRCT`（ベータは `ms-software/VRCT-beta`）のまま。
-  今のインストーラーを実行すると VRCT-0 ではなくフォーク元のパッケージが入るので、インストールでの確認はしていない。
-  配布先の切り替えはインストーラーのサブプロジェクトで扱う。
+- 注意: インストーラーのダウンロード元は `feat/distribution-github-releases` ブランチ以降、
+  このフォークの GitHub Releases (`lighfu/VRCT-0`) に切り替わっている(旧: Hugging Face の
+  `ms-software/VRCT`/`ms-software/VRCT-beta`)。本ドキュメントの数値測定時点ではまだ
+  切り替え前で、インストーラーを実行すると VRCT-0 ではなくフォーク元のパッケージが
+  入る状態だったため、インストールでの確認はしていない。
 
 未実施の一覧のうち、次は 2026-09-24 に `npm run dev-ui` で画面を起動して確認した:
 

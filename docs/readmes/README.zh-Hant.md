@@ -9,8 +9,8 @@
 <br>
 <br>
 
-[![GitHub release](https://img.shields.io/github/v/release/misyaguziya/VRCT.svg)](https://github.com/misyaguziya/VRCT/releases)
-[![Downloads](https://img.shields.io/github/downloads/misyaguziya/VRCT/total)](https://github.com/misyaguziya/VRCT/releases)
+[![GitHub release](https://img.shields.io/github/v/release/lighfu/VRCT-0.svg)](https://github.com/lighfu/VRCT-0/releases)
+[![Downloads](https://img.shields.io/github/downloads/lighfu/VRCT-0/total)](https://github.com/lighfu/VRCT-0/releases)
 [![Licence](https://img.shields.io/github/license/misyaguziya/VRCT)](https://github.com/misyaguziya/VRCT/blob/master/LICENSE)
 [![Booth](https://img.shields.io/badge/Store-Booth.pm-red)](https://misyaguziya.booth.pm/items/5155325)
 [![Github Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-30363D?&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/misyaguziya)
@@ -58,7 +58,7 @@ VRCT 是一個支援 VRChat 對話翻譯和紀錄的軟體。
 
 # 下載 & 安裝
 你可以從這些地方下載 VRCT：
-- [Github.com](https://github.com/misyaguziya/VRCT/releases/)
+- [Github.com](https://github.com/lighfu/VRCT-0/releases/)
 - [BOOTH.pm](https://misyaguziya.booth.pm/items/5155325)
 
 你只需要下載並啟動 exe 文件。

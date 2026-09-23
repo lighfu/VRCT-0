@@ -141,14 +141,15 @@ jobs:
       - name: Enforce GitHub's 2 GiB per-asset limit
         shell: pwsh
         run: |
-          # GitHub Releases rejects any single asset over 2 GiB. Fail early
-          # with a clear message instead of letting the upload step 422.
+          # GitHub Releases requires every asset to be strictly under 2 GiB
+          # (an asset AT 2 GiB is already rejected). Fail early with a clear
+          # message instead of letting the upload step 422.
           $limitBytes = 2GB
           $failed = $false
           Get-ChildItem -Path "${{ steps.stage.outputs.dir }}" -File | ForEach-Object {
-            if ($_.Length -gt $limitBytes) {
+            if ($_.Length -ge $limitBytes) {
               $mb = [Math]::Round($_.Length / 1MB, 1)
-              Write-Host "::error::$($_.Name) is $mb MB, which exceeds GitHub's 2 GiB per-file release asset limit"
+              Write-Host "::error::$($_.Name) is $mb MB, which is at or over GitHub's 2 GiB per-file release asset limit"
               $failed = $true
             }
           }

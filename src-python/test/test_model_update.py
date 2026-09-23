@@ -27,6 +27,22 @@ def _make_text_response(text: str) -> Mock:
     return response
 
 
+def _make_release_json_response(name: str, assets: list) -> Mock:
+    # Every release used to drive updateSoftware()/updateCudaSoftware() in
+    # this file must list the setup.exe asset itself (Model._downloadVerifiedSetup
+    # aborts before downloading anything if it is missing) in addition to
+    # whatever ".sha256" sidecar assets the test cares about.
+    setup_asset = {
+        "name": "VRCT_setup.exe",
+        "browser_download_url": "https://example.invalid/VRCT_setup.exe",
+    }
+    return _make_json_response({
+        "name": name,
+        "tag_name": f"v{name}",
+        "assets": [setup_asset] + assets,
+    })
+
+
 class TestModelUpdate(unittest.TestCase):
     def setUp(self) -> None:
         # _downloadSetup() rejects downloads under 1MB as a likely non-installer
@@ -66,17 +82,27 @@ class TestModelUpdate(unittest.TestCase):
         requests_get: Mock,
         error_logging: Mock,
     ) -> None:
-        requests_get.side_effect = Exception("network error")
+        # Release resolution itself succeeds (so this exercises the download
+        # failure path specifically, not the "no release resolved" path).
+        def fake_get(url, *args, **kwargs):
+            if url == config.GITHUB_URL:
+                return _make_release_json_response("9.9.9", [])
+            raise Exception("network error")
+
+        requests_get.side_effect = fake_get
 
         with patch("model.Popen") as popen:
             Model.updateSoftware()
             Model.updateCudaSoftware()
 
         popen.assert_not_called()
-        # per call: 1 release-resolution attempt (fails, caught inside
-        # _resolveReleaseForVersion) + 5 _downloadSetup() retry attempts.
+        # per call: 1 release-resolution attempt (succeeds) + 5
+        # _downloadSetup() retry attempts (all fail).
         self.assertEqual(requests_get.call_count, 12)
-        self.assertEqual(error_logging.call_count, 12)
+        # only the 5 download-retry failures per call are logged as errors;
+        # release resolution succeeded and the missing ".sha256" asset is a
+        # printLog fallback notice, not an error.
+        self.assertEqual(error_logging.call_count, 10)
 
     @patch("model.os_exit")
     @patch("model.psutil_Process")
@@ -95,14 +121,23 @@ class TestModelUpdate(unittest.TestCase):
         # releases stay installable/downgradable.
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
-                return _make_json_response({"name": "9.9.9", "assets": []})
+                return _make_release_json_response("9.9.9", [])
             return _make_download_response(self.payload)
 
         requests_get.side_effect = fake_get
 
         Model.updateCudaSoftware()
 
-        popen.assert_called_once()
+        popen.assert_called_once_with(
+            [
+                "VRCT_setup.exe",
+                "/EDITION=gpu",
+                f"/UILANG={config.UI_LANGUAGE}",
+                f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}",
+                "/VERSION=9.9.9",
+            ],
+            cwd=config.PATH_LOCAL,
+        )
         os_exit.assert_called_once_with(0)
 
     @patch("model.os_exit")
@@ -121,13 +156,10 @@ class TestModelUpdate(unittest.TestCase):
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
-                return _make_json_response({
-                    "name": "9.9.9",
-                    "assets": [{
-                        "name": "VRCT_setup.exe.sha256",
-                        "browser_download_url": sha_asset_url,
-                    }],
-                })
+                return _make_release_json_response("9.9.9", [{
+                    "name": "VRCT_setup.exe.sha256",
+                    "browser_download_url": sha_asset_url,
+                }])
             if url == sha_asset_url:
                 return _make_text_response(wrong_hash)
             return _make_download_response(self.payload)
@@ -156,13 +188,10 @@ class TestModelUpdate(unittest.TestCase):
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
-                return _make_json_response({
-                    "name": "9.9.9",
-                    "assets": [{
-                        "name": "VRCT_setup.exe.sha256",
-                        "browser_download_url": sha_asset_url,
-                    }],
-                })
+                return _make_release_json_response("9.9.9", [{
+                    "name": "VRCT_setup.exe.sha256",
+                    "browser_download_url": sha_asset_url,
+                }])
             if url == sha_asset_url:
                 return _make_text_response(self.actual_sha256)
             return _make_download_response(self.payload)
@@ -194,13 +223,10 @@ class TestModelUpdate(unittest.TestCase):
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
-                return _make_json_response({
-                    "name": "9.9.9",
-                    "assets": [{
-                        "name": "VRCT_setup.exe.sha256",
-                        "browser_download_url": sha_asset_url,
-                    }],
-                })
+                return _make_release_json_response("9.9.9", [{
+                    "name": "VRCT_setup.exe.sha256",
+                    "browser_download_url": sha_asset_url,
+                }])
             if url == sha_asset_url:
                 raise Exception("sidecar fetch failed")
             return _make_download_response(self.payload)
@@ -237,13 +263,10 @@ class TestModelUpdate(unittest.TestCase):
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
-                return _make_json_response({
-                    "name": "9.9.9",
-                    "assets": [{
-                        "name": "VRCT_setup.exe.sha256",
-                        "browser_download_url": sha_asset_url,
-                    }],
-                })
+                return _make_release_json_response("9.9.9", [{
+                    "name": "VRCT_setup.exe.sha256",
+                    "browser_download_url": sha_asset_url,
+                }])
             if url == sha_asset_url:
                 sidecar_attempts["n"] += 1
                 if sidecar_attempts["n"] == 1:
@@ -263,32 +286,44 @@ class TestModelUpdate(unittest.TestCase):
     @patch("model.psutil_Process")
     @patch("model.Popen")
     @patch("model.requests_get")
-    def test_downloads_setup_from_resolved_release_version_not_target_arg(
+    def test_resolved_release_version_beats_ambient_config_version(
         self,
         requests_get: Mock,
         popen: Mock,
         psutil_process: Mock,
         os_exit: Mock,
     ) -> None:
-        # The resolved GitHub Release's own "name" (its actual version) must
-        # drive the setup.exe download URL, not merely the target_version
-        # argument the caller passed in -- they can legitimately differ (e.g.
-        # target_version left as None so the "latest" release is resolved).
-        expected_setup_url = config.setupDownloadUrlForVersion("9.9.9")
+        # The resolved GitHub Release's own "name"/"tag_name" (its actual
+        # version) must drive the setup.exe download URL and the /VERSION=
+        # the setup wizard is launched with, NOT config.VERSION (this
+        # installer's own current version) -- they can legitimately differ
+        # (e.g. target_version left as None so "latest" is resolved, and
+        # "latest" is newer than what is currently installed).
+        expected_setup_url = config.setupDownloadUrlForTag("v9.9.9")
         downloaded_urls = []
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
-                return _make_json_response({"name": "9.9.9", "assets": []})
+                return _make_release_json_response("9.9.9", [])
             downloaded_urls.append(url)
             return _make_download_response(self.payload)
 
         requests_get.side_effect = fake_get
 
-        Model.updateCudaSoftware()
+        with patch.object(type(config), "VERSION", "1.0.0"):
+            Model.updateCudaSoftware()
 
         self.assertIn(expected_setup_url, downloaded_urls)
-        popen.assert_called_once()
+        popen.assert_called_once_with(
+            [
+                "VRCT_setup.exe",
+                "/EDITION=gpu",
+                f"/UILANG={config.UI_LANGUAGE}",
+                f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}",
+                "/VERSION=9.9.9",
+            ],
+            cwd=config.PATH_LOCAL,
+        )
         os_exit.assert_called_once_with(0)
 
     @patch("model.os_exit")
@@ -311,14 +346,11 @@ class TestModelUpdate(unittest.TestCase):
 
         def fake_get(url, *args, **kwargs):
             if url == config.GITHUB_URL:
-                return _make_json_response({
-                    "name": "9.9.9",
-                    "assets": [
-                        {"name": "VRCT.zip.sha256", "browser_download_url": zip_sha_url},
-                        {"name": "VRCT_cuda.zip.sha256", "browser_download_url": cuda_zip_sha_url},
-                        {"name": "VRCT_setup.exe.sha256", "browser_download_url": setup_sha_url},
-                    ],
-                })
+                return _make_release_json_response("9.9.9", [
+                    {"name": "VRCT.zip.sha256", "browser_download_url": zip_sha_url},
+                    {"name": "VRCT_cuda.zip.sha256", "browser_download_url": cuda_zip_sha_url},
+                    {"name": "VRCT_setup.exe.sha256", "browser_download_url": setup_sha_url},
+                ])
             if url == zip_sha_url or url == cuda_zip_sha_url:
                 raise AssertionError(f"must not fetch the wrong .sha256 asset: {url}")
             if url == setup_sha_url:
@@ -343,11 +375,16 @@ class TestModelUpdate(unittest.TestCase):
         psutil_process: Mock,
         os_exit: Mock,
     ) -> None:
-        # A single generic mocked response for every call: its .json() is an
-        # unconfigured Mock (not a dict), so release resolution yields no
-        # usable release object and hash verification cleanly falls back to
-        # the size check, matching pre-item-13 behavior for this happy path.
-        requests_get.return_value = _make_download_response(self.payload)
+        # Release resolution must succeed here: since item 3 of fix round 1,
+        # an unresolved release with no explicit target_version aborts the
+        # update entirely instead of falling back to size-only validation
+        # against the currently installed version.
+        def fake_get(url, *args, **kwargs):
+            if url == config.GITHUB_URL:
+                return _make_release_json_response("9.9.9", [])
+            return _make_download_response(self.payload)
+
+        requests_get.side_effect = fake_get
 
         Model.updateCudaSoftware()
 
@@ -357,11 +394,114 @@ class TestModelUpdate(unittest.TestCase):
                 "/EDITION=gpu",
                 f"/UILANG={config.UI_LANGUAGE}",
                 f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}",
+                "/VERSION=9.9.9",
             ],
             cwd=config.PATH_LOCAL,
         )
         psutil_process.return_value.terminate.assert_called_once()
         os_exit.assert_called_once_with(0)
+
+    @patch("model.os_exit")
+    @patch("model.psutil_Process")
+    @patch("model.Popen")
+    @patch("model.requests_get")
+    def test_aborts_when_release_unresolved_and_no_target_version(
+        self,
+        requests_get: Mock,
+        popen: Mock,
+        psutil_process: Mock,
+        os_exit: Mock,
+    ) -> None:
+        # config.GITHUB_URL's .json() is an unconfigured Mock (not a dict),
+        # so _resolveReleaseForVersion() yields no usable release, and
+        # target_version is None (no explicit pin). With no release AND no
+        # target_version there is no way to know which version to fetch, so
+        # this must abort the update entirely rather than silently
+        # reinstalling whatever config.VERSION currently is.
+        requests_get.return_value = _make_download_response(self.payload)
+
+        Model.updateCudaSoftware()
+
+        popen.assert_not_called()
+        os_exit.assert_not_called()
+        # only the release-resolution GET is made; no setup.exe download is
+        # attempted once release resolution has failed.
+        self.assertEqual(requests_get.call_count, 1)
+
+    @patch("model.os_exit")
+    @patch("model.psutil_Process")
+    @patch("model.Popen")
+    @patch("model.requests_get")
+    def test_setup_url_built_from_release_tag_name(
+        self,
+        requests_get: Mock,
+        popen: Mock,
+        psutil_process: Mock,
+        os_exit: Mock,
+    ) -> None:
+        # The download URL must be built from the release's own tag_name,
+        # not by mechanically prefixing "v" onto its "name" -- these can
+        # diverge (e.g. a release tagged with build metadata the display
+        # name omits).
+        downloaded_urls = []
+
+        def fake_get(url, *args, **kwargs):
+            if url == config.GITHUB_URL:
+                return _make_json_response({
+                    "name": "9.9.9",
+                    "tag_name": "v9.9.9+build.7",
+                    "assets": [{
+                        "name": "VRCT_setup.exe",
+                        "browser_download_url": "https://example.invalid/VRCT_setup.exe",
+                    }],
+                })
+            downloaded_urls.append(url)
+            return _make_download_response(self.payload)
+
+        requests_get.side_effect = fake_get
+
+        Model.updateCudaSoftware()
+
+        self.assertIn(
+            config.setupDownloadUrlForTag("v9.9.9+build.7"),
+            downloaded_urls,
+        )
+        self.assertNotIn(
+            config.setupDownloadUrlForTag("v9.9.9"),
+            downloaded_urls,
+        )
+        popen.assert_called_once()
+        os_exit.assert_called_once_with(0)
+
+    @patch("model.errorLogging")
+    @patch("model.requests_get")
+    def test_aborts_when_setup_exe_asset_missing_from_release(
+        self,
+        requests_get: Mock,
+        error_logging: Mock,
+    ) -> None:
+        # The release exists and resolves fine, but its assets list does not
+        # include VRCT_setup.exe itself (e.g. still building / partially
+        # published). Must not attempt to download a URL that 404s.
+        def fake_get(url, *args, **kwargs):
+            if url == config.GITHUB_URL:
+                return _make_json_response({
+                    "name": "9.9.9",
+                    "tag_name": "v9.9.9",
+                    "assets": [{
+                        "name": "VRCT.zip",
+                        "browser_download_url": "https://example.invalid/VRCT.zip",
+                    }],
+                })
+            raise AssertionError(f"must not fetch anything once VRCT_setup.exe asset is missing: {url}")
+
+        requests_get.side_effect = fake_get
+
+        with patch("model.Popen") as popen:
+            Model.updateCudaSoftware()
+
+        popen.assert_not_called()
+        error_logging.assert_not_called()
 
 
 class TestCheckSoftwareUpdatedBetaChannel(unittest.TestCase):

@@ -9,8 +9,8 @@
 <br>
 <br>
 
-[![GitHub release](https://img.shields.io/github/v/release/misyaguziya/VRCT.svg)](https://github.com/misyaguziya/VRCT/releases)
-[![Downloads](https://img.shields.io/github/downloads/misyaguziya/VRCT/total)](https://github.com/misyaguziya/VRCT/releases)
+[![GitHub release](https://img.shields.io/github/v/release/lighfu/VRCT-0.svg)](https://github.com/lighfu/VRCT-0/releases)
+[![Downloads](https://img.shields.io/github/downloads/lighfu/VRCT-0/total)](https://github.com/lighfu/VRCT-0/releases)
 [![Licence](https://img.shields.io/github/license/misyaguziya/VRCT)](https://github.com/misyaguziya/VRCT/blob/master/LICENSE)
 [![Booth](https://img.shields.io/badge/Store-Booth.pm-red)](https://misyaguziya.booth.pm/items/5155325)
 [![Github Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-30363D?&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/misyaguziya)
@@ -58,7 +58,7 @@ VRCT는 음성인식 및 번역 기능을 통해 VRChat의 대화를 지원하�
 
 # 다운로드 및 설치
 원하는 곳에서 다운로드 할 수 있어요.
-- [Github.com](https://github.com/misyaguziya/VRCT/releases/)
+- [Github.com](https://github.com/lighfu/VRCT-0/releases/)
 - [BOOTH.pm](https://misyaguziya.booth.pm/items/5155325)
 
 다운로드 후 exe를 실행하기만 하면 됩니다.

@@ -28,6 +28,15 @@ class TestConfigGithubReleaseSource(unittest.TestCase):
             "https://github.com/lighfu/VRCT-0/releases/download/v3.5.1-beta.1/VRCT_setup.exe",
         )
 
+    def test_setup_download_url_for_tag_uses_the_tag_verbatim(self) -> None:
+        # Must use the given tag exactly as-is (not "v" + something derived
+        # from it), so a release whose tag_name diverges from "v<name>"
+        # still resolves to the correct asset.
+        self.assertEqual(
+            config.setupDownloadUrlForTag("v3.5.1-beta.1+build.7"),
+            "https://github.com/lighfu/VRCT-0/releases/download/v3.5.1-beta.1+build.7/VRCT_setup.exe",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

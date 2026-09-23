@@ -707,13 +707,21 @@ class Config:
     GROQ_WHISPER_BASE_URL = "https://api.groq.com/openai/v1"
     OPENAI_WHISPER_BASE_URL = "https://api.openai.com/v1"
 
+    def setupDownloadUrlForTag(self, tag: str) -> str:
+        # 更新対象として解決済みの release の tag_name (GitHub API の
+        # release["tag_name"]、例: "v3.5.1-beta.1") に対応する setup.exe の
+        # URL。"v" + version を機械的に合成するのではなく、release オブジェ
+        # クトが実際に持っている tag_name をそのまま渡すこと(将来 "v" 接頭
+        # 辞以外の tag 命名になっても壊れないようにするため)。ハッシュ検証
+        # と実際にダウンロードするファイルを同じ release に揃えるため、
+        # 呼び出し側は必ず Model._resolveReleaseForVersion() 等で解決した
+        # release の tag を渡すこと。
+        return f"https://github.com/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases/download/{tag}/VRCT_setup.exe"
+
     def setupDownloadUrlForVersion(self, version: str) -> str:
-        # 更新対象として解決済みの release の version (tag "v{version}") に
-        # 対応する setup.exe の URL。ハッシュ検証と実際にダウンロードする
-        # ファイルを同じ release に揃えるため、呼び出し側は必ず
-        # Model._resolveReleaseForVersion() 等で解決した release の
-        # version を渡すこと。
-        return f"https://github.com/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases/download/v{version}/VRCT_setup.exe"
+        # 後方互換のための薄いラッパー: tag_name が取得できない場合の
+        # フォールバック ("v" + version という従来通りの想定) 用。
+        return self.setupDownloadUrlForTag(f"v{version}")
 
     def __new__(cls):
         if cls._instance is None:

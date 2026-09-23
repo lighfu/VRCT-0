@@ -514,15 +514,21 @@ Release固定で、`/VERSION=` を指定しない場合はこのsetup.exe自身�
 `${VERSION}` をそのままターゲットとして使います(GitHubの「Latest
 release」はprereleaseを含まないため使わない)。
 
-チャンネル・バージョンの指定はGUI画面ではなく `/CHANNEL=` `/VERSION=` の
-CLI引数でのみ行えます(setup.exe自体はどのバージョン・チャンネルのものでも
-構いません)。setup.exeを単体でダブルクリックした場合はこれらの引数が付かない
-ため、CPU/GPU選択のみでこのsetup.exe自身のバージョンがインストールされます
-(GUI上に選択肢を増やさないための意図的な設計です)。VRCT本体のUpdaterタブ
-からの更新はこれらの引数を自動的に付与して起動します。
+どのバージョンをダウンロードするかはGUI画面ではなく `/VERSION=` のCLI引数
+のみで決まります(省略時はこのsetup.exe自身の `${VERSION}`。setup.exe自体は
+どのバージョンのものでも構いません)。setup.exeを単体でダブルクリックした
+場合はこの引数が付かないため、CPU/GPU選択のみでこのsetup.exe自身の
+バージョンがインストールされます(GUI上に選択肢を増やさないための意図的な
+設計です)。VRCT本体のUpdaterタブからの更新は、実際に解決・ダウンロード・
+ハッシュ検証した release のバージョンを常に `/VERSION=` として付与して
+起動します。
+
+`/CHANNEL=` も引数としては引き続き受け付けます(旧バージョンのUpdaterタブ
+との互換性のため)が、**どのパッケージをダウンロードするかには一切影響
+しません**。ダウンロード対象はあくまで `/VERSION=`(省略時はsetup.exe自身の
+バージョン)だけで決まります。
 
 ```bash
-VRCT_setup.exe /CHANNEL=beta
 VRCT_setup.exe /VERSION=3.4.2
 ```
 

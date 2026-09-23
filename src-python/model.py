@@ -1923,61 +1923,105 @@ class Model:
                     errorLogging()
         return False
 
+    # setup.exe 本体のアセット名。_fetchExpectedSha256 が探す
+    # _SHA256_ASSET_NAME (= このファイル名 + ".sha256") と対をなす。
+    _SETUP_ASSET_NAME = "VRCT_setup.exe"
+
     @staticmethod
-    def _downloadVerifiedSetup(target_version: Optional[str]) -> bool:
+    def _downloadVerifiedSetup(target_version: Optional[str]) -> Optional[str]:
         # GitHub Release を解決して期待する SHA-256 を求め、setup.exe を
         # ダウンロード & 検証する。updateSoftware()/updateCudaSoftware() の
         # 共通前処理。
         #
-        # 戻り値 True  : VRCT_setup.exe がディスク上にあり起動して問題ない
-        # 戻り値 False : 呼び出し側は何も起動せず中止すること。内訳は
-        #   - ダウンロード or ハッシュ検証に失敗した (_downloadSetup が False)
+        # 戻り値 str (バージョン文字列) : VRCT_setup.exe がディスク上にあり
+        #   起動して問題ない。実際にダウンロードした release のバージョン
+        #   (呼び出し側はこれをそのまま /VERSION= に渡し、起動する setup.exe
+        #   がハッシュ検証したのと同じバージョンを再度対象にできるようにする)。
+        # 戻り値 None : 呼び出し側は何も起動せず中止すること。内訳は
+        #   - 対象の GitHub Release を解決できず、かつ target_version も
+        #     指定されていない (どのバージョンを配布すべきか判断できない)。
+        #   - release の assets に setup.exe 本体が見つからない。
+        #   - ダウンロード or ハッシュ検証に失敗した (_downloadSetup が False)。
         #   - ".sha256" が公開されているのに取得できなかった
         #     (SetupSha256Unavailable)。サイズチェックのみへは格下げしない。
         release = Model._resolveReleaseForVersion(target_version)
+
         # ダウンロードするファイルとハッシュ検証の対象を同じ release に
         # 揃える: release から解決できた version (release["name"]) を
-        # 最優先し、release が解決できなかった場合のみ target_version /
-        # 自インストーラの現在バージョンにフォールバックする。
+        # 最優先する。release が解決できなかった場合は target_version (明示
+        # 的にピン留めされたバージョン) にのみフォールバックする -- release
+        # も target_version も無い場合、どのバージョンを配布すべきかを
+        # 判断する根拠が無いので、現在インストールされているバージョンを
+        # 黙って再インストールするのではなく更新を中止する。
         if isinstance(release, dict) and isinstance(release.get("name"), str):
             resolved_version = release["name"]
+            tag = release.get("tag_name")
+            if not isinstance(tag, str):
+                tag = f"v{resolved_version}"
         elif target_version is not None:
             resolved_version = target_version
+            tag = f"v{target_version}"
         else:
-            resolved_version = config.VERSION
-        setup_url = config.setupDownloadUrlForVersion(resolved_version)
+            printLog(
+                "Could not resolve a GitHub Release to update to (no release "
+                "found for the current channel, and no explicit /VERSION= was "
+                "given); aborting update"
+            )
+            return None
+
+        if isinstance(release, dict):
+            assets = release.get("assets")
+            asset_names = {
+                asset.get("name") for asset in assets
+                if isinstance(asset, dict)
+            } if isinstance(assets, list) else set()
+            if Model._SETUP_ASSET_NAME not in asset_names:
+                printLog(f"{Model._SETUP_ASSET_NAME} asset missing for {tag}; aborting update")
+                return None
+
+        setup_url = config.setupDownloadUrlForTag(tag)
         try:
             expected_sha256 = Model._fetchExpectedSha256(release)
         except SetupSha256Unavailable:
             printLog(
-                "Setup file SHA-256 sidecar was published for "
-                f"{target_version or 'the latest release'} but could not be "
-                "retrieved; aborting update (not falling back to size-only "
-                "validation)"
+                f"Setup file SHA-256 sidecar was published for {tag} but "
+                "could not be retrieved; aborting update (not falling back "
+                "to size-only validation)"
             )
-            return False
+            return None
         if expected_sha256 is None:
             printLog(
-                "Setup file SHA-256 could not be verified (no .sha256 asset found for "
-                f"{target_version or 'the latest release'}); falling back to size-only validation"
+                f"Setup file SHA-256 could not be verified (no .sha256 asset found for {tag}); "
+                "falling back to size-only validation"
             )
-        return Model._downloadSetup(setup_url, expected_sha256)
+        if not Model._downloadSetup(setup_url, expected_sha256):
+            return None
+        return resolved_version
 
     @staticmethod
     def updateSoftware(target_version: Optional[str] = None):
         if target_version is not None and not Model._isVersionSupported(target_version):
             return
-        if not Model._downloadVerifiedSetup(target_version):
+        resolved_version = Model._downloadVerifiedSetup(target_version)
+        if resolved_version is None:
             return
-        # run the NSIS setup wizard, preselecting the CPU edition; pin to
-        # target_version when the user picked a specific release to install;
-        # carry over the current UI language so the installer chrome and the
-        # custom "UI Language" page start on the user's chosen language;
-        # carry over the current release channel so the installer's channel
-        # page defaults to what the user already has selected in VRCT.
-        args = ["VRCT_setup.exe", "/EDITION=cpu", f"/UILANG={config.UI_LANGUAGE}", f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}"]
-        if target_version:
-            args.append(f"/VERSION={target_version}")
+        # run the NSIS setup wizard, preselecting the CPU edition; always pin
+        # to the exact version we just resolved/downloaded/hash-verified
+        # (not merely target_version, which may be None for "latest") so the
+        # setup wizard targets the very release this download already
+        # verified, instead of possibly re-resolving "latest" a second time
+        # and landing on a different release; carry over the current UI
+        # language so the installer chrome and the custom "UI Language" page
+        # start on the user's chosen language; carry over the current
+        # release channel so the installer's channel page defaults to what
+        # the user already has selected in VRCT.
+        args = [
+            "VRCT_setup.exe",
+            "/EDITION=cpu",
+            f"/UILANG={config.UI_LANGUAGE}",
+            f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}",
+            f"/VERSION={resolved_version}",
+        ]
         Popen(args, cwd=config.PATH_LOCAL)
         Model._quitApp()
 
@@ -1985,17 +2029,26 @@ class Model:
     def updateCudaSoftware(target_version: Optional[str] = None):
         if target_version is not None and not Model._isVersionSupported(target_version):
             return
-        if not Model._downloadVerifiedSetup(target_version):
+        resolved_version = Model._downloadVerifiedSetup(target_version)
+        if resolved_version is None:
             return
-        # run the NSIS setup wizard, preselecting the GPU edition; pin to
-        # target_version when the user picked a specific release to install;
-        # carry over the current UI language so the installer chrome and the
-        # custom "UI Language" page start on the user's chosen language;
-        # carry over the current release channel so the installer's channel
-        # page defaults to what the user already has selected in VRCT.
-        args = ["VRCT_setup.exe", "/EDITION=gpu", f"/UILANG={config.UI_LANGUAGE}", f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}"]
-        if target_version:
-            args.append(f"/VERSION={target_version}")
+        # run the NSIS setup wizard, preselecting the GPU edition; always pin
+        # to the exact version we just resolved/downloaded/hash-verified
+        # (not merely target_version, which may be None for "latest") so the
+        # setup wizard targets the very release this download already
+        # verified, instead of possibly re-resolving "latest" a second time
+        # and landing on a different release; carry over the current UI
+        # language so the installer chrome and the custom "UI Language" page
+        # start on the user's chosen language; carry over the current
+        # release channel so the installer's channel page defaults to what
+        # the user already has selected in VRCT.
+        args = [
+            "VRCT_setup.exe",
+            "/EDITION=gpu",
+            f"/UILANG={config.UI_LANGUAGE}",
+            f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}",
+            f"/VERSION={resolved_version}",
+        ]
         Popen(args, cwd=config.PATH_LOCAL)
         Model._quitApp()
 

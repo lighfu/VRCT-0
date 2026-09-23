@@ -234,12 +234,14 @@ Function PageLeaveChooseEdition
     ${EndIf}
 FunctionEnd
 
-; Release channel (stable/beta) and specific-version pinning are controlled
-; only via the /CHANNEL= and /VERSION= CLI flags (set by VRCT's own Updater
-; tab -- see .onInit below and Section Install). Deliberately no GUI page
-; for these: a user who double-clicks setup.exe standalone just gets the
-; latest release of the channel this installer itself was published for,
-; with no extra decisions to make.
+; Specific-version pinning is controlled only via the /VERSION= CLI flag
+; (set by VRCT's own Updater tab -- see .onInit below and Section Install).
+; Deliberately no GUI page for this: a user who double-clicks setup.exe
+; standalone just gets this installer's own baked-in ${VERSION}, with no
+; extra decisions to make. /CHANNEL= is also accepted (see .onInit) for
+; backward compatibility with older Updater tabs that still send it, but it
+; no longer affects which package is downloaded -- that is decided solely
+; by ${VERSION} / /VERSION=.
 
 !insertmacro MUI_PAGE_COMPONENTS
 
@@ -514,16 +516,18 @@ Function .onInit
     StrCpy $SelectedEdition $0
 
   ; Pin the downloaded app package to a specific released version instead of
-  ; always fetching the latest from the HF "main" revision (e.g.
-  ; "/VERSION=3.4.2" for rollback). Falls back to latest when omitted.
+  ; this installer's own baked-in ${VERSION} (e.g. "/VERSION=3.4.2" for
+  ; rollback). Falls back to ${VERSION} when omitted (see Section Install).
   ${GetOptions} $CMDLINE "/VERSION=" $0
   IfErrors +2 0
     StrCpy $TargetVersion $0
 
-  ; Default the release channel page to whatever channel this very
-  ; installer was itself built/published for (a setup.exe downloaded from
-  ; the beta GitHub release has "-beta"/"-rc" baked into ${VERSION}), so a
-  ; standalone run without any flags still lands on a sensible default.
+  ; $SelectedChannel no longer influences which package is downloaded (that
+  ; is decided solely by ${VERSION} / /VERSION= -- see Section Install); it
+  ; is derived here purely for display/compatibility. Default it to
+  ; whatever channel this very installer was itself built/published for (a
+  ; setup.exe downloaded from a beta GitHub release has "-beta"/"-rc" baked
+  ; into ${VERSION}).
   ${StrLoc} $0 "${VERSION}" "-beta" ">"
   ${If} $0 == ""
     ${StrLoc} $0 "${VERSION}" "-rc" ">"
@@ -534,9 +538,10 @@ Function .onInit
     StrCpy $SelectedChannel "beta"
   ${EndIf}
 
-  ; Launched from within the app (e.g. the user is on the beta channel and
-  ; clicks "reinstall"/"switch edition"): use VRCT's current channel setting
-  ; instead of the baked-in default above.
+  ; /CHANNEL= is still accepted for backward compatibility with older
+  ; Updater tabs that pass it, and used to preselect $SelectedChannel here,
+  ; but it is otherwise unused: it does NOT select which package is
+  ; downloaded (again, ${VERSION} / /VERSION= alone decide that).
   ${GetOptions} $CMDLINE "/CHANNEL=" $0
   IfErrors +2 0
     StrCpy $SelectedChannel $0
@@ -816,10 +821,12 @@ Section Install
   ${EndIf}
 
   ; Pin to a specific released version's tag (e.g. "/VERSION=3.4.2" -> tag
-  ; "v3.4.2", or typed into the release-channel page) when requested for
-  ; rollback; otherwise target this installer's own version. GitHub Releases'
-  ; "latest" excludes prereleases, and the updater always passes /VERSION
-  ; anyway, so there is no "fetch whatever is newest" case left to support.
+  ; "v3.4.2") when requested for rollback; otherwise target this installer's
+  ; own ${VERSION}. VRCT's in-app Updater always passes /VERSION= set to
+  ; the exact version it resolved and downloaded (see model.py
+  ; _downloadVerifiedSetup / updateSoftware / updateCudaSoftware), so this
+  ; "no /VERSION=" branch is only ever hit for a standalone double-clicked
+  ; setup.exe.
   ${If} $TargetVersion != ""
     StrCpy $effective_version $TargetVersion
   ${Else}
