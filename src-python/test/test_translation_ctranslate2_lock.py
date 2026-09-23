@@ -11,6 +11,10 @@
 
   修正: Translator に _ctranslate2_lock (RLock) を追加し、
   translateCTranslate2()/changeCTranslate2Model() の全体を保護した。
+
+  2026-09-23: transformers を外して言語を encode() の引数で渡す形になり、
+  src_lang の共有状態は無くなった。ロックは translator/tokenizer の
+  差し替えとの排他のために残っている。
 """
 
 import threading
@@ -23,38 +27,24 @@ from models.translation.translation_translator import Translator
 class _FakeTokenizer:
     """CTranslate2 tokenizer の代わり。
 
-    src_lang の setter に意図的な遅延を入れることで、「代入」と直後の
-    「encode() での読み取り」の間に他スレッドが割り込める窓を広げる
+    encode() に遅延を入れて他スレッドが割り込める窓を広げる
     (実機の tokenizer 呼び出しにも一定の処理時間がかかることを模す)。
+    言語は引数で渡すので共有状態は無いが、ロックの回帰検知として残す。
     """
 
-    lang_code_to_token: dict = {}
+    def __init__(self, delay_sec: float = 0.05) -> None:
+        self._delay_sec = delay_sec
+        self.calls: list[tuple] = []  # (encode に渡された source_lang, message)
 
-    def __init__(self, set_delay_sec: float = 0.05) -> None:
-        self._src_lang = None
-        self._set_delay_sec = set_delay_sec
-        self.calls: list[tuple] = []  # (encode 時点で見えていた src_lang, message)
+    def encode(self, message, source_lang):
+        time.sleep(self._delay_sec)
+        self.calls.append((source_lang, message))
+        return ["<tok>"]
 
-    @property
-    def src_lang(self):
-        return self._src_lang
+    def targetPrefix(self, target_lang):
+        return [target_lang]
 
-    @src_lang.setter
-    def src_lang(self, value):
-        time.sleep(self._set_delay_sec)
-        self._src_lang = value
-
-    def encode(self, message):
-        self.calls.append((self._src_lang, message))
-        return [1, 2, 3]
-
-    def convert_ids_to_tokens(self, ids):
-        return ["<tok>"] * len(ids)
-
-    def convert_tokens_to_ids(self, tokens):
-        return [1] * len(tokens)
-
-    def decode(self, ids):
+    def decode(self, tokens):
         return "decoded"
 
 
@@ -114,22 +104,16 @@ class TranslateCTranslate2LockTests(unittest.TestCase):
         order = []
         release_change = threading.Event()
 
-        original_from_pretrained = None
         import models.translation.translation_translator as tt_module
 
         class _SlowTokenizer(_FakeTokenizer):
             pass
 
-        class _FakeAutoTokenizer:
-            @staticmethod
-            def from_pretrained(*args, **kwargs):
-                order.append("change:tokenizer_loading")
-                release_change.wait(timeout=5)
-                order.append("change:tokenizer_loaded")
-                return _SlowTokenizer()
-
-        class _FakeTransformers:
-            AutoTokenizer = _FakeAutoTokenizer
+        def _fakeLoadCT2Tokenizer(*args, **kwargs):
+            order.append("change:tokenizer_loading")
+            release_change.wait(timeout=5)
+            order.append("change:tokenizer_loaded")
+            return _SlowTokenizer()
 
         class _FakeCTranslate2Module:
             @staticmethod
@@ -137,10 +121,10 @@ class TranslateCTranslate2LockTests(unittest.TestCase):
                 return _FakeCTranslate2Translator()
 
         original_ctranslate2 = tt_module.ctranslate2
-        original_transformers = tt_module.transformers
+        original_loader = tt_module.loadCT2Tokenizer
         original_weights = tt_module.ctranslate2_weights.get("nllb-200-distilled-600M-ct2-int8")
         tt_module.ctranslate2 = _FakeCTranslate2Module()
-        tt_module.transformers = _FakeTransformers()
+        tt_module.loadCT2Tokenizer = _fakeLoadCT2Tokenizer
         tt_module.ctranslate2_weights["nllb-200-distilled-600M-ct2-int8"] = {
             "directory_name": "nllb-200-distilled-600M-ct2-int8",
             "tokenizer": "dummy",
@@ -174,7 +158,7 @@ class TranslateCTranslate2LockTests(unittest.TestCase):
 
         def _restore():
             tt_module.ctranslate2 = original_ctranslate2
-            tt_module.transformers = original_transformers
+            tt_module.loadCT2Tokenizer = original_loader
             if original_weights is not None:
                 tt_module.ctranslate2_weights["nllb-200-distilled-600M-ct2-int8"] = original_weights
 

@@ -1,0 +1,248 @@
+{
+  "label": "after-transformers-cpu",
+  "measured_at": "2026-09-23T23:21:36",
+  "size": {
+    "total_bytes": 1170338306,
+    "top_entries": [
+      {
+        "name": "_internal",
+        "bytes": 1147029751
+      },
+      {
+        "name": "VRCT-sidecar-x86_64-pc-windows-msvc.exe",
+        "bytes": 23281648
+      },
+      {
+        "name": "process.log",
+        "bytes": 26840
+      },
+      {
+        "name": "telemetry_state.json",
+        "bytes": 67
+      },
+      {
+        "name": "crash_trace.log",
+        "bytes": 0
+      },
+      {
+        "name": "freeze_trace.log",
+        "bytes": 0
+      }
+    ],
+    "internal_top_entries": [
+      {
+        "name": "sudachidict_full",
+        "bytes": 359742835
+      },
+      {
+        "name": "sudachidict_core",
+        "bytes": 217171677
+      },
+      {
+        "name": "cv2",
+        "bytes": 129311006
+      },
+      {
+        "name": "rapidocr",
+        "bytes": 83404817
+      },
+      {
+        "name": "av.libs",
+        "bytes": 65593344
+      },
+      {
+        "name": "ctranslate2",
+        "bytes": 64121440
+      },
+      {
+        "name": "numpy.libs",
+        "bytes": 38168576
+      },
+      {
+        "name": "onnxruntime",
+        "bytes": 37547432
+      },
+      {
+        "name": "fonts",
+        "bytes": 29596528
+      },
+      {
+        "name": "ocr_onnx",
+        "bytes": 12798073
+      },
+      {
+        "name": "cryptography",
+        "bytes": 9943040
+      },
+      {
+        "name": "hf_xet",
+        "bytes": 7283122
+      },
+      {
+        "name": "lxml",
+        "bytes": 6901432
+      },
+      {
+        "name": "tokenizers",
+        "bytes": 6065152
+      },
+      {
+        "name": "qh3",
+        "bytes": 5878784
+      },
+      {
+        "name": "python311.dll",
+        "bytes": 5800216
+      },
+      {
+        "name": "speech_recognition",
+        "bytes": 5485782
+      },
+      {
+        "name": "numpy",
+        "bytes": 5286400
+      },
+      {
+        "name": "libcrypto-3.dll",
+        "bytes": 5191960
+      },
+      {
+        "name": "pydantic_core",
+        "bytes": 5148672
+      }
+    ]
+  },
+  "installer_bytes": null,
+  "startup_seconds": 5.31640900000275,
+  "startup_seconds_runs": [
+    5.0723902999998245,
+    5.4478641000023345,
+    5.444403199999215,
+    5.2167383000014524,
+    5.31640900000275
+  ],
+  "idle_rss_bytes": 222535680,
+  "import_time_top": [
+    {
+      "module": "mainloop",
+      "cumulative_us": 3084152
+    },
+    {
+      "module": "controller",
+      "cumulative_us": 3059056
+    },
+    {
+      "module": "model",
+      "cumulative_us": 2111910
+    },
+    {
+      "module": "models.translation.translation_translator",
+      "cumulative_us": 1563867
+    },
+    {
+      "module": "models.translation.translation_providers",
+      "cumulative_us": 959297
+    },
+    {
+      "module": "device_manager",
+      "cumulative_us": 646550
+    },
+    {
+      "module": "models.translation.translation_gemini",
+      "cumulative_us": 637484
+    },
+    {
+      "module": "google.genai",
+      "cumulative_us": 635768
+    },
+    {
+      "module": "translators",
+      "cumulative_us": 597297
+    },
+    {
+      "module": "translators.server",
+      "cumulative_us": 489584
+    },
+    {
+      "module": "models.ocr",
+      "cumulative_us": 440469
+    },
+    {
+      "module": "models.ocr.ocr_pipeline",
+      "cumulative_us": 440086
+    },
+    {
+      "module": "google.genai.types",
+      "cumulative_us": 419069
+    },
+    {
+      "module": "utils",
+      "cumulative_us": 390392
+    },
+    {
+      "module": "models.translation.translation_groq",
+      "cumulative_us": 318459
+    },
+    {
+      "module": "openai",
+      "cumulative_us": 317625
+    },
+    {
+      "module": "config",
+      "cumulative_us": 278056
+    },
+    {
+      "module": "models.ocr.ocr_engine_rapidocr",
+      "cumulative_us": 263671
+    },
+    {
+      "module": "openai.types",
+      "cumulative_us": 243382
+    },
+    {
+      "module": "google.genai.client",
+      "cumulative_us": 215779
+    },
+    {
+      "module": "ctranslate2",
+      "cumulative_us": 203738
+    },
+    {
+      "module": "google.genai._api_client",
+      "cumulative_us": 194877
+    },
+    {
+      "module": "requests",
+      "cumulative_us": 180707
+    },
+    {
+      "module": "openai.types.eval_create_params",
+      "cumulative_us": 172156
+    },
+    {
+      "module": "openai.types.graders.python_grader_param",
+      "cumulative_us": 165372
+    },
+    {
+      "module": "openai.types.graders",
+      "cumulative_us": 165351
+    },
+    {
+      "module": "openai.types.graders.multi_grader",
+      "cumulative_us": 162150
+    },
+    {
+      "module": "openai.types.graders.label_model_grader",
+      "cumulative_us": 157836
+    },
+    {
+      "module": "openai.types.responses.response_input_text",
+      "cumulative_us": 155961
+    },
+    {
+      "module": "openai.types.responses",
+      "cumulative_us": 155936
+    }
+  ],
+  "model_loaded_rss_bytes": null
+}

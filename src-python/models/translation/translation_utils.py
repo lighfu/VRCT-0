@@ -38,9 +38,9 @@ except Exception:
     list_repo_files = None  # type: ignore
 
 try:
-    import transformers  # noqa: F401
+    from .translation_ct2_tokenizer import loadCT2Tokenizer
 except Exception:
-    transformers = None  # type: ignore
+    from translation_ct2_tokenizer import loadCT2Tokenizer
 
 
 """Utilities for downloading and verifying CTranslate2 weights and tokenizers.
@@ -192,18 +192,16 @@ def downloadCTranslate2Weight(root: str, weight_type: str = "m2m100_418M-ct2-int
     return all_succeeded
 
 def downloadCTranslate2Tokenizer(path: str, weight_type: str = "m2m100_418M-ct2-int8"):
-    if transformers is None:
-        return
     directory_name = ctranslate2_weights[weight_type]["directory_name"]
     tokenizer = ctranslate2_weights[weight_type]["tokenizer"]
     tokenizer_path = os_path.join(path, "weights", "ctranslate2", directory_name, "tokenizer")
     try:
         os_makedirs(tokenizer_path, exist_ok=True)
-        transformers.AutoTokenizer.from_pretrained(tokenizer, cache_dir=tokenizer_path)
+        loadCT2Tokenizer(tokenizer_path, tokenizer, weight_type)
     except Exception:
         errorLogging()
         tokenizer_path = os_path.join("./weights", "ctranslate2", directory_name, "tokenizer")
-        transformers.AutoTokenizer.from_pretrained(tokenizer, cache_dir=tokenizer_path)
+        loadCT2Tokenizer(tokenizer_path, tokenizer, weight_type)
 
 def loadTranslatePromptConfig(root_path: str | None = None, prompt_filename: str | None = None) -> dict:
     # PyInstaller 展開後

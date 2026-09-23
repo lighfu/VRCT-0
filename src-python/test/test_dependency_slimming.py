@@ -66,5 +66,13 @@ class LangchainRemovedTests(unittest.TestCase):
         self.assertIn("openai", _requirementNames())
 
 
+class TransformersRemovedTests(unittest.TestCase):
+    def test_transformers_is_not_required_at_runtime(self) -> None:
+        self.assertNotIn("transformers", _requirementNames())
+
+    def test_transformers_is_not_imported_by_the_app(self) -> None:
+        self.assertNotIn("transformers", _importedTopLevelModules())
+
+
 if __name__ == "__main__":
     unittest.main()

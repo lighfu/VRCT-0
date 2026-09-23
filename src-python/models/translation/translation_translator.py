@@ -52,9 +52,9 @@ except Exception:
     ctranslate2 = None  # type: ignore
 
 try:
-    import transformers  # noqa: F401
+    from .translation_ct2_tokenizer import loadCT2Tokenizer
 except Exception:
-    transformers = None  # type: ignore
+    from translation_ct2_tokenizer import loadCT2Tokenizer
 
 # 各プロバイダの LLM クライアント SDK は起動時にまとめて import する。
 # try/except は Python パッケージ vs スクリプト実行の両方で動かすため
@@ -447,7 +447,7 @@ class Translator:
         This sets internal translator/tokenizer objects and flips
         ``is_loaded_ctranslate2_model`` on success.
         """
-        if ctranslate2 is None or transformers is None:
+        if ctranslate2 is None:
             return
 
         with self._ctranslate2_lock:
@@ -468,11 +468,15 @@ class Translator:
                 intra_threads=4,
             )
             try:
-                self.ctranslate2_tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer, cache_dir=tokenizer_path)
+                self.ctranslate2_tokenizer = loadCT2Tokenizer(tokenizer_path, tokenizer, model_type)
             except Exception:
                 errorLogging()
                 tokenizer_path = os_path.join("./weights", "ctranslate2", directory_name, "tokenizer")
-                self.ctranslate2_tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer, cache_dir=tokenizer_path)
+                try:
+                    self.ctranslate2_tokenizer = loadCT2Tokenizer(tokenizer_path, tokenizer, model_type)
+                except Exception:
+                    errorLogging()
+                    return
             self.is_loaded_ctranslate2_model = True
 
     def isLoadedCTranslate2Model(self) -> bool:
@@ -493,18 +497,16 @@ class Translator:
         with self._ctranslate2_lock:
             if self.is_loaded_ctranslate2_model is True:
                 try:
-                    self.ctranslate2_tokenizer.src_lang = source_language
-                    source = self.ctranslate2_tokenizer.convert_ids_to_tokens(self.ctranslate2_tokenizer.encode(message))
                     match weight_type:
-                        case "m2m100_418M-ct2-int8" | "m2m100_1.2B-ct2-int8":
-                            target_prefix = [self.ctranslate2_tokenizer.lang_code_to_token[target_language]]
-                        case "nllb-200-distilled-600M-ct2-int8" | "nllb-200-distilled-1.3B-ct2-int8" | "nllb-200-3.3B-ct2-int8":
-                            target_prefix = [target_language]
+                        case "m2m100_418M-ct2-int8" | "m2m100_1.2B-ct2-int8" | "nllb-200-distilled-600M-ct2-int8" | "nllb-200-distilled-1.3B-ct2-int8" | "nllb-200-3.3B-ct2-int8":
+                            pass
                         case _:
                             return False
+                    source = self.ctranslate2_tokenizer.encode(message, source_language)
+                    target_prefix = self.ctranslate2_tokenizer.targetPrefix(target_language)
                     results = self.ctranslate2_translator.translate_batch([source], target_prefix=[target_prefix])
                     target = results[0].hypotheses[0][1:]
-                    result = self.ctranslate2_tokenizer.decode(self.ctranslate2_tokenizer.convert_tokens_to_ids(target))
+                    result = self.ctranslate2_tokenizer.decode(target)
                 except Exception:
                     errorLogging()
         return result

@@ -5,7 +5,6 @@
 # nvidia-*-cu12 wheels listed in requirements_cuda.txt instead.
 faster-whisper==1.1.1
 ctranslate2==4.6.0
-transformers==4.40.2
 pillow == 10.0.0
 PyAudioWPatch == 0.2.12.6
 python-osc == 1.9.0

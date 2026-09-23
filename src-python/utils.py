@@ -58,19 +58,6 @@ def _registerBundledCudaLibraries() -> None:
 
 _registerBundledCudaLibraries()
 
-# ctranslate2 は import 時に ctranslate2.converters.transformers 経由で
-# transformers を読み込む。transformers は torch が無いと
-# "Models won't be available" という advice 警告を stderr へ出すが、
-# VRCT が transformers に使っているのは AutoTokenizer だけなので
-# 実害はなく紛らわしいだけ (torch 撤去後に発生, 2026-09-18)。
-# advice 警告だけを黙らせる。通常の警告・エラーはそのまま出る。
-# フロントの StartPythonController は sidecar の stderr 出力を致命的エラー
-# 通知に昇格させるため、放置すると良性の警告が「An error occurred」
-# ダイアログに化ける (mainloop.py の grpcio FutureWarning と同じ理由)。
-# ここに置いているのは、ctranslate2 を最初に import するのがこのファイルで、
-# 警告は import 時に出てしまうため。
-os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
-
 # Optional runtime dependencies. `None` fallback lets non-GPU / no-ctranslate2
 # environments keep the app running with reduced feature set.
 try:
