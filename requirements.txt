@@ -37,9 +37,13 @@ langchain-ollama==0.3.10
 SudachiPy==0.6.10
 SudachiDict-core==20250825
 SudachiDict-full==20250825
+# used by translators (not imported directly)
 niquests==3.21.0
+# used by translators (not imported directly)
 exejs==1.0.1
+# used by translators (not imported directly)
 cloudscraper==1.2.71
+# used by translators (not imported directly)
 aiohttp==3.14.3
 # requests is imported directly; urllib3/certifi are its transitive deps that
 # are also used at runtime. pyperclip is imported directly too. None of these
