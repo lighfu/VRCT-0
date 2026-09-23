@@ -228,6 +228,15 @@ config_page:
         select_ollama_model:
             label: "Select Ollama Model"
             connection_required: "Ollama Connection Required"
+        ai_cli_tool:
+            label: "AI CLI"
+            desc: "Translate with an AI CLI installed on this PC (codex / claude / agy). You need to be logged in to the CLI."
+            not_installed: "No supported CLI found"
+        ai_cli_connection_check:
+            label: "Check AI CLI Connection"
+        select_ai_cli_model:
+            label: "Select AI CLI Model"
+            connection_required: "AI CLI Connection Check Required"
 
     transcription:
         section_label_mic: "Mic"

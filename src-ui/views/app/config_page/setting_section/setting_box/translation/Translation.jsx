@@ -57,6 +57,10 @@ export const Translation = () => {
             <OllamaConnectionCheck_Box />
             <OllamaModelContainer />
 
+            <AiCliTool_Box />
+            <AiCliConnectionCheck_Box />
+            <AiCliModelContainer />
+
             <OpenAICompatibleURL_Box />
             <OpenAICompatibleAuthKey_Box />
             <OpenAICompatibleModelContainer />
@@ -587,6 +591,72 @@ const OllamaModelContainer = () => {
             selectFunction={selectFunction}
             state={currentSelectedOllamaModel.state}
             is_disabled={!currentIsOllamaConnected.data}
+        />
+    );
+};
+
+const AiCliTool_Box = () => {
+    const { t } = useI18n();
+    const {
+        currentSelectableAiCliToolList,
+        currentSelectedAiCliTool,
+        setSelectedAiCliTool,
+    } = useTranslation();
+
+    const is_empty = Object.keys(currentSelectableAiCliToolList.data ?? {}).length === 0;
+    const selected_label = is_empty
+        ? t("config_page.translation.ai_cli_tool.not_installed")
+        : currentSelectedAiCliTool.data;
+
+    return (
+        <DropdownMenuContainer
+            dropdown_id="select_ai_cli_tool"
+            label={t("config_page.translation.ai_cli_tool.label")}
+            desc={t("config_page.translation.ai_cli_tool.desc")}
+            selected_id={selected_label}
+            list={currentSelectableAiCliToolList.data}
+            selectFunction={(selected_data) => setSelectedAiCliTool(selected_data.selected_id)}
+            state={currentSelectedAiCliTool.state}
+            is_disabled={is_empty}
+        />
+    );
+};
+const AiCliConnectionCheck_Box = () => {
+    const { t } = useI18n();
+    const { currentIsAiCliConnected, checkConnection_AiCli } = useLLMConnection();
+
+    return (
+        <ConnectionCheckButtonContainer
+            label={t("config_page.translation.ai_cli_connection_check.label")}
+            variable={currentIsAiCliConnected.data}
+            state={currentIsAiCliConnected.state}
+            checkFunction={checkConnection_AiCli}
+            remove_border_bottom={true}
+        />
+    );
+};
+const AiCliModelContainer = () => {
+    const { t } = useI18n();
+    const {
+        currentSelectableAiCliModelList,
+        currentSelectedAiCliModel,
+        setSelectedAiCliModel,
+    } = useTranslation();
+    const { currentIsAiCliConnected } = useLLMConnection();
+
+    const selected_label = (!currentIsAiCliConnected.data && !currentSelectedAiCliModel.data)
+        ? t("config_page.translation.select_ai_cli_model.connection_required")
+        : currentSelectedAiCliModel.data;
+
+    return (
+        <DropdownMenuContainer
+            dropdown_id="select_ai_cli_model"
+            label={t("config_page.translation.select_ai_cli_model.label")}
+            selected_id={selected_label}
+            list={currentSelectableAiCliModelList.data}
+            selectFunction={(selected_data) => setSelectedAiCliModel(selected_data.selected_id)}
+            state={currentSelectedAiCliModel.state}
+            is_disabled={!currentIsAiCliConnected.data}
         />
     );
 };

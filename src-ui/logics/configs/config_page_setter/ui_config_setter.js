@@ -464,6 +464,43 @@ export const SETTINGS_ARRAY = [
         add_endpoint_run_array: ["from_backend"],
         base_endpoint_name: "selected_ollama_model",
     },
+    // AI CLI
+    {
+        Category: "Translation",
+        Base_Name: "SelectableAiCliToolList",
+        default_value: [],
+        ui_template_id: "list",
+        logics_template_id: "get_set",
+        base_endpoint_name: "selectable_ai_cli_tool_list",
+        response_transform: "arrayToObject",
+    },
+    {
+        Category: "Translation",
+        Base_Name: "SelectedAiCliTool",
+        default_value: "",
+        ui_template_id: "select",
+        logics_template_id: "get_set",
+        base_endpoint_name: "selected_ai_cli_tool",
+    },
+    {
+        Category: "Translation",
+        Base_Name: "SelectableAiCliModelList",
+        default_value: [],
+        ui_template_id: "list",
+        logics_template_id: "get_set",
+        add_endpoint_run_array: ["from_backend"],
+        base_endpoint_name: "selectable_ai_cli_model_list",
+        response_transform: "arrayToObject",
+    },
+    {
+        Category: "Translation",
+        Base_Name: "SelectedAiCliModel",
+        default_value: "",
+        ui_template_id: "select",
+        logics_template_id: "get_set",
+        add_endpoint_run_array: ["from_backend"],
+        base_endpoint_name: "selected_ai_cli_model",
+    },
 
     // Transcription
     // Mic

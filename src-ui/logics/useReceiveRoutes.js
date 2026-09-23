@@ -29,6 +29,9 @@ export const STATIC_ROUTE_META_LIST = [
     { endpoint: "/get/data/connected_ollama", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_Ollama" },
     { endpoint: "/run/ollama_connection", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_Ollama" },
 
+    { endpoint: "/get/data/connected_ai_cli", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_AiCli" },
+    { endpoint: "/run/ai_cli_connection", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_AiCli" },
+
     // Software Version
     { endpoint: "/get/data/version", ns: common, hook_name: "useSoftwareVersion", method_name: "updateSoftwareVersion" },
     { endpoint: "/get/data/available_releases", ns: common, hook_name: "useAvailableReleases", method_name: "updateAvailableReleasesFromBackend" },

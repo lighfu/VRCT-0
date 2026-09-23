@@ -228,6 +228,15 @@ config_page:
         select_ollama_model:
             label: "Ollama モデルを選択"
             connection_required: "Ollama との接続が必要"
+        ai_cli_tool:
+            label: "AI CLI"
+            desc: "この PC に入っている AI の CLI（codex / claude / agy）で翻訳します。CLI にログインしておく必要があります。"
+            not_installed: "対応する CLI が見つかりません"
+        ai_cli_connection_check:
+            label: "AI CLI の接続確認"
+        select_ai_cli_model:
+            label: "AI CLI のモデルを選択"
+            connection_required: "AI CLI の接続確認が必要"
 
     transcription:
         section_label_mic: "マイク"

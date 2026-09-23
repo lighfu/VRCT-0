@@ -62,6 +62,8 @@ export const _useBackendErrorHandling = () => {
         updateSelectedOpenAICompatibleModel,
 
         updateSelectedOllamaModel,
+
+        updateSelectedAiCliModel,
     } = useTranslation();
 
     const { updateEnableVrcMicMuteSync } = useOthers();
@@ -86,6 +88,7 @@ export const _useBackendErrorHandling = () => {
     const {
         updateIsOllamaConnected,
         updateIsLMStudioConnected,
+        updateIsAiCliConnected,
     } = useLLMConnection();
 
     const errorHandling_Backend = ({error_code, message, data, endpoint, result}) => {
@@ -270,6 +273,10 @@ export const _useBackendErrorHandling = () => {
                 updateSelectedOllamaModel(data);
                 showNotification_Error(message, { category_id: error_code });
                 return;
+            case "MODEL_AI_CLI_INVALID":
+                updateSelectedAiCliModel(data);
+                showNotification_Error(message, { category_id: error_code });
+                return;
 
             // ============================================================================
             // 接続エラー (CONNECTION_*)
@@ -280,6 +287,10 @@ export const _useBackendErrorHandling = () => {
                 return;
             case "CONNECTION_OLLAMA_FAILED":
                 updateIsOllamaConnected(data);
+                showNotification_Error(message, { category_id: error_code });
+                return;
+            case "CONNECTION_AI_CLI_FAILED":
+                updateIsAiCliConnected(false);
                 showNotification_Error(message, { category_id: error_code });
                 return;
             case "CONNECTION_LMSTUDIO_URL_INVALID":
