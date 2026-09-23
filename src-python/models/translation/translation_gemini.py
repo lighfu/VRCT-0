@@ -1,4 +1,13 @@
-from google import genai
+genai = None  # 使うときに _genai() が読み込む (起動時間の短縮, A-1)
+
+
+def _genai():
+    global genai
+    if genai is None:
+        from google import genai as _module
+        genai = _module
+    return genai
+
 
 try:
     from .translation_languages import translation_lang
@@ -17,7 +26,7 @@ def _authentication_check(api_key: str) -> bool:
     """Check if the provided API key is valid by attempting to list models.
     """
     try:
-        client = genai.Client(api_key=api_key)
+        client = _genai().Client(api_key=api_key)
         client.models.list()
         return True
     except Exception:
@@ -26,7 +35,7 @@ def _authentication_check(api_key: str) -> bool:
 def _get_available_text_models(api_key: str) -> list[str]:
     """Extract only Gemini models suitable for translation and chat applications
     """
-    client = genai.Client(api_key=api_key)
+    client = _genai().Client(api_key=api_key)
     res = client.models.list()
     allowed_models = []
 

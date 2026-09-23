@@ -1,4 +1,13 @@
-from openai import OpenAI
+OpenAI = None  # 使うときに _openai() が読み込む (起動時間の短縮, A-1)
+
+
+def _openai():
+    global OpenAI
+    if OpenAI is None:
+        from openai import OpenAI as _cls
+        OpenAI = _cls
+    return OpenAI
+
 
 try:
     from .translation_languages import translation_lang
@@ -37,7 +46,7 @@ def _get_available_text_models(api_key: str, base_url: str) -> list[str]:
     プロバイダ独自命名（`llama-3.3-70b`, `mistral-large-latest`, `claude-3-5-sonnet` 等）
     が多いため `gpt-` プレフィックス判定は行わない。
     """
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    client = _openai()(api_key=api_key, base_url=base_url)
     res = client.models.list()
     allowed_models = []
 

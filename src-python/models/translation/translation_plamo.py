@@ -1,4 +1,13 @@
-from openai import OpenAI
+OpenAI = None  # 使うときに _openai() が読み込む (起動時間の短縮, A-1)
+
+
+def _openai():
+    global OpenAI
+    if OpenAI is None:
+        from openai import OpenAI as _cls
+        OpenAI = _cls
+    return OpenAI
+
 
 try:
     from .translation_languages import translation_lang
@@ -19,7 +28,7 @@ def _authentication_check(api_key: str) -> bool:
     """Check if the provided API key is valid by attempting to list models.
     """
     try:
-        client = OpenAI(api_key=api_key, base_url=BASE_URL)
+        client = _openai()(api_key=api_key, base_url=BASE_URL)
         client.models.list()
         return True
     except Exception:
@@ -28,7 +37,7 @@ def _authentication_check(api_key: str) -> bool:
 def _get_available_text_models(api_key: str) -> list[str]:
     """Extract all available models from the PLAMO API
     """
-    client = OpenAI(api_key=api_key, base_url=BASE_URL)
+    client = _openai()(api_key=api_key, base_url=BASE_URL)
     res = client.models.list()
     allowed_models = []
 

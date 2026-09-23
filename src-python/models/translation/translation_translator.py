@@ -14,14 +14,27 @@ except Exception:
 
 from utils import errorLogging, getBestComputeType
 
-try:
+import importlib.util
+
+# translators は import に時間がかかる (Google/Bing/Papago は起動直後には
+# 使われない) ので、実際に呼ぶときまで読み込みを遅らせる (A-1, 2026-09-23)。
+# ENABLE_TRANSLATORS は有無の判定だけなので実 import ではなく find_spec で
+# 済ませる。other_web_Translator はテストが patch するので属性名は変えない。
+other_web_Translator = None  # type: ignore
+ENABLE_TRANSLATORS = importlib.util.find_spec("translators") is not None
+
+
+def _other_web_translator():
     # Bing の認証情報パース (parse_bing_credentials) は monkey-patch を
     # やめ、フォーク本体の Bing.get_tk へ取り込んだ。
-    from translators import translate_text as other_web_Translator
-    ENABLE_TRANSLATORS = True
-except Exception:
-    other_web_Translator = None  # type: ignore
-    ENABLE_TRANSLATORS = False
+    global other_web_Translator
+    if other_web_Translator is None:
+        try:
+            from translators import translate_text as _fn
+        except Exception:
+            return None
+        other_web_Translator = _fn
+    return other_web_Translator
 
 # translators 経由 (Google/Bing/Papago) の HTTP タイムアウト。
 # ライブラリ既定は timeout=None = 無制限で、応答が返らないと呼び出し元の
@@ -46,10 +59,19 @@ class UnsupportedLanguageError(Exception):
     """
     pass
 
-try:
-    import ctranslate2  # noqa: F401
-except Exception:
-    ctranslate2 = None  # type: ignore
+# 使うときに _ctranslate2() が読み込む (起動時間の短縮, A-1)。テストはこの属性を差し替える。
+ctranslate2 = None
+
+
+def _ctranslate2():
+    global ctranslate2
+    if ctranslate2 is None:
+        try:
+            import ctranslate2 as _module
+        except Exception:
+            return None
+        ctranslate2 = _module
+    return ctranslate2
 
 try:
     from .translation_ct2_tokenizer import loadCT2Tokenizer
@@ -447,7 +469,8 @@ class Translator:
         This sets internal translator/tokenizer objects and flips
         ``is_loaded_ctranslate2_model`` on success.
         """
-        if ctranslate2 is None:
+        ct2 = _ctranslate2()
+        if ct2 is None:
             return
 
         with self._ctranslate2_lock:
@@ -459,7 +482,7 @@ class Translator:
 
             if compute_type == "auto":
                 compute_type = getBestComputeType(device, device_index)
-            self.ctranslate2_translator = ctranslate2.Translator(
+            self.ctranslate2_translator = ct2.Translator(
                 weight_path,
                 device=device,
                 device_index=device_index,
@@ -635,8 +658,9 @@ class Translator:
                             output_lang=target_language,
                         )
                 case "Google":
-                    if ENABLE_TRANSLATORS is True and other_web_Translator is not None:
-                        result = other_web_Translator(
+                    web_translate_fn = _other_web_translator()
+                    if ENABLE_TRANSLATORS is True and web_translate_fn is not None:
+                        result = web_translate_fn(
                             query_text=message,
                             translator="google",
                             from_language=source_language,
@@ -644,8 +668,9 @@ class Translator:
                             timeout=_WEB_TRANSLATOR_TIMEOUT_SECONDS,
                         )
                 case "Bing":
-                    if ENABLE_TRANSLATORS is True and other_web_Translator is not None:
-                        result = other_web_Translator(
+                    web_translate_fn = _other_web_translator()
+                    if ENABLE_TRANSLATORS is True and web_translate_fn is not None:
+                        result = web_translate_fn(
                             query_text=message,
                             translator="bing",
                             from_language=source_language,
@@ -653,8 +678,9 @@ class Translator:
                             timeout=_WEB_TRANSLATOR_TIMEOUT_SECONDS,
                         )
                 case "Papago":
-                    if ENABLE_TRANSLATORS is True and other_web_Translator is not None:
-                        result = other_web_Translator(
+                    web_translate_fn = _other_web_translator()
+                    if ENABLE_TRANSLATORS is True and web_translate_fn is not None:
+                        result = web_translate_fn(
                             query_text=message,
                             translator="papago",
                             from_language=source_language,

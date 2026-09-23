@@ -24,12 +24,18 @@ _DOWNLOAD_TIMEOUT = (10, 60)  # (connect, read) 秒
 _DOWNLOAD_MAX_ATTEMPTS = 3
 _DOWNLOAD_RETRY_BACKOFF = 2  # 秒。attempt 番号を掛けて待機 (2s, 4s, ...)
 
-# Optional deps; None fallback lets checkWhisperWeight etc. return False
-# gracefully when the package is missing.
-try:
-    from faster_whisper import WhisperModel  # noqa: F401
-except Exception:
-    WhisperModel = None  # type: ignore
+WhisperModel = None  # 使うときに _whisperModelClass() が読み込む (A-1)
+
+
+def _whisperModelClass():
+    global WhisperModel
+    if WhisperModel is None:
+        try:
+            from faster_whisper import WhisperModel as _cls
+        except Exception:
+            return None
+        WhisperModel = _cls
+    return WhisperModel
 
 try:
     import huggingface_hub  # noqa: F401
@@ -118,10 +124,11 @@ def checkWhisperWeight(root: str, weight_type: str) -> bool:
     if isWeightVerifiedCache(path):
         return True
 
-    if WhisperModel is None:
+    cls = _whisperModelClass()
+    if cls is None:
         return False
     try:
-        WhisperModel(
+        cls(
             path,
             device="cpu",
             device_index=0,
@@ -190,13 +197,14 @@ def getWhisperModel(
         ValueError: when VRAM shortage is detected (wrapped from RuntimeError)
         Exception: other loading errors are propagated.
     """
-    if WhisperModel is None:
+    cls = _whisperModelClass()
+    if cls is None:
         raise RuntimeError("faster_whisper is not installed")
     path = os_path.join(root, "weights", "whisper", weight_type)
     if compute_type == "auto":
         compute_type = getBestComputeType(device, device_index)
     try:
-        model = WhisperModel(
+        model = cls(
             path,
             device=device,
             device_index=device_index,

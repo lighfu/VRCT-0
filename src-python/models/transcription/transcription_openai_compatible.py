@@ -10,7 +10,15 @@
 可用性の代理指標として使う。
 """
 
-from openai import OpenAI
+OpenAI = None  # 使うときに _openai() が読み込む (起動時間の短縮, A-1)
+
+
+def _openai():
+    global OpenAI
+    if OpenAI is None:
+        from openai import OpenAI as _cls
+        OpenAI = _cls
+    return OpenAI
 
 # OpenAICompatibleTranscriptionProvider を base_url/model の差し替えだけで
 # 使い回す3つのユーザー向けエンジン名。transcription_transcriber.py と
@@ -30,7 +38,7 @@ TRANSCRIPTION_MODEL_KEYWORDS = ["whisper", "transcribe"]
 def checkTranscriptionApiKey(api_key: str, base_url: str) -> bool:
     """`api_key`/`base_url` の組でモデル一覧が取得できるかどうかを返す。"""
     try:
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        client = _openai()(api_key=api_key, base_url=base_url)
         client.models.list()
         return True
     except Exception:
@@ -50,7 +58,7 @@ def getAvailableTranscriptionModels(
     (どんなモデル名を使っているか分からないため) 絞り込まずに
     全件そのまま返す想定。
     """
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    client = _openai()(api_key=api_key, base_url=base_url)
     res = client.models.list()
     models = [m.id for m in res.data]
     if keyword_filter:

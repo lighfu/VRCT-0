@@ -24,20 +24,44 @@ from typing import Optional, Tuple
 
 import numpy as np
 
-try:
-    import openvr
-except Exception:  # pragma: no cover
-    openvr = None  # type: ignore
+# openvr/OpenGL/glfw はVRを使わない起動では不要なので、使うときに読み込む
+# (起動時間の短縮, A-1, 2026-09-23)。テストはこれらの属性を差し替える。
+openvr = None  # type: ignore
+GL = None  # type: ignore
+glfw = None  # type: ignore
 
-try:
-    from OpenGL import GL
-except Exception:  # pragma: no cover
-    GL = None  # type: ignore
 
-try:
-    import glfw
-except Exception:  # pragma: no cover
-    glfw = None  # type: ignore
+def _openvr():
+    global openvr
+    if openvr is None:
+        try:
+            import openvr as _module
+        except Exception:
+            return None
+        openvr = _module
+    return openvr
+
+
+def _gl():
+    global GL
+    if GL is None:
+        try:
+            from OpenGL import GL as _module
+        except Exception:
+            return None
+        GL = _module
+    return GL
+
+
+def _glfw():
+    global glfw
+    if glfw is None:
+        try:
+            import glfw as _module
+        except Exception:
+            return None
+        glfw = _module
+    return glfw
 
 try:
     from utils import errorLogging, printLog
@@ -68,27 +92,29 @@ class OpenVRMirrorCapture:
         self._initialized = False
 
     def isAvailable(self) -> bool:
-        return openvr is not None and GL is not None and glfw is not None
+        return _openvr() is not None and _gl() is not None and _glfw() is not None
 
     @property
     def _eye(self):
-        if openvr is None:
+        ov = _openvr()
+        if ov is None:
             return 0
-        return openvr.Eye_Right if self._eye_name == "right" else openvr.Eye_Left
+        return ov.Eye_Right if self._eye_name == "right" else ov.Eye_Left
 
     def _initGlContext(self) -> bool:
         if self._gl_window is not None:
             return True
-        if not glfw.init():
+        gf = _glfw()
+        if not gf.init():
             printLog("OCR: glfw.init() failed")
             return False
-        glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
-        self._gl_window = glfw.create_window(64, 64, "vrct-ocr-gl", None, None)
+        gf.window_hint(gf.VISIBLE, gf.FALSE)
+        self._gl_window = gf.create_window(64, 64, "vrct-ocr-gl", None, None)
         if self._gl_window is None:
-            glfw.terminate()
+            gf.terminate()
             printLog("OCR: failed to create hidden GLFW window")
             return False
-        glfw.make_context_current(self._gl_window)
+        gf.make_context_current(self._gl_window)
         return True
 
     def _init(self) -> bool:
@@ -103,8 +129,9 @@ class OpenVRMirrorCapture:
             # Join (or create) the process-wide OpenVR session. Background
             # mode so we never steal focus from the running scene app.
             # Ownership is deliberately not tracked: see module docstring.
-            openvr.init(openvr.VRApplication_Background)
-            self._compositor = openvr.IVRCompositor()
+            ov = _openvr()
+            ov.init(ov.VRApplication_Background)
+            self._compositor = ov.IVRCompositor()
 
             # Acquire the mirror texture exactly once.
             tex = self._compositor.getMirrorTextureGL(self._eye)
@@ -161,20 +188,22 @@ class OpenVRMirrorCapture:
 
         locked = False
         try:
-            glfw.make_context_current(self._gl_window)
+            gl = GL
+            gf = glfw
+            gf.make_context_current(self._gl_window)
             self._lock()
             locked = True
 
-            GL.glBindTexture(GL.GL_TEXTURE_2D, self._texture_id)
-            width = GL.glGetTexLevelParameteriv(GL.GL_TEXTURE_2D, 0, GL.GL_TEXTURE_WIDTH)
-            height = GL.glGetTexLevelParameteriv(GL.GL_TEXTURE_2D, 0, GL.GL_TEXTURE_HEIGHT)
+            gl.glBindTexture(gl.GL_TEXTURE_2D, self._texture_id)
+            width = gl.glGetTexLevelParameteriv(gl.GL_TEXTURE_2D, 0, gl.GL_TEXTURE_WIDTH)
+            height = gl.glGetTexLevelParameteriv(gl.GL_TEXTURE_2D, 0, gl.GL_TEXTURE_HEIGHT)
             if not width or not height:
-                GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+                gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
                 return None
 
-            buf = (GL.GLubyte * (int(width) * int(height) * 4))()
-            GL.glGetTexImage(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, buf)
-            GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+            buf = (gl.GLubyte * (int(width) * int(height) * 4))()
+            gl.glGetTexImage(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, buf)
+            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
 
             arr = np.frombuffer(buf, dtype=np.uint8).reshape((int(height), int(width), 4))
             # OpenGL textures are bottom-up; flip so top-of-image is row 0.

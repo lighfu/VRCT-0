@@ -21,14 +21,6 @@ from typing import List, Optional, Protocol, Tuple
 
 import numpy as np
 import requests
-from openai import (
-    APIConnectionError,
-    APIStatusError,
-    APITimeoutError,
-    AuthenticationError,
-    OpenAI,
-    RateLimitError,
-)
 from speech_recognition import AudioData, Recognizer, UnknownValueError
 
 from errors import ErrorCode
@@ -167,7 +159,26 @@ class LocalWhisperProvider:
         return text, info.language_probability, is_definitive
 
 
+OpenAI = None  # 使うときに _openai() が読み込む (起動時間の短縮, A-1)
+
+
+def _openai():
+    global OpenAI
+    if OpenAI is None:
+        from openai import OpenAI as _cls
+        OpenAI = _cls
+    return OpenAI
+
+
 def _map_openai_exception(exc: Exception) -> ErrorCode:
+    # isinstance 判定だけなので、openai パッケージ自体は使うときにだけ読み込む。
+    from openai import (
+        APIConnectionError,
+        APIStatusError,
+        APITimeoutError,
+        AuthenticationError,
+        RateLimitError,
+    )
     if isinstance(exc, AuthenticationError):
         return ErrorCode.TRANSCRIPTION_API_AUTH_FAILED
     if isinstance(exc, RateLimitError):
@@ -200,7 +211,7 @@ class OpenAICompatibleTranscriptionProvider:
         self.base_url = base_url
         self.model = model
         self.engine_name = engine_name
-        self._client = OpenAI(api_key=api_key, base_url=base_url, timeout=_HTTP_TIMEOUT)
+        self._client = _openai()(api_key=api_key, base_url=base_url, timeout=_HTTP_TIMEOUT)
 
     def transcribe(
         self,

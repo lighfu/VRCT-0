@@ -28,12 +28,25 @@ except Exception:  # pragma: no cover
     def printLog(*args, **kwargs):
         print(*args, **kwargs)
 
-try:
-    from rapidocr import EngineType, LangRec, ModelType, OCRVersion, RapidOCR  # type: ignore
-except Exception:  # pragma: no cover
-    RapidOCR = None  # type: ignore
-    EngineType = LangRec = ModelType = OCRVersion = None  # type: ignore
-    errorLogging()
+# rapidocr は import に時間がかかる (onnxruntime 等を引き込む) ので、
+# 使うときに読み込む (起動時間の短縮, A-1, 2026-09-23)。
+RapidOCR = None  # type: ignore
+EngineType = LangRec = ModelType = OCRVersion = None  # type: ignore
+
+
+def _rapidocr():
+    global RapidOCR, EngineType, LangRec, ModelType, OCRVersion
+    if RapidOCR is None:
+        try:
+            from rapidocr import EngineType as _EngineType, LangRec as _LangRec, \
+                ModelType as _ModelType, OCRVersion as _OCRVersion, RapidOCR as _RapidOCR  # type: ignore
+        except Exception:
+            errorLogging()
+            return None
+        RapidOCR, EngineType, LangRec, ModelType, OCRVersion = (
+            _RapidOCR, _EngineType, _LangRec, _ModelType, _OCRVersion,
+        )
+    return RapidOCR
 
 # 吹き出しの切り出しは小さい(短辺100px前後のこともある)。RapidOCRの既定は
 # 短辺を736pxまで拡大する設定 (limit_type="min") なので、そのままだと7倍に
@@ -46,12 +59,12 @@ _engine_lock = Lock()
 
 
 def isAvailable() -> bool:
-    return RapidOCR is not None
+    return _rapidocr() is not None
 
 
 def getReader(spec: OcrModelSpec) -> Optional[object]:
     """モデル指定に対応する推論器を返す。生成に失敗したら None。"""
-    if RapidOCR is None or spec is None:
+    if _rapidocr() is None or spec is None:
         return None
     with _engine_lock:
         cached = _engine_cache.get(spec)

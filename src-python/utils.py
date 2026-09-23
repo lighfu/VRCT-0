@@ -58,19 +58,22 @@ def _registerBundledCudaLibraries() -> None:
 
 _registerBundledCudaLibraries()
 
-# Optional runtime dependencies. `None` fallback lets non-GPU / no-ctranslate2
-# environments keep the app running with reduced feature set.
-try:
-    from ctranslate2 import get_supported_compute_types as _ct2_get_supported_compute_types  # noqa: F401
-except Exception:
-    def _ct2_get_supported_compute_types(device: str, device_index: int) -> List[str]:  # type: ignore
+# ctranslate2 は import に時間がかかるので、使うときに読み込む (A-1, 2026-09-23)。
+# 関数名はテストが patch するので変えない。ctranslate2 が無い環境では空/0 を返す。
+def _ct2_get_supported_compute_types(device: str, device_index: int) -> List[str]:
+    try:
+        from ctranslate2 import get_supported_compute_types
+    except Exception:
         return []
+    return get_supported_compute_types(device, device_index)
 
-try:
-    from ctranslate2 import get_cuda_device_count as _ct2_get_cuda_device_count  # noqa: F401
-except Exception:
-    def _ct2_get_cuda_device_count() -> int:  # type: ignore
+
+def _ct2_get_cuda_device_count() -> int:
+    try:
+        from ctranslate2 import get_cuda_device_count
+    except Exception:
         return 0
+    return get_cuda_device_count()
 
 _WEIGHT_VERIFIED_MARKER_NAME = ".weight_verified.json"
 

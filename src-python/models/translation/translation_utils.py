@@ -24,12 +24,19 @@ _DOWNLOAD_TIMEOUT = (10, 60)  # (connect, read) 秒
 _DOWNLOAD_MAX_ATTEMPTS = 3
 _DOWNLOAD_RETRY_BACKOFF = 2  # 秒。attempt 番号を掛けて待機 (2s, 4s, ...)
 
-# Optional runtime deps; None fallback disables the corresponding features
-# (check/download/tokenizer) when the package is unavailable.
-try:
-    import ctranslate2  # noqa: F401
-except Exception:
-    ctranslate2 = None  # type: ignore
+# 使うときに _ctranslate2() が読み込む (起動時間の短縮, A-1)。テストはこの属性を差し替える。
+ctranslate2 = None
+
+
+def _ctranslate2():
+    global ctranslate2
+    if ctranslate2 is None:
+        try:
+            import ctranslate2 as _module
+        except Exception:
+            return None
+        ctranslate2 = _module
+    return ctranslate2
 
 try:
     from huggingface_hub import hf_hub_url, list_repo_files  # noqa: F401
@@ -105,11 +112,12 @@ def checkCTranslate2Weight(root: str, weight_type: str = "m2m100_418M-ct2-int8")
         return True
 
     try:
-        if ctranslate2 is None:
+        ct2 = _ctranslate2()
+        if ct2 is None:
             return False
         # モデルロード可能かどうかで判定
         compute_type = getBestComputeType("cpu", 0)
-        ctranslate2.Translator(path, compute_type=compute_type)
+        ct2.Translator(path, compute_type=compute_type)
         writeWeightVerifiedCache(path)
         return True
     except Exception:

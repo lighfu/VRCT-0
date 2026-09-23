@@ -1,5 +1,15 @@
 import requests
-from openai import OpenAI
+
+OpenAI = None  # 使うときに _openai() が読み込む (起動時間の短縮, A-1)
+
+
+def _openai():
+    global OpenAI
+    if OpenAI is None:
+        from openai import OpenAI as _cls
+        OpenAI = _cls
+    return OpenAI
+
 
 try:
     from .translation_languages import translation_lang
@@ -30,7 +40,7 @@ def _authentication_check(api_key: str) -> bool:
 def _get_available_text_models(api_key: str, base_url: str | None = None) -> list[str]:
     """Extract only OpenRouter models suitable for translation and chat applications.
     """
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    client = _openai()(api_key=api_key, base_url=base_url)
     res = client.models.list()
     allowed_models = []
 
