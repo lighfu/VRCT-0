@@ -28,7 +28,16 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['pandas', 'matplotlib', 'PyQt5'],
+    # transformers/torch: ctranslate2.converters.__init__ imports
+    # ctranslate2.converters.transformers, which does `import transformers`
+    # inside try/except ImportError. PyInstaller's modulegraph follows that
+    # import (and pyinstaller-hooks-contrib ships hook-transformers.py), so
+    # whenever transformers is installed in .venv (it is, via
+    # requirements-dev.txt, for the tokenizer parity test) a normal build
+    # bundles it (~37MB) even though the app itself no longer imports it
+    # (2026-09-23, Task 7 fix round 1). ctranslate2 swallows the resulting
+    # ImportError at runtime, so excluding both is safe.
+    excludes=['pandas', 'matplotlib', 'PyQt5', 'transformers', 'torch'],
     noarchive=False,
     optimize=0,
 )

@@ -32,7 +32,10 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['pandas', 'matplotlib', 'PyQt5'],
+    # transformers/torch: see spec/backend.spec for why these are excluded
+    # (ctranslate2.converters optionally imports transformers; PyInstaller
+    # follows that import and bundles it if installed in .venv_cuda).
+    excludes=['pandas', 'matplotlib', 'PyQt5', 'transformers', 'torch'],
     noarchive=False,
     optimize=0,
 )

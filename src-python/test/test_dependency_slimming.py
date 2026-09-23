@@ -66,12 +66,34 @@ class LangchainRemovedTests(unittest.TestCase):
         self.assertIn("openai", _requirementNames())
 
 
+def _specExcludes(spec_filename: str) -> list:
+    spec_path = os.path.join(_REPO_ROOT, "spec", spec_filename)
+    with open(spec_path, encoding="utf-8") as f:
+        source = f.read()
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.keyword) and node.arg == "excludes":
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"excludes= not found in {spec_filename}")
+
+
 class TransformersRemovedTests(unittest.TestCase):
     def test_transformers_is_not_required_at_runtime(self) -> None:
         self.assertNotIn("transformers", _requirementNames())
 
     def test_transformers_is_not_imported_by_the_app(self) -> None:
         self.assertNotIn("transformers", _importedTopLevelModules())
+
+    def test_transformers_is_excluded_from_pyinstaller_builds(self) -> None:
+        # ctranslate2.converters optionally imports transformers (try/except
+        # ImportError); PyInstaller's modulegraph follows that import and
+        # bundles transformers (~37MB) whenever it happens to be installed
+        # in .venv/.venv_cuda (it is, via requirements-dev.txt, for the
+        # tokenizer parity test), regardless of --clean. Excluding it in the
+        # spec is the only reliable way to keep it out of release builds.
+        for spec_filename in ("backend.spec", "backend_cuda.spec"):
+            with self.subTest(spec=spec_filename):
+                self.assertIn("transformers", _specExcludes(spec_filename))
 
 
 if __name__ == "__main__":
