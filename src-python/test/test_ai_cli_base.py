@@ -1,5 +1,6 @@
 """CliSession（常駐セッションの共通基底）のテスト。偽 CLI を実際に起動する。"""
 
+import json
 import os
 import sys
 import tempfile
@@ -7,7 +8,7 @@ import threading
 import time
 import unittest
 
-from models.translation.ai_cli.base import AiCliError, CliSession
+from models.translation.ai_cli.base import AiCliError, AiCliToolUseError, CliSession
 
 FAKE = os.path.join(os.path.dirname(__file__), "fixtures", "fake_ai_cli.py")
 
@@ -179,6 +180,81 @@ class CliSessionTests(unittest.TestCase):
         with self.assertRaises(AiCliError):
             session.translate("b")
         self.assertEqual(self._spawnCount(), 1)
+
+    def test_first_turn_failure_is_marked_as_startup(self):
+        # 起動したてのプロセスの最初のターンの失敗 (未ログインなど) だけを、
+        # AICliClient のサーキットブレーカーが見る。
+        session = self._session("--error-on", "BAD")
+        with self.assertRaises(AiCliError) as caught:
+            session.translate("BAD")
+        self.assertTrue(caught.exception.startup)
+        session.translate("warm")
+        with self.assertRaises(AiCliError) as caught:
+            session.translate("BAD again")
+        self.assertFalse(caught.exception.startup)
+
+    def test_missing_executable_is_a_startup_failure(self):
+        session = _EchoSession(command_prefix=[os.path.join(self._tmp.name, "no_such_cli.exe")],
+                               model="m", workspace=self.workspace, base_instructions="B")
+        with self.assertRaises(AiCliError) as caught:
+            session.translate("x")
+        self.assertTrue(caught.exception.startup)
+
+    def test_tool_verdict_raises_tool_use_error_and_kills_the_process(self):
+        class _ToolSession(_EchoSession):
+            def _interpret(self, message):
+                if message.get("type") == "result" and "TOOL" in str(message.get("result")):
+                    return ("tool", "tried a tool")
+                return super()._interpret(message)
+
+        session = _ToolSession(command_prefix=[sys.executable, FAKE, "--record", self.record],
+                               model="m", workspace=self.workspace, base_instructions="B")
+        self.addCleanup(session.close)
+        session.translate("warm")
+        with self.assertRaises(AiCliToolUseError):
+            session.translate("TOOL")
+        self.assertFalse(session.isAlive())
+        self.assertEqual(session.translate("again"), "T(again)")
+
+    def test_process_gone_hook_runs_after_close_and_shutdown(self):
+        gone = []
+
+        class _HookSession(_EchoSession):
+            def _onProcessGone(self, proc):
+                gone.append((proc.pid, proc.poll() is not None))
+
+        session = _HookSession(command_prefix=[sys.executable, FAKE, "--record", self.record],
+                               model="m", workspace=self.workspace, base_instructions="B")
+        session.translate("a")
+        first_pid = session._proc.pid
+        session.close()
+        session.translate("b")
+        second_pid = session._proc.pid
+        session.shutdown()
+        self.assertEqual(gone, [(first_pid, True), (second_pid, True)])
+
+    def test_environment_and_before_spawn_hooks_are_used(self):
+        home = os.path.join(self._tmp.name, "home")
+
+        class _EnvSession(_EchoSession):
+            prepared = 0
+
+            def _buildEnv(self):
+                env = dict(os.environ)
+                env["USERPROFILE"] = home
+                return env
+
+            def _beforeSpawn(self):
+                _EnvSession.prepared += 1
+
+        session = _EnvSession(command_prefix=[sys.executable, FAKE, "--record", self.record],
+                              model="m", workspace=self.workspace, base_instructions="B")
+        self.addCleanup(session.close)
+        session.translate("a")
+        with open(self.record, encoding="utf-8") as f:
+            first = json.loads(f.readline())
+        self.assertEqual(first["env"]["USERPROFILE"], home)
+        self.assertEqual(_EnvSession.prepared, 1)
 
     def test_close_racing_spawn_kills_new_process_and_raises(self):
         session = _RaceSession(

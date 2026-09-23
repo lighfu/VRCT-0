@@ -23,6 +23,12 @@ kill する処理はどちらのロックも保持しないところで行う。
 これをインクリメントする。`start()` は自分が観測した世代を覚えておき、
 `_spawn()` は公開直前に世代 (と shutdown フラグ) を `_procLock` の下で
 再確認し、ずれていれば今作ったプロセスを黙って殺して `AiCliError` を送出する。
+
+翻訳する文には他人の発言 (スピーカーの文字起こし) も含まれるので、CLI への入力は
+信用できない。各アダプターは CLI のツール使用 (ファイル・コマンド・Web・MCP) を
+起動引数で止めたうえで、応答にツール使用の兆しが見えたら `_interpret` で
+`("tool", 説明)` を返す。基底はそのターンを `AiCliToolUseError` で失敗させ、
+プロセスを殺して会話ごと捨てる (次のターンで作り直す)。
 """
 
 import json
@@ -39,7 +45,24 @@ _CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 class AiCliError(Exception):
-    """CLI セッションで翻訳できなかった (起動失敗・タイムアウト・異常終了・エラー応答)。"""
+    """CLI セッションで翻訳できなかった (起動失敗・タイムアウト・異常終了・エラー応答)。
+
+    `startup` は、起動中か起動直後の最初のターンで失敗したことを表す
+    (未ログイン・CLI の故障など、次も失敗しそうな失敗)。AICliClient は
+    これを見て、しばらく CLI を呼ばずに即座に失敗させる (サーキットブレーカー)。
+    """
+
+    def __init__(self, message: str = "", *, startup: bool = False) -> None:
+        super().__init__(message)
+        self.startup = startup
+
+
+class AiCliToolUseError(AiCliError):
+    """CLI がツール (ファイル・コマンド・Web・MCP など) を使おうとした。
+
+    入力に紛れ込んだ指示 (プロンプトインジェクション) によるもので、CLI の故障ではない。
+    そのターンを失敗にして会話を捨てるが、サーキットブレーカーは開かない。
+    """
 
 
 class CliSession:
@@ -47,14 +70,18 @@ class CliSession:
     START_TIMEOUT = 120.0
     TURN_TIMEOUT = 60.0
 
-    def __init__(self, command_prefix: list[str], model: str, workspace: str, base_instructions: str) -> None:
+    def __init__(self, command_prefix: list[str], model: str, workspace: str, base_instructions: str,
+                 client_version: str = "") -> None:
         self.command_prefix = list(command_prefix)
         self.model = model
         self.workspace = workspace
         self.base_instructions = base_instructions
+        self.client_version = client_version
         self._lock = threading.RLock()
         self._procLock = threading.Lock()
         self._proc: Optional[subprocess.Popen] = None
+        # 実行中のターンが使っているプロセス (アダプターが会話 ID などを紐付けるのに使う)。
+        self._turnProc: Optional[subprocess.Popen] = None
         self._messages: "queue.Queue" = queue.Queue()
         self._stderr: deque = deque(maxlen=50)
         self._turns = 0
@@ -65,6 +92,13 @@ class CliSession:
     def _buildArgs(self) -> list[str]:
         raise NotImplementedError
 
+    def _buildEnv(self) -> Optional[dict]:
+        """CLI に渡す環境変数。None なら親の環境をそのまま使う。"""
+        return None
+
+    def _beforeSpawn(self) -> None:
+        """Popen の直前に呼ばれる (CLI 用の設定ファイルを用意するなど)。既定は何もしない。"""
+
     def _afterStart(self, deadline: float) -> None:
         """起動直後のハンドシェイク (codex の initialize など)。既定は何もしない。"""
 
@@ -72,8 +106,18 @@ class CliSession:
         raise NotImplementedError
 
     def _interpret(self, message: dict):
-        """("ok", text) / ("error", detail) / None (続きを待つ) を返す。"""
+        """("ok", text) / ("error", detail) / ("tool", detail) / None (続きを待つ) を返す。
+
+        "tool" は CLI がツールを使おうとした印で、基底がそのターンを
+        `AiCliToolUseError` で失敗させ、プロセスを殺す。
+        """
         raise NotImplementedError
+
+    def _onProcessGone(self, proc: subprocess.Popen) -> None:
+        """プロセスを殺した後に呼ばれる (CLI が残した自分の会話の後始末など)。
+
+        close()/shutdown()/見張り役から呼ばれるので、ブロックしてはいけない。
+        """
 
     def _beforePublish(self, proc: subprocess.Popen) -> None:
         """テスト用フック: Popen 成功後・`_proc` 公開前に呼ばれる。既定は何もしない。
@@ -86,6 +130,10 @@ class CliSession:
         with self._procLock:
             proc = self._proc
         return proc is not None and proc.poll() is None
+
+    def turnCount(self) -> int:
+        """今のプロセスで終えたターン数 (起動し直すと 0 に戻る)。"""
+        return self._turns
 
     def start(self) -> None:
         with self._lock:
@@ -113,6 +161,8 @@ class CliSession:
 
     def translate(self, prompt: str, timeout: Optional[float] = None) -> str:
         with self._lock:
+            # 起動か、起動したてのプロセスの最初のターンで失敗したかどうか。
+            first_turn = True
             try:
                 if self.isAlive() and self._turns >= self.MAX_TURNS:
                     self.close()
@@ -122,6 +172,8 @@ class CliSession:
                 if not self.isAlive():
                     self.start()
                 proc = self._proc
+                first_turn = self._turns == 0
+                self._turnProc = proc
                 # 起動直後の最初のターンはモデルの準備 (claude で約 30 秒) を含むので長めに待つ。
                 limit = self.START_TIMEOUT if self._turns == 0 else (timeout or self.TURN_TIMEOUT)
                 deadline = time.monotonic() + limit
@@ -143,6 +195,8 @@ class CliSession:
                         kind, value = verdict
                         if kind == "ok":
                             return str(value).strip()
+                        if kind == "tool":
+                            raise AiCliToolUseError(str(value))
                         raise AiCliError(str(value))
                 finally:
                     # 見張り役が発火した直後で cancel() が効かない場合でも、
@@ -152,12 +206,18 @@ class CliSession:
                     if watchdog is not None:
                         watchdog.cancel()
                         watchdog.join()
-            except AiCliError:
+            except AiCliToolUseError:
+                # ツールを使おうとした会話は、指示が紛れ込んだ履歴ごと捨てる。
                 self.close()
+                raise
+            except AiCliError as e:
+                self.close()
+                if first_turn:
+                    e.startup = True
                 raise
             except Exception as e:
                 self.close()
-                raise AiCliError(str(e)) from e
+                raise AiCliError(str(e), startup=first_turn) from e
 
     def close(self) -> None:
         """今のプロセスを殺す。shutdown 済みでなければ次の translate() で再起動される。"""
@@ -167,6 +227,7 @@ class CliSession:
             self._proc = None
         if proc is not None:
             self._kill(proc)
+            self._onProcessGone(proc)
 
     def shutdown(self) -> None:
         """セッションを恒久的に終える。以後 start()/translate() は AiCliError を送出する。"""
@@ -177,6 +238,7 @@ class CliSession:
             self._proc = None
         if proc is not None:
             self._kill(proc)
+            self._onProcessGone(proc)
 
     # --- サブクラス向けの補助 ---
     def _write(self, obj: dict) -> None:
@@ -223,6 +285,7 @@ class CliSession:
         detached = self._detachIfCurrent(proc)
         if detached is not None:
             self._kill(detached)
+            self._onProcessGone(detached)
 
     @staticmethod
     def _kill(proc: subprocess.Popen) -> None:
@@ -290,11 +353,12 @@ class CliSession:
         """
         os.makedirs(self.workspace, exist_ok=True)
         try:
+            self._beforeSpawn()
             proc = subprocess.Popen(
                 self.command_prefix + self._buildArgs(),
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 cwd=self.workspace, text=True, encoding="utf-8", errors="replace",
-                creationflags=_CREATE_NO_WINDOW,
+                env=self._buildEnv(), creationflags=_CREATE_NO_WINDOW,
             )
         except OSError as e:
             raise AiCliError(f"failed to start AI CLI: {e}") from e
@@ -314,6 +378,10 @@ class CliSession:
 
         if not published:
             self._kill(proc)
+            # 読み手のスレッドを起こしていないので、ここでパイプを閉じる。
+            self._closeQuietly(proc.stdout)
+            self._closeQuietly(proc.stderr)
+            self._onProcessGone(proc)
             if shut_down:
                 raise AiCliError("session was shut down")
             raise AiCliError("AI CLI session was closed while starting")
@@ -360,11 +428,23 @@ class CliSession:
             pass
         finally:
             messages.put(_EOF)
+            CliSession._closeQuietly(proc.stdout)
 
     @staticmethod
     def _readStderr(proc: subprocess.Popen, stderr: deque) -> None:
         try:
             for line in proc.stderr:
                 stderr.append(line.rstrip())
+        except Exception:
+            pass
+        finally:
+            CliSession._closeQuietly(proc.stderr)
+
+    @staticmethod
+    def _closeQuietly(stream) -> None:
+        """読み終えたパイプを閉じる (プロセスの終了後に読み手のスレッドから呼ぶ)。"""
+        try:
+            if stream is not None:
+                stream.close()
         except Exception:
             pass
