@@ -1,10 +1,9 @@
-import logging
 from google import genai
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 try:
     from .translation_languages import translation_lang
     from .translation_utils import loadTranslatePromptConfig
+    from .translation_llm_common import GeminiChat, buildSystemPrompt
 except Exception:
     import sys
     from os import path as os_path
@@ -12,9 +11,7 @@ except Exception:
     sys.path.append(os_path.dirname(os_path.dirname(os_path.dirname(os_path.abspath(__file__)))))
     from translation_languages import translation_lang
     from translation_utils import loadTranslatePromptConfig
-
-logger = logging.getLogger("langchain_google_genai")
-logger.setLevel(logging.ERROR)
+    from translation_llm_common import GeminiChat, buildSystemPrompt
 
 def _authentication_check(api_key: str) -> bool:
     """Check if the provided API key is valid by attempting to list models.
@@ -96,10 +93,7 @@ class GeminiClient:
             return False
 
     def updateClient(self) -> None:
-        self.gemini_llm = ChatGoogleGenerativeAI(
-            model=self.model,
-            api_key=self.api_key,
-        )
+        self.gemini_llm = GeminiChat(api_key=self.api_key, model=self.model)
 
     def setContextHistory(self, history_items: list[dict]) -> None:
         """Set recent conversation history for prompt injection.
@@ -112,63 +106,15 @@ class GeminiClient:
         self._context_history = history_items or []
 
     def translate(self, text: str, input_lang: str, output_lang: str) -> str:
-        system_prompt = self.prompt_template.format(
-            supported_languages=self.supported_languages,
-            input_lang=input_lang,
-            output_lang=output_lang
+        system_prompt = buildSystemPrompt(
+            self.prompt_template, self.supported_languages, input_lang, output_lang,
+            self.history_cfg, self._context_history,
         )
-
-        # Inject recent conversation history if enabled by YAML config
-        if self.history_cfg.get("use_history"):
-            allowed_sources = set(self.history_cfg.get("sources", []))
-            max_messages = int(self.history_cfg.get("max_messages", 0))
-            max_chars = int(self.history_cfg.get("max_chars", 0))
-            item_tmpl = self.history_cfg.get("item_template", "[{source}] {role}: {text}")
-            header_tmpl = self.history_cfg.get("header_template", "{history}")
-
-            filtered = [h for h in self._context_history if h.get("source") in allowed_sources]
-            recent = filtered[-max_messages:] if max_messages > 0 else filtered
-            formatted_items = []
-            for h in recent:
-                # Format timestamp as HH:MM to save tokens
-                timestamp_str = ''
-                if 'timestamp' in h:
-                    from datetime import datetime
-                    try:
-                        ts = datetime.fromisoformat(h['timestamp'])
-                        timestamp_str = ts.strftime('%H:%M')
-                    except:
-                        timestamp_str = ''
-                formatted_items.append(
-                    item_tmpl.format(
-                        timestamp=timestamp_str,
-                        source=h.get("source", ""),
-                        text=h.get("text", ""),
-                    )
-                )
-            history_blob = "\n".join(formatted_items).strip()
-            if max_chars and len(history_blob) > max_chars:
-                history_blob = history_blob[-max_chars:]
-            history_header = header_tmpl.format(max_messages=max_messages, history=history_blob)
-            if history_header:
-                system_prompt = f"{system_prompt}\n\n{history_header}"
-
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text}
+            {"role": "user", "content": text},
         ]
-
-        resp = self.gemini_llm.invoke(messages)
-        content = ""
-        if isinstance(resp.content, str):
-            content = resp.content
-        elif isinstance(resp.content, list):
-            for part in resp.content:
-                if isinstance(part, str):
-                    content += part
-                elif isinstance(part, dict) and "content" in part and isinstance(part["content"], str):
-                    content += part["content"]
-        return content.strip()
+        return self.gemini_llm.complete(messages)
 
 if __name__ == "__main__":
     AUTH_KEY = "AUTH_KEY"

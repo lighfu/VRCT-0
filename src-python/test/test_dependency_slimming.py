@@ -50,5 +50,21 @@ class FrontendDependencyTests(unittest.TestCase):
                 self.assertNotIn(name, declared)
 
 
+class LangchainRemovedTests(unittest.TestCase):
+    def test_langchain_is_not_required(self) -> None:
+        for name in ("langchain-openai", "langchain-google-genai", "langchain-ollama"):
+            with self.subTest(package=name):
+                self.assertNotIn(name, _requirementNames())
+
+    def test_langchain_is_not_imported(self) -> None:
+        imported = _importedTopLevelModules()
+        for module in ("langchain_openai", "langchain_google_genai", "langchain_ollama", "langchain_core"):
+            with self.subTest(module=module):
+                self.assertNotIn(module, imported)
+
+    def test_openai_sdk_is_declared_explicitly(self) -> None:
+        self.assertIn("openai", _requirementNames())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -49,5 +49,21 @@ class OpenAICompatibleClientTests(unittest.TestCase):
                 self.assertEqual(messages[1]["content"], "こんにちは")
 
 
+class GeminiClientTests(unittest.TestCase):
+    def test_translate_goes_through_gemini_chat(self) -> None:
+        from models.translation import translation_gemini
+        client = translation_gemini.GeminiClient()
+        client.api_key = "key"
+        client.model = "gemini-x"
+        with patch.object(translation_gemini, "GeminiChat") as mock_chat:
+            mock_chat.return_value.complete.return_value = "translated"
+            client.updateClient()
+            result = client.translate("こんにちは", "Japanese", "English")
+        mock_chat.assert_called_once_with(api_key="key", model="gemini-x")
+        self.assertEqual(result, "translated")
+        messages = mock_chat.return_value.complete.call_args.args[0]
+        self.assertEqual([m["role"] for m in messages], ["system", "user"])
+
+
 if __name__ == "__main__":
     unittest.main()
