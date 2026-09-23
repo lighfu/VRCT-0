@@ -258,3 +258,53 @@ Rust を導入して `npm run build` を実行した（CPU 版、develop `b87f7e
 - full 辞書の UI からのダウンロード（取得後に full を選べるようになる。展開後 359,725,440 バイト）
 - full 辞書そのものでの読みがな変換（動くが、複合語で読みの按分が崩れる既存バグあり: https://github.com/lighfu/VRCT-0/issues/1）
 - 画面からの送信と CTranslate2 翻訳
+
+## 追記（AI CLI 翻訳）: 実際の CLI での確認（2026-09-24）
+
+`feat/ai-cli-translation`（`e9fdb051`）で、この PC に入っている 3 つの CLI
+（codex-cli 0.155.1 / Claude Code 2.1.281 / agy 1.2.9）を実際に使って確かめた。
+計測ではなく動作確認の記録で、値はどれも 1 回ずつ測ったもの。
+
+サイドカー単体（`bat\build.bat` で作り、UI と同じ stdin/stdout で操作）:
+
+| CLI | モデル（既定） | 接続確認 | 1 回目 | 2 回目 |
+|---|---|---|---|---|
+| codex | gpt-6-astra | 1.6 秒 | 3.9 秒 | 2.4 秒 |
+| claude | haiku | 0.6 秒 | 4.2 秒 | 2.7 秒 |
+| agy | gemini-3.8-flash-high | 6.6 秒 | 7.5 秒 | 3.6 秒 |
+
+- 接続確認は `/set/data/selected_ai_cli_tool` を送ってから `/run/ai_cli_connection` が true で届くまで（モデル一覧の取得を含む）。
+  接続確認のあと裏でセッションの起動が始まるので、1 回目には起動の残りが入る。
+- 1 回目・2 回目は `/run/send_message_box` を送ってから訳文つきの応答が返るまで。
+  原文は「こんにちは、元気ですか？」と「今日はいい天気ですね。」で、3 つとも
+  「Hello, how are you?」「The weather is nice today, isn't it?」が返った。
+- 2 回目の目標（claude は数秒、agy・codex は 10 秒以内）は 3 つとも満たした。
+  claude の起動は事前検証の 31 秒よりずっと短く、1 回目も 4 秒台だった。
+
+画面（`npm run dev-ui`）:
+
+- 翻訳の設定に「AI CLI」「AI CLI の接続確認」「AI CLI のモデルを選択」が出る（ja・en とも確認）。接続確認ボタンも動く（agy で 4.7 秒）。
+- CLI を切り替えるとモデル一覧が変わる（claude は 3 件、codex は 8 件、agy は 14 件）。
+- メイン画面の翻訳エンジンで「AI CLI」を選べ、3 つの CLI それぞれでチャットの訳文が表示された。
+  所要時間（開発モードのログから）は codex 3.9 秒・2.4 秒、claude 1.9 秒・1.4 秒、agy 3.6 秒（1 通だけ）。
+
+プロセスの後片付け:
+
+- サイドカーを `/run/shutdown` で終えたあとも、画面を閉じたあとも、起動した CLI
+  （claude / agy / codex と、その子の node など）は残らなかった。
+- `/run/shutdown` を送らずにサイドカーを強制終了しても残らなかった（CLI は標準入力が閉じると自分で終わる）。
+- CLI を切り替えると前の CLI のプロセスは終わり、常駐するのは 1 本だけ。
+
+確認できなかった点・気になった点:
+
+- agy の許可要求: 実物の agy はヘッドレスの stream-json では許可を求めるイベントを出さない。
+  許可が要る道具（`run_command`）は agy 自身が断り、`step_update`（`state: "ERROR"`）のあと
+  `status: "SUCCESS"`・`response: ""`・`denied_actions` つきの `result` で 4 秒ほどでターンが終わる。
+  いまの `AgySession` はイベント名に `permission` が含まれるかで見ているので反応せず、この場合は空の訳文を返す。
+  また、agy 自身の作業フォルダ（`~/.gemini/antigravity-cli/scratch`）へのファイル書き込みは許可なしで通った。
+  翻訳する文に道具を使わせる指示が混ざったときの扱いは、別に検討が要る。
+- codex の app-server はユーザーの codex の設定を読み、設定済みの MCP サーバー（この PC では codegraph）や
+  cua_node のランタイムを子プロセスとして起動する。終了時にはまとめて終わる。
+- 既定の CLI は、設計書の「検出された最初の CLI」（この PC では codex）ではなく claude になる。
+  既定のモデルは一覧の先頭（codex は gpt-6-astra、agy は gemini-3.8-flash-high）。
+- 未ログインや、CLI が応答しないときの立ち直りは、実際の CLI では試していない（偽の CLI を使うテストだけ）。
