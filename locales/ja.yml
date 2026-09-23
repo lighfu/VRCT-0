@@ -14,6 +14,7 @@ common_error:
     threshold_invalid_value: "{{min}} から {{max}} までの数値で設定できます。"
     failed_download_weight_ctranslate2: "CTranslate2 モデルのダウンロードに失敗しました。"
     failed_download_weight_whisper: "Whisper モデルのダウンロードに失敗しました。"
+    failed_download_sudachi_dict: "読みがな用の辞書のダウンロードに失敗しました。"
     translation_limit: "翻訳エンジンの使用制限に達したか、一時的に利用制限がかけられています。"
     deepl_auth_key_invalid_length: "APIキーの文字数が間違っています。"
     deepl_auth_key_failed_authentication: "APIキーが間違っているか、API使用制限が上限に達しています。"
@@ -350,6 +351,11 @@ config_page:
             desc: "「{{convert_message_to_hiragana}}」と同時に有効にした場合は、マウスホバーで表示されます。"
         convert_message_to_hiragana:
             label: "ひらがなを表示"
+        sudachi_dict_type:
+            label: "読みがなの辞書"
+            desc: "「full」は人名・地名・新しい言葉の読みがより正確になります。初回だけダウンロード（約127MB、展開後は約360MB）が必要です。"
+            core: "標準"
+            full: "full（高精度）"
         telemetry:
             label: "製品の改善に協力する"
             desc: "開発者が「みんな使ってくれてるんだな～」ってにやにやしながら機能改善するための使用状況データを送信します。\n※会話内容など個人情報は一切送信しません。"

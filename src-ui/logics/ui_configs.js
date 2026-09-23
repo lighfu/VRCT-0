@@ -99,6 +99,11 @@ export const whisper_weight_type_status = [
     { id: "large-v3-turbo", capacity: "1.58GB"},
 ].map(item => ({ is_default: false, ...item, is_downloaded: false, progress: null }));
 
+export const sudachi_dict_type_status = [
+    { id: "core", capacity: "", is_default: true },
+    { id: "full", capacity: "127MB" },
+].map(item => ({ is_default: false, ...item, is_downloaded: false, progress: null }));
+
 
 export const deepl_auth_key_url = "https://www.deepl.com/ja/your-account/keys";
 export const plamo_auth_key_url = "https://plamo.preferredai.jp/api";

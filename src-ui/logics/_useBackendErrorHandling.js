@@ -142,6 +142,9 @@ export const _useBackendErrorHandling = () => {
             case "WEIGHT_WHISPER_DOWNLOAD":
                 showNotification_Error(t("common_error.failed_download_weight_whisper"), { category_id: error_code });
                 return;
+            case "WEIGHT_SUDACHI_DICT_DOWNLOAD":
+                showNotification_Error(t("common_error.failed_download_sudachi_dict"), { category_id: error_code });
+                return;
 
             // ============================================================================
             // バリデーションエラー (VALIDATION_*)

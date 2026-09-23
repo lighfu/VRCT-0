@@ -3,6 +3,7 @@ import { createAtomWithHook } from "@store";
 import {
     ctranslate2_weight_type_status,
     whisper_weight_type_status,
+    sudachi_dict_type_status,
     ui_configs,
 } from "@ui_configs";
 
@@ -745,6 +746,22 @@ export const SETTINGS_ARRAY = [
         ui_template_id: "toggle",
         logics_template_id: "toggle_enable_disable",
         base_endpoint_name: "convert_message_to_hiragana",
+    },
+    {
+        Category: "Others",
+        Base_Name: "SudachiDictTypeStatus",
+        default_value: sudachi_dict_type_status,
+        ui_template_id: "list",
+        logics_template_id: "weight_download_status",
+        base_endpoint_name: "sudachi_dict",
+    },
+    {
+        Category: "Others",
+        Base_Name: "SelectedSudachiDictType",
+        default_value: "core",
+        ui_template_id: "select",
+        logics_template_id: "get_set",
+        base_endpoint_name: "selected_sudachi_dict_type",
     },
     {
         Category: "Others",

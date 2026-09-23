@@ -13,6 +13,7 @@ import {
 import {
     CheckboxContainer,
     MessageFormatContainer,
+    DownloadModelsContainer,
 } from "../_templates/Templates";
 
 import {
@@ -53,6 +54,7 @@ export const Others = () => {
             <div>
                 <ConvertMessageToRomajiContainer />
                 <ConvertMessageToHiraganaContainer />
+                <SudachiDictTypeContainer />
             </div>
             <div>
                 <TelemetryContainer />
@@ -250,6 +252,39 @@ const ConvertMessageToHiraganaContainer = () => {
             desc={desc}
             variable={currentConvertMessageToHiragana}
             toggleFunction={toggleConvertMessageToHiragana}
+        />
+    );
+};
+
+const SudachiDictTypeContainer = () => {
+    const { t } = useI18n();
+    const {
+        currentSudachiDictTypeStatus,
+        pendingSudachiDictTypeStatus,
+        downloadSudachiDictTypeStatus,
+        currentSelectedSudachiDictType,
+        setSelectedSudachiDictType,
+    } = useOthers();
+
+    const downloadStartFunction = (id) => {
+        pendingSudachiDictTypeStatus(id);
+        downloadSudachiDictTypeStatus(id);
+    };
+
+    const options = currentSudachiDictTypeStatus.data.map(item => ({
+        ...item,
+        label: t(`config_page.others.sudachi_dict_type.${item.id}`),
+    }));
+
+    return (
+        <DownloadModelsContainer
+            label={t("config_page.others.sudachi_dict_type.label")}
+            desc={t("config_page.others.sudachi_dict_type.desc")}
+            name="sudachi_dict_type"
+            options={options}
+            checked_variable={currentSelectedSudachiDictType}
+            selectFunction={setSelectedSudachiDictType}
+            downloadStartFunction={downloadStartFunction}
         />
     );
 };

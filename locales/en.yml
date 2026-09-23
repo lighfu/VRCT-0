@@ -14,6 +14,7 @@ common_error:
     threshold_invalid_value: "You can set it with a value between {{min}} to {{max}}."
     failed_download_weight_ctranslate2: "CTranslate2 weight download error."
     failed_download_weight_whisper: "Whisper weight download error."
+    failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "Translation engine limit reached or temporarily restricted."
     deepl_auth_key_invalid_length: "DeepL API key length is not correct."
     deepl_auth_key_failed_authentication: "API key is incorrect or API usage limit reached."
@@ -350,6 +351,11 @@ config_page:
             desc:  "When enabled along with '{{convert_message_to_hiragana}}', romaji will be shown on mouse hover."
         convert_message_to_hiragana:
             label: "Show Hiragana"
+        sudachi_dict_type:
+            label: "Reading Dictionary"
+            desc: "\"full\" gives more accurate readings for names, places and newer words. It needs a one-time download (about 127MB, about 360MB after extraction)."
+            core: "Standard"
+            full: "full (more accurate)"
         telemetry:
             label: "Support Our Development"
             desc: "Sends usage data so our developers can grin and say 'Thanks for using it!' while improving the app.\n* No personal info or conversation content is ever sent."

@@ -14,6 +14,7 @@ common_error:
     threshold_invalid_value: "可设置的数值范围为 {{min}} 到 {{max}}。"
     failed_download_weight_ctranslate2: "CTranslate2 模型下载失败。"
     failed_download_weight_whisper: "Whisper 模型下载失败。"
+    failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "已达到翻译引擎使用限制或临时受到使用限制。"
     deepl_auth_key_invalid_length: "API 密钥字符数错误。"
     deepl_auth_key_failed_authentication: "API 密钥错误或已达 API 使用上限。"
@@ -344,6 +345,11 @@ config_page:
             desc: "与「{{convert_message_to_hiragana}}」同时启用时，将通过鼠标悬停显示。"
         convert_message_to_hiragana:
             label: "显示平假名"
+        sudachi_dict_type:
+            label: "Reading Dictionary"
+            desc: "\"full\" gives more accurate readings for names, places and newer words. It needs a one-time download (about 127MB, about 360MB after extraction)."
+            core: "Standard"
+            full: "full (more accurate)"
         telemetry:
             label:
             desc:
