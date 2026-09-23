@@ -122,6 +122,15 @@ try:
 except Exception:
     from translation_ollama import OllamaClient
 
+try:
+    from .translation_ai_cli import AICliClient
+    from .ai_cli import catalog as ai_cli_catalog
+    from .ai_cli.base import AiCliError
+except Exception:
+    from translation_ai_cli import AICliClient
+    from ai_cli import catalog as ai_cli_catalog
+    from ai_cli.base import AiCliError
+
 
 class Translator:
     """High-level translator facade.
@@ -148,6 +157,8 @@ class Translator:
         self.lmstudio_connected: bool = False
         self.ollama_client: Optional[Any] = None
         self.ollama_connected: bool = False
+        self.ai_cli_client: Optional[Any] = None
+        self.ai_cli_connected: bool = False
         self.ctranslate2_translator: Any = None
         self.ctranslate2_tokenizer: Any = None
         self.is_loaded_ctranslate2_model: bool = False
@@ -463,6 +474,40 @@ class Translator:
         """Update the Ollama client (fetch available models)."""
         self.ollama_client.updateClient()
 
+    def getAiCliInstalledTools(self) -> list[str]:
+        return ai_cli_catalog.detectInstalledTools()
+
+    def getAiCliConnected(self) -> bool:
+        return self.ai_cli_connected
+
+    def checkAiCliClient(self, tool: str, root_path: str = None) -> bool:
+        """選んだ AI CLI が入っていれば接続済みにする (セッションはまだ起動しない)。"""
+        if self.ai_cli_client is None:
+            self.ai_cli_client = AICliClient(root_path=root_path)
+        result = bool(self.ai_cli_client.setTool(tool) and self.ai_cli_client.authenticationCheck())
+        if result is False:
+            self.ai_cli_client.close()
+        self.ai_cli_connected = result
+        return result
+
+    def getAiCliModelList(self) -> list[str]:
+        if self.ai_cli_client is None:
+            return []
+        return self.ai_cli_client.getModelList()
+
+    def setAiCliModel(self, model: str) -> bool:
+        if self.ai_cli_client is None:
+            return False
+        return self.ai_cli_client.setModel(model)
+
+    def updateAiCliClient(self) -> None:
+        if self.ai_cli_client is not None:
+            self.ai_cli_client.updateClient()
+
+    def closeAiCliClient(self) -> None:
+        if self.ai_cli_client is not None:
+            self.ai_cli_client.shutdown()
+
     def changeCTranslate2Model(self, path: str, model_type: str, device: str = "cpu", device_index: int = 0, compute_type: str = "auto") -> None:
         """Load a CTranslate2 model from weights.
 
@@ -654,6 +699,17 @@ class Translator:
                         if context_history:
                             self.ollama_client.setContextHistory(context_history)
                         result = self.ollama_client.translate(
+                            message,
+                            input_lang=source_language,
+                            output_lang=target_language,
+                        )
+                case "AI_CLI":
+                    if self.ai_cli_client is None:
+                        result = False
+                    else:
+                        if context_history:
+                            self.ai_cli_client.setContextHistory(context_history)
+                        result = self.ai_cli_client.translate(
                             message,
                             input_lang=source_language,
                             output_lang=target_language,

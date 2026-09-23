@@ -1212,6 +1212,38 @@ class Model:
         self.ensure_initialized()
         self.translator.updateOllamaClient()
 
+    def getTranslatorAiCliInstalledTools(self) -> list[str]:
+        self.ensure_initialized()
+        return self.translator.getAiCliInstalledTools()
+
+    def getTranslatorAiCliConnected(self) -> bool:
+        self.ensure_initialized()
+        return self.translator.getAiCliConnected()
+
+    def authenticationTranslatorAiCli(self) -> bool:
+        self.ensure_initialized()
+        return self.translator.checkAiCliClient(tool=config.SELECTED_AI_CLI_TOOL, root_path=config.PATH_LOCAL)
+
+    def setTranslatorAiCliTool(self, tool: str) -> bool:
+        self.ensure_initialized()
+        return self.translator.checkAiCliClient(tool=tool, root_path=config.PATH_LOCAL)
+
+    def getTranslatorAiCliModelList(self) -> list[str]:
+        self.ensure_initialized()
+        return self.translator.getAiCliModelList()
+
+    def setTranslatorAiCliModel(self, model: str) -> bool:
+        self.ensure_initialized()
+        return self.translator.setAiCliModel(model=model)
+
+    def updateTranslatorAiCliClient(self) -> None:
+        self.ensure_initialized()
+        self.translator.updateAiCliClient()
+
+    def closeTranslatorAiCli(self) -> None:
+        if getattr(self, "_inited", False):
+            self.translator.closeAiCliClient()
+
     def startLogger(self):
         self.ensure_initialized()
         os_makedirs(config.PATH_LOGS, exist_ok=True)

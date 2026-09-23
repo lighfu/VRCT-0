@@ -141,6 +141,7 @@ class ErrorCode(str, Enum):
     MODEL_OPENROUTER_INVALID = "MODEL_OPENROUTER_INVALID"
     MODEL_LMSTUDIO_INVALID = "MODEL_LMSTUDIO_INVALID"
     MODEL_OLLAMA_INVALID = "MODEL_OLLAMA_INVALID"
+    MODEL_AI_CLI_INVALID = "MODEL_AI_CLI_INVALID"
     # Groq/OpenAI/カスタムサーバーの文字起こしモデルは全て
     # OpenAICompatibleTranscriptionProvider の1実装を共有するため、翻訳側の
     # ようにエンジンごとのコードを分けず1つにまとめる (エラーコード追加は
@@ -152,6 +153,7 @@ class ErrorCode(str, Enum):
     # ============================================================================
     CONNECTION_LMSTUDIO_FAILED = "CONNECTION_LMSTUDIO_FAILED"
     CONNECTION_OLLAMA_FAILED = "CONNECTION_OLLAMA_FAILED"
+    CONNECTION_AI_CLI_FAILED = "CONNECTION_AI_CLI_FAILED"
     CONNECTION_LMSTUDIO_URL_INVALID = "CONNECTION_LMSTUDIO_URL_INVALID"
     CONNECTION_OPENAI_COMPATIBLE_URL_INVALID = "CONNECTION_OPENAI_COMPATIBLE_URL_INVALID"
     CONNECTION_TRANSCRIPTION_CUSTOM_URL_INVALID = "CONNECTION_TRANSCRIPTION_CUSTOM_URL_INVALID"
@@ -612,6 +614,12 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
         "severity": "warning",
         "user_action_required": True,
     },
+    ErrorCode.MODEL_AI_CLI_INVALID: {
+        "category": ErrorCategory.MODEL,
+        "message": "AI CLI model is not valid",
+        "severity": "warning",
+        "user_action_required": True,
+    },
     ErrorCode.MODEL_TRANSCRIPTION_INVALID: {
         "category": ErrorCategory.MODEL,
         "message": "Transcription API model is not valid",
@@ -629,6 +637,12 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
     ErrorCode.CONNECTION_OLLAMA_FAILED: {
         "category": ErrorCategory.CONNECTION,
         "message": "Cannot connect to ollama server",
+        "severity": "error",
+        "user_action_required": True,
+    },
+    ErrorCode.CONNECTION_AI_CLI_FAILED: {
+        "category": ErrorCategory.CONNECTION,
+        "message": "The selected AI CLI is not installed or could not be started",
         "severity": "error",
         "user_action_required": True,
     },

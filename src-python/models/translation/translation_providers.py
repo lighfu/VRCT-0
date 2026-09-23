@@ -32,8 +32,8 @@
     - `TRANSLATION_PROVIDER_REGISTRY` (認証キー + モデル一覧型、5エンジン):
       Plamo/Gemini/OpenAI/Groq/OpenRouter。controller.py 側は
       `Controller._getTranslationEngineAuthKey` 等の6メソッドに委譲する。
-    - `CONNECTION_PROVIDER_REGISTRY` (疎通確認型、2エンジン): LMStudio/
-      Ollama。認証キーを持たず、URL指定またはローカル自動検出で接続を
+    - `CONNECTION_PROVIDER_REGISTRY` (疎通確認型、3エンジン): LMStudio/
+      Ollama/AI_CLI（AI_CLI はローカルの CLI を検出する）。認証キーを持たず、URL指定またはローカル自動検出で接続を
       確認する。controller.py 側は `Controller._checkTranslationEngineConnection`
       に委譲する。モデル一覧取得/選択モデル変更の3メソッドは
       `selectable_model_list_attr`/`selected_model_attr`/`error_model_invalid`
@@ -234,5 +234,14 @@ CONNECTION_PROVIDER_REGISTRY: Dict[str, ConnectionEngineSpec] = {
         selected_model_attr="SELECTED_OLLAMA_MODEL",
         run_mapping_selectable_key="selectable_ollama_model_list",
         run_mapping_selected_key="selected_ollama_model",
+    ),
+    "AI_CLI": ConnectionEngineSpec(
+        engine_key="AI_CLI",
+        error_connection_failed=ErrorCode.CONNECTION_AI_CLI_FAILED,
+        error_model_invalid=ErrorCode.MODEL_AI_CLI_INVALID,
+        selectable_model_list_attr="SELECTABLE_AI_CLI_MODEL_LIST",
+        selected_model_attr="SELECTED_AI_CLI_MODEL",
+        run_mapping_selectable_key="selectable_ai_cli_model_list",
+        run_mapping_selected_key="selected_ai_cli_model",
     ),
 }
