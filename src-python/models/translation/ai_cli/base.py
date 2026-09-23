@@ -10,6 +10,19 @@ CLI ごとの違い (起動引数・送る JSON・完了の見分け方) はサ�
 kill する処理はどちらのロックも保持しないところで行う。加えて各ターン (と
 起動直後のハンドシェイク) には `threading.Timer` の見張り役を付け、
 `proc.stdin.write()` がブロックしたままでも締め切りで確実に殺せるようにする。
+
+`close()` と `shutdown()` は別物: `close()` は「今のプロセスを殺すだけ」で、
+次の `translate()` は普通に再起動する。`shutdown()` は恒久的にセッションを
+無効化し、以後の `start()`/`translate()` はすべて `AiCliError` になる
+(呼び出し元がセッションへの参照を手放した後でも、既に走っていた
+起動中スレッドが CLI を孤児として残さないようにするため)。
+
+`start()` の途中 (Popen 成功後・`_proc` 公開前) に別スレッドから `close()`/
+`shutdown()` が割り込むと、公開されないまま孤児プロセスが残ってしまう。これを
+防ぐため `_generation` を持ち、`close()`/`shutdown()` は `_procLock` の下で
+これをインクリメントする。`start()` は自分が観測した世代を覚えておき、
+`_spawn()` は公開直前に世代 (と shutdown フラグ) を `_procLock` の下で
+再確認し、ずれていれば今作ったプロセスを黙って殺して `AiCliError` を送出する。
 """
 
 import json
@@ -45,6 +58,8 @@ class CliSession:
         self._messages: "queue.Queue" = queue.Queue()
         self._stderr: deque = deque(maxlen=50)
         self._turns = 0
+        self._generation = 0
+        self._shut_down = False
 
     # --- サブクラスが実装する ---
     def _buildArgs(self) -> list[str]:
@@ -60,6 +75,12 @@ class CliSession:
         """("ok", text) / ("error", detail) / None (続きを待つ) を返す。"""
         raise NotImplementedError
 
+    def _beforePublish(self, proc: subprocess.Popen) -> None:
+        """テスト用フック: Popen 成功後・`_proc` 公開前に呼ばれる。既定は何もしない。
+
+        close()/_spawn の競合をテストで決定的に再現するためのもの。
+        """
+
     # --- 公開メソッド ---
     def isAlive(self) -> bool:
         with self._procLock:
@@ -70,18 +91,25 @@ class CliSession:
         with self._lock:
             if self.isAlive():
                 return
-            self._spawn()
-            proc = self._proc
-            watchdog = threading.Timer(self.START_TIMEOUT, self._killIfStill, args=(proc,))
-            watchdog.daemon = True
-            watchdog.start()
+            with self._procLock:
+                if self._shut_down:
+                    raise AiCliError("session was shut down")
+                generation = self._generation
+            proc = self._spawn(generation)
+            watchdog = None
+            if proc is not None:
+                watchdog = threading.Timer(self.START_TIMEOUT, self._killIfStill, args=(proc,))
+                watchdog.daemon = True
+                watchdog.start()
             try:
                 self._afterStart(time.monotonic() + self.START_TIMEOUT)
             except Exception:
                 self.close()
                 raise
             finally:
-                watchdog.cancel()
+                if watchdog is not None:
+                    watchdog.cancel()
+                    watchdog.join()
 
     def translate(self, prompt: str, timeout: Optional[float] = None) -> str:
         with self._lock:
@@ -99,9 +127,11 @@ class CliSession:
                 deadline = time.monotonic() + limit
                 # proc.stdin.write() 自体は締め切りで自動的には止まらないので、
                 # 別スレッドの見張り役でターン全体 (書き込みも含む) を締め切りに縛る。
-                watchdog = threading.Timer(limit, self._killIfStill, args=(proc,))
-                watchdog.daemon = True
-                watchdog.start()
+                watchdog = None
+                if proc is not None:
+                    watchdog = threading.Timer(limit, self._killIfStill, args=(proc,))
+                    watchdog.daemon = True
+                    watchdog.start()
                 try:
                     for message in self._turnMessages(prompt):
                         self._write(message)
@@ -115,7 +145,13 @@ class CliSession:
                             return str(value).strip()
                         raise AiCliError(str(value))
                 finally:
-                    watchdog.cancel()
+                    # 見張り役が発火した直後で cancel() が効かない場合でも、
+                    # join() で完全に終わるのを待ってから次のターンに進む。
+                    # そうしないと、既に完了した見張り役が次のターンの
+                    # (別の) 健全なプロセスを誤って殺す隙が生まれる。
+                    if watchdog is not None:
+                        watchdog.cancel()
+                        watchdog.join()
             except AiCliError:
                 self.close()
                 raise
@@ -124,7 +160,21 @@ class CliSession:
                 raise AiCliError(str(e)) from e
 
     def close(self) -> None:
-        proc = self._detach()
+        """今のプロセスを殺す。shutdown 済みでなければ次の translate() で再起動される。"""
+        with self._procLock:
+            self._generation += 1
+            proc = self._proc
+            self._proc = None
+        if proc is not None:
+            self._kill(proc)
+
+    def shutdown(self) -> None:
+        """セッションを恒久的に終える。以後 start()/translate() は AiCliError を送出する。"""
+        with self._procLock:
+            self._shut_down = True
+            self._generation += 1
+            proc = self._proc
+            self._proc = None
         if proc is not None:
             self._kill(proc)
 
@@ -153,25 +203,24 @@ class CliSession:
         return item
 
     # --- プロセスの入れ替え・停止 (self._lock を握らずに呼べる) ---
-    def _detach(self, expected: Optional[subprocess.Popen] = None) -> Optional[subprocess.Popen]:
-        """`_proc` を None に入れ替え、切り離した旧プロセスを返す (無ければ None)。
+    def _detachIfCurrent(self, proc: subprocess.Popen) -> Optional[subprocess.Popen]:
+        """`_proc` が `proc` と同一のときだけ切り離して返す (世代は変えない)。
 
-        `expected` を指定すると、現在の `_proc` がそれと同一のときだけ切り離す
-        (見張り役のタイマーが、既に別プロセスに世代交代した後の proc を誤って
-        殺さないようにするため)。
+        見張り役タイマー専用。close()/shutdown() による本物の世代交代とは違い、
+        既に別プロセスに交代済みなら何もしない (誤って新しいプロセスを
+        殺さないため)。
         """
         with self._procLock:
-            proc = self._proc
-            if proc is None:
-                return None
-            if expected is not None and proc is not expected:
-                return None
-            self._proc = None
-            return proc
+            if self._proc is proc:
+                self._proc = None
+                return proc
+            return None
 
-    def _killIfStill(self, proc: subprocess.Popen) -> None:
+    def _killIfStill(self, proc: Optional[subprocess.Popen]) -> None:
         """締め切りを過ぎたときに見張り役タイマーから呼ばれる。"""
-        detached = self._detach(expected=proc)
+        if proc is None:
+            return
+        detached = self._detachIfCurrent(proc)
         if detached is not None:
             self._kill(detached)
 
@@ -184,6 +233,10 @@ class CliSession:
         その書き込みスレッドが握っている内部バッファのロックを待ってしまい、
         ここ自体が止まって taskkill にたどり着けなくなる (実測で確認済み)。
         先にプロセスを殺せば、詰まっていた書き込みは broken pipe で解放される。
+        それでも (taskkill が失敗し、なおかつ読み手が生き残っている等で)
+        stdin の close 自体がブロックする可能性は残るので、close() は
+        デーモンスレッドに投げっぱなしにして `_kill()` 自体が絶対に
+        ブロックしないようにする。
         """
         try:
             if proc.poll() is None:
@@ -209,14 +262,32 @@ class CliSession:
                 proc.wait(timeout=2)
         except Exception:
             pass
-        try:
-            if proc.stdin is not None:
-                proc.stdin.close()
-        except Exception:
-            pass
+        CliSession._closeStdinAsync(proc)
+
+    @staticmethod
+    def _closeStdinAsync(proc: subprocess.Popen) -> None:
+        stdin = proc.stdin
+        if stdin is None:
+            return
+
+        def _close() -> None:
+            try:
+                stdin.close()
+            except Exception:
+                pass
+
+        threading.Thread(target=_close, daemon=True).start()
 
     # --- 内部 ---
-    def _spawn(self) -> None:
+    def _spawn(self, generation: int) -> Optional[subprocess.Popen]:
+        """新しいプロセスを起動する。
+
+        起動中 (Popen の呼び出し中) に別スレッドが close()/shutdown() すると
+        `_generation` が進むので、Popen 完了後にそれを確認し、ずれていたら
+        (または既に shutdown 済みなら) 今作ったプロセスを黙って殺して
+        AiCliError を送出する。呼び出し元にはプロセスを公開できたときだけ
+        proc を返す。
+        """
         os.makedirs(self.workspace, exist_ok=True)
         try:
             proc = subprocess.Popen(
@@ -227,15 +298,32 @@ class CliSession:
             )
         except OSError as e:
             raise AiCliError(f"failed to start AI CLI: {e}") from e
+
+        self._beforePublish(proc)
+
         messages: "queue.Queue" = queue.Queue()
         stderr: deque = deque(maxlen=50)
         with self._procLock:
-            self._proc = proc
+            shut_down = self._shut_down
+            stale = self._generation != generation
+            if shut_down or stale:
+                published = False
+            else:
+                self._proc = proc
+                published = True
+
+        if not published:
+            self._kill(proc)
+            if shut_down:
+                raise AiCliError("session was shut down")
+            raise AiCliError("AI CLI session was closed while starting")
+
         self._messages = messages
         self._stderr = stderr
         self._turns = 0
         threading.Thread(target=self._readStdout, args=(proc, messages), daemon=True).start()
         threading.Thread(target=self._readStderr, args=(proc, stderr), daemon=True).start()
+        return proc
 
     def _drainStale(self) -> None:
         """次のターンを送る前に、前のターンの取りこぼしをためずに捨てる。
