@@ -16,8 +16,43 @@ import requests
 import ipaddress
 import socket
 
-def _registerBundledCudaLibraries() -> None:
-    """nvidia-*-cu12 wheel が置いたCUDAライブラリをDLL検索パスへ登録する。
+def externalCudaLibraryDir() -> Optional[str]:
+    """インストーラーが後から入れた CUDA ライブラリの置き場所 (存在すれば)。
+
+    CPU版とCUDA版を1つのビルドにするため、cuBLAS / cuDNN を同梱せず
+    %LOCALAPPDATA%\\VRCT\\cuda\\bin に置けるようにした (A-1, 2026-09-23)。
+    取得処理はインストーラー側のサブプロジェクトで作る。
+    """
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    path = os.path.join(local_app_data, "VRCT", "cuda", "bin")
+    return path if os.path.isdir(path) else None
+
+
+def _cudaLibraryDirs() -> List[str]:
+    library_dirs: List[str] = []
+    try:
+        import nvidia  # type: ignore
+    except ImportError:
+        nvidia = None
+    if nvidia is not None:
+        library_dirs.extend(sorted(
+            {
+                library_dir
+                for search_path in nvidia.__path__
+                for library_dir in glob.glob(os.path.join(search_path, "*", "bin"))
+                if os.path.isdir(library_dir)
+            }
+        ))
+    external = externalCudaLibraryDir()
+    if external is not None:
+        library_dirs.append(external)
+    return library_dirs
+
+
+def _registerCudaLibraries() -> None:
+    """CUDAライブラリをDLL検索パスへ登録する。
 
     CUDA版ビルドは ctranslate2 が必要とする cuBLAS / cuDNN を
     nvidia-cublas-cu12 / nvidia-cudnn-cu12 から取る。これらは
@@ -33,30 +68,21 @@ def _registerBundledCudaLibraries() -> None:
     凍結ビルドでも同じ処理で動く。PyInstaller は同じDLL群を
     _internal/nvidia/<lib>/bin/ へ収集するので (spec/backend_cuda.spec の
     hiddenimports 参照)、`nvidia.__path__` からそのまま辿れる。
-    CPU版ビルドには `nvidia` が無いので、その場合は何もせず返る。
+    CPU版ビルドには `nvidia` が無いので、その場合はここでは何も見つからない。
+
+    同梱 (CUDA版ビルド) に加えて externalCudaLibraryDir() も登録する。
+    どちらも無ければ何もしない。
     """
     if os.name != "nt":
         return
-    try:
-        import nvidia  # type: ignore
-    except ImportError:
-        return
-
-    library_dirs = sorted(
-        {
-            library_dir
-            for search_path in nvidia.__path__
-            for library_dir in glob.glob(os.path.join(search_path, "*", "bin"))
-            if os.path.isdir(library_dir)
-        }
-    )
+    library_dirs = _cudaLibraryDirs()
     if not library_dirs:
         return
     for library_dir in library_dirs:
         os.add_dll_directory(library_dir)
     os.environ["PATH"] = os.pathsep.join(library_dirs) + os.pathsep + os.environ.get("PATH", "")
 
-_registerBundledCudaLibraries()
+_registerCudaLibraries()
 
 # ctranslate2 は import に時間がかかるので、使うときに読み込む (A-1, 2026-09-23)。
 # 関数名はテストが patch するので変えない。ctranslate2 が無い環境では空/0 を返す。
