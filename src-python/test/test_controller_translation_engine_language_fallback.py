@@ -163,7 +163,7 @@ class TestSetSelectedTranslationEnginesValidatesFinalEngine(unittest.TestCase):
     ENGINES = [
         "DeepL_API", "Google", "Bing", "Papago", "CTranslate2",
         "Plamo_API", "Gemini_API", "OpenAI_API", "LMStudio",
-        "OpenAI_Compatible", "Ollama", "Groq_API", "OpenRouter_API",
+        "OpenAI_Compatible", "Ollama", "Groq_API", "OpenRouter_API", "AI_CLI",
     ]
 
     def setUp(self) -> None:
@@ -240,7 +240,7 @@ class TestUpdateTranslationEngineAndEngineListResetsLanguageWhenCTranslate2AlsoU
     ENGINES = [
         "DeepL_API", "Google", "Bing", "Papago", "CTranslate2",
         "Plamo_API", "Gemini_API", "OpenAI_API", "LMStudio",
-        "OpenAI_Compatible", "Ollama", "Groq_API", "OpenRouter_API",
+        "OpenAI_Compatible", "Ollama", "Groq_API", "OpenRouter_API", "AI_CLI",
     ]
 
     def setUp(self) -> None:

@@ -747,3 +747,7 @@ Groq_API:
 OpenRouter_API:
   source: *openai_langs
   target: *openai_langs
+
+AI_CLI:
+  source: *openai_langs
+  target: *openai_langs

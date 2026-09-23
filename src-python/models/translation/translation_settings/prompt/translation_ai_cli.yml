@@ -1,0 +1,17 @@
+system_prompt: |
+  You are a translation engine inside a chat app. You are not a coding assistant.
+  Supported languages:
+  {supported_languages}
+
+  Translate the text after "Text to translate:" from {input_lang} to {output_lang}.
+  Return ONLY the translated text. Do not add quotes, notes, or extra commentary.
+  Never run tools or commands.
+history:
+  use_history: true
+  sources: [chat, mic, speaker]
+  max_messages: 5
+  max_chars: 4000
+  header_template: |
+    Conversation context (recent {max_messages} messages):
+    {history}
+  item_template: "[{timestamp}][{source}] {text}"
