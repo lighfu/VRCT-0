@@ -209,29 +209,45 @@ class TransformersParityTests(unittest.TestCase):
     src-python/weights に無い環境ではスキップする (ネットワークに出ない)。
     """
 
-    def test_tokens_and_decoding_match_transformers(self) -> None:
+    def _assertParityForModel(self, weight_type: str, repo_id: str, to_code) -> None:
+        """Check one model's tokenizer parity against transformers.
+
+        Split out of the old single loop-based test so that a missing cache for one
+        model (e.g. m2m100) only skips that model, not the other (e.g. NLLB) -- a
+        skipTest() inside a for-loop skips the whole remaining test, including models
+        that come after the missing one.
+        """
         try:
             import transformers
         except ImportError:
             self.skipTest("transformers is not installed")
         from config import config
-        for weight_type, repo_id, to_code in _PARITY_MODELS:
-            cache_dir = os.path.join(config.PATH_LOCAL, "weights", "ctranslate2", weight_type, "tokenizer")
-            family = ct2tok.tokenizerFamily(weight_type)
-            if ct2tok.findTokenizerFiles(cache_dir, repo_id, ct2tok.REQUIRED_FILES[family]) is None:
-                self.skipTest(f"tokenizer files for {weight_type} are not cached")
-            ours = ct2tok.loadCT2Tokenizer(cache_dir, repo_id, weight_type)
-            theirs = transformers.AutoTokenizer.from_pretrained(repo_id, cache_dir=cache_dir, local_files_only=True)
-            for lang, sentences in _SENTENCES.items():
-                code = to_code(lang)
-                for sentence in sentences:
-                    with self.subTest(model=weight_type, lang=lang, sentence=sentence):
-                        theirs.src_lang = code
-                        expected = theirs.convert_ids_to_tokens(theirs.encode(sentence))
-                        actual = ours.encode(sentence, code)
-                        self.assertEqual(actual, expected)
-                        body = actual[1:-1]
-                        self.assertEqual(ours.decode(body), theirs.decode(theirs.convert_tokens_to_ids(body)))
+        cache_dir = os.path.join(config.PATH_LOCAL, "weights", "ctranslate2", weight_type, "tokenizer")
+        family = ct2tok.tokenizerFamily(weight_type)
+        if ct2tok.findTokenizerFiles(cache_dir, repo_id, ct2tok.REQUIRED_FILES[family]) is None:
+            self.skipTest(f"tokenizer files for {weight_type} are not cached")
+        ours = ct2tok.loadCT2Tokenizer(cache_dir, repo_id, weight_type)
+        theirs = transformers.AutoTokenizer.from_pretrained(repo_id, cache_dir=cache_dir, local_files_only=True)
+        for lang, sentences in _SENTENCES.items():
+            code = to_code(lang)
+            for sentence in sentences:
+                with self.subTest(model=weight_type, lang=lang, sentence=sentence):
+                    theirs.src_lang = code
+                    expected = theirs.convert_ids_to_tokens(theirs.encode(sentence))
+                    actual = ours.encode(sentence, code)
+                    self.assertEqual(actual, expected)
+                    body = actual[1:-1]
+                    self.assertEqual(ours.decode(body), theirs.decode(theirs.convert_tokens_to_ids(body)))
+
+    def test_tokens_and_decoding_match_transformers_m2m100(self) -> None:
+        weight_type, repo_id, to_code = _PARITY_MODELS[0]
+        assert weight_type == "m2m100_418M-ct2-int8"
+        self._assertParityForModel(weight_type, repo_id, to_code)
+
+    def test_tokens_and_decoding_match_transformers_nllb(self) -> None:
+        weight_type, repo_id, to_code = _PARITY_MODELS[1]
+        assert weight_type == "nllb-200-distilled-600M-ct2-int8"
+        self._assertParityForModel(weight_type, repo_id, to_code)
 
 
 if __name__ == "__main__":

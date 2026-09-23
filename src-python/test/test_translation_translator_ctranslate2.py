@@ -66,6 +66,26 @@ class TestChangeCTranslate2Model(unittest.TestCase):
              patch.object(tt_module, "loadCT2Tokenizer", side_effect=OSError("offline")):
             translator.changeCTranslate2Model(path=".", model_type="m2m100_418M-ct2-int8")
         self.assertFalse(translator.isLoadedCTranslate2Model())
+        # Minor 5: don't leave a loaded ctranslate2_translator pointing at a model
+        # whose tokenizer never loaded.
+        self.assertIsNone(translator.ctranslate2_translator)
+
+    def test_change_model_is_loaded_when_fallback_tokenizer_path_succeeds(self) -> None:
+        # First loadCT2Tokenizer attempt (weights/ctranslate2/.../tokenizer under `path`)
+        # fails, but the fallback attempt (relative ./weights/... path) succeeds.
+        translator = Translator()
+        fake_ct2 = MagicMock()
+        fake_tokenizer = FakeTokenizer("m2m100")
+        with patch.object(tt_module, "ctranslate2", fake_ct2), \
+             patch.object(
+                 tt_module,
+                 "loadCT2Tokenizer",
+                 side_effect=[OSError("offline"), fake_tokenizer],
+             ):
+            translator.changeCTranslate2Model(path=".", model_type="m2m100_418M-ct2-int8")
+        self.assertTrue(translator.isLoadedCTranslate2Model())
+        self.assertIsNotNone(translator.ctranslate2_translator)
+        self.assertIs(translator.ctranslate2_tokenizer, fake_tokenizer)
 
 
 if __name__ == "__main__":

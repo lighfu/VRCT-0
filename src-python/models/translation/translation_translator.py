@@ -499,6 +499,7 @@ class Translator:
                     self.ctranslate2_tokenizer = loadCT2Tokenizer(tokenizer_path, tokenizer, model_type)
                 except Exception:
                     errorLogging()
+                    self.ctranslate2_translator = None
                     return
             self.is_loaded_ctranslate2_model = True
 

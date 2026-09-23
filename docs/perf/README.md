@@ -21,7 +21,7 @@ import 時間の上位 5（CPU 版）: mainloop: 4978.2ms, controller: 4956.6ms,
 
 | 版 | bin 合計 | インストーラー | 起動（中央値） | アイドル RSS | モデル読込後 RSS |
 |---|---|---|---|---|---|
-| langchain 撤去後（CPU） | 1180.6MB | -（Rust 未導入のため未計測） | 4.70秒 | 220.5MB | - |
+| langchain 撤去後（CPU） | 1180.5MB | -（Rust 未導入のため未計測） | 4.70秒 | 220.5MB | - |
 
 import 時間の上位 5（CPU 版）: mainloop: 2684.6ms, controller: 2667.1ms, model: 1808.5ms, models.translation.translation_translator: 1378.1ms, models.translation.translation_providers: 864.2ms
 
@@ -52,6 +52,8 @@ modulegraph はこの try/except 内の import も辿るため、`.venv`/`.venv_
 | 版 | bin 合計 | インストーラー | 起動（中央値） | アイドル RSS | モデル読込後 RSS |
 |---|---|---|---|---|---|
 | transformers 撤去後（CPU） | 1116.8MB | -（Rust 未導入のため未計測） | 5.77秒 | 212.9MB | - |
+
+import 時間の上位 5（CPU 版）: mainloop: 3289.4ms, controller: 3269.8ms, model: 2341.4ms, models.translation.translation_translator: 1664.2ms, models.translation.translation_providers: 1020.0ms
 
 ## 遅延 import 後（Task 11, §5, 2026-09-24）
 
@@ -120,20 +122,20 @@ modulegraph はこの try/except 内の import も辿るため、`.venv`/`.venv_
 PyInstaller.utils.cliutils.archive_viewer -r -b` で確認した。`hiddenimports`
 の追加は不要だった。
 
-フリーズ後の計測（`tools\measure_footprint.py`、Rust 未導入のためインストーラー未計測）:
+遅延 import 後の計測（`tools\measure_footprint.py`、Rust 未導入のためインストーラー未計測）:
 
 | 版 | bin 合計 | インストーラー | 起動（中央値） | アイドル RSS | モデル読込後 RSS |
 |---|---|---|---|---|---|
 | 遅延 import 後（CPU） | 773.8MB | -（Rust 未導入のため未計測） | 2.99秒 | 150.6MB | - |
 
-import 時間の上位 5（フリーズ後、CPU 版）: mainloop: 860.2ms, controller: 845.2ms, config: 315.5ms, device_manager: 310.7ms, model: 204.8ms
+import 時間の上位 5（遅延 import 後、CPU 版。開発 .venv のインタープリタで
+`-X importtime` を用いて計測しており、フリーズ済みバイナリの計測ではない）:
+mainloop: 860.2ms, controller: 845.2ms, config: 315.5ms, device_manager: 310.7ms, model: 204.8ms
 
 （bin 合計・アイドル RSS・起動時間は前段の Task 8〜10 (Sudachi 辞書 core 切替) 後の
 状態と比べての差分であり、この行だけでは §5 単独の寄与分を切り分けられない。
 mainloop の import 時間は前回記録の transformers 撤去後 3289.4ms から
 860.2ms へ大きく縮んでおり、遅延させたモジュール群 (§5) の効果が支配的と見て良い。）
-
-import 時間の上位 5（CPU 版）: mainloop: 3289.4ms, controller: 3269.8ms, model: 2341.4ms, models.translation.translation_translator: 1664.2ms, models.translation.translation_providers: 1020.0ms
 
 ## 結果（A-1 完了時）
 
@@ -144,13 +146,15 @@ Task 13 の最終計測。`bat\build.bat`／`bat\build_cuda.bat`（いずれも
 確認した上で `tools\measure_footprint.py`（`--python` に `.venv` /
 `.venv_cuda` の絶対パスを指定）で計測した
 （`docs/perf/final-cpu-2026-09-24.json` / `docs/perf/final-cuda-2026-09-24.json`）。
-Rust 未導入のためインストーラーは未計測、モデル読込後 RSS も
-`measure_footprint.py` の対応範囲外のため基準値と同じく未計測。
+Rust 未導入のためインストーラーは未計測。モデル読込後 RSS は
+`measure_footprint.py` 自体が `_MODEL_RSS_SCRIPT` でモデルをロードして計測する
+実装になっているが、`src-tauri\bin\weights\whisper\small` が存在しない環境
+だったため、ロード対象が無く結果が null になった（未実装ではなく、対象の
+モデル重みが未配置だったことによる欠測）。
 
 単位は MB = 1024² bytes（MiB）に統一している。すべてのセルは
 `docs/perf/*.json` の生値から `bytes/1024²` で MB を、秒はそのまま
-小数第2位まで計算し、差分は丸める前の生値どうしの差から算出した
-（詳細は `task-13-report.md` の「Fix round 1」節のスクリプト出力を参照）。
+小数第2位まで計算し、差分は丸める前の生値どうしの差から算出した。
 
 | 版 | 指標 | 基準値 | 最終 | 差 |
 |---|---|---|---|---|
@@ -212,7 +216,8 @@ Rust が未導入のためインストーラー経由の実機確認は行って
 - **OCR エンジン構築**: `models/ocr` の RapidOCR パイプラインを構築し、
   例外なく初期化できることを確認した。
 
-（詳細な出力は `task-13-report.md` を参照。）
+（`Translator` 構築・翻訳実行、`Transliterator` によるカタカナ変換出力、
+RapidOCR パイプライン構築のいずれも例外なく完了したことを標準出力で確認した。）
 
 以下は今回のセッションでは実施していない（要ユーザー確認）:
 
