@@ -18,6 +18,28 @@ class TranslatorAiCliTests(unittest.TestCase):
         self.assertTrue(translator.getAiCliConnected())
         fake_client.setTool.assert_called_once_with("claude")
 
+    def test_check_client_passes_version_resets_breaker_and_registers_status(self):
+        translator = Translator()
+        fake_client = MagicMock()
+        fake_client.setTool.return_value = True
+        fake_client.authenticationCheck.return_value = True
+        with patch.object(tt_module, "AICliClient", return_value=fake_client) as client_class:
+            translator.checkAiCliClient("claude", root_path=".", client_version="3.0.0")
+        self.assertEqual(client_class.call_args.kwargs["client_version"], "3.0.0")
+        fake_client.setStatusCallback.assert_called_once_with(translator._onAiCliStatus)
+        fake_client.resetBreaker.assert_called_once()
+
+    def test_status_change_updates_connected_and_forwards(self):
+        translator = Translator()
+        seen = []
+        translator.setAiCliStatusCallback(seen.append)
+        translator.ai_cli_connected = True
+        translator._onAiCliStatus(False)
+        self.assertFalse(translator.getAiCliConnected())
+        translator._onAiCliStatus(True)
+        self.assertTrue(translator.getAiCliConnected())
+        self.assertEqual(seen, [False, True])
+
     def test_check_client_fails_and_closes_when_tool_missing(self):
         translator = Translator()
         fake_client = MagicMock()

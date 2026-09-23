@@ -1222,11 +1222,17 @@ class Model:
 
     def authenticationTranslatorAiCli(self) -> bool:
         self.ensure_initialized()
-        return self.translator.checkAiCliClient(tool=config.SELECTED_AI_CLI_TOOL, root_path=config.PATH_LOCAL)
+        return self.translator.checkAiCliClient(tool=config.SELECTED_AI_CLI_TOOL, root_path=config.PATH_LOCAL,
+                                                client_version=config.VERSION)
 
     def setTranslatorAiCliTool(self, tool: str) -> bool:
         self.ensure_initialized()
-        return self.translator.checkAiCliClient(tool=tool, root_path=config.PATH_LOCAL)
+        return self.translator.checkAiCliClient(tool=tool, root_path=config.PATH_LOCAL, client_version=config.VERSION)
+
+    def setTranslatorAiCliStatusCallback(self, callback) -> None:
+        """AI CLI が使えなくなった/立ち直ったときに呼ぶ関数 (引数は bool) を登録する。"""
+        self.ensure_initialized()
+        self.translator.setAiCliStatusCallback(callback)
 
     def getTranslatorAiCliModelList(self) -> list[str]:
         self.ensure_initialized()

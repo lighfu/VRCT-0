@@ -159,6 +159,7 @@ class Translator:
         self.ollama_connected: bool = False
         self.ai_cli_client: Optional[Any] = None
         self.ai_cli_connected: bool = False
+        self._ai_cli_status_callback = None
         self.ctranslate2_translator: Any = None
         self.ctranslate2_tokenizer: Any = None
         self.is_loaded_ctranslate2_model: bool = False
@@ -480,13 +481,30 @@ class Translator:
     def getAiCliConnected(self) -> bool:
         return self.ai_cli_connected
 
-    def checkAiCliClient(self, tool: str, root_path: str = None) -> bool:
-        """選んだ AI CLI が入っていれば接続済みにする (セッションはまだ起動しない)。"""
+    def setAiCliStatusCallback(self, callback) -> None:
+        """AI CLI が使えなくなった/立ち直ったときに呼ぶ関数 (引数は bool) を登録する。"""
+        self._ai_cli_status_callback = callback
+
+    def _onAiCliStatus(self, available: bool) -> None:
+        self.ai_cli_connected = bool(available)
+        callback = getattr(self, "_ai_cli_status_callback", None)
+        if callback is not None:
+            callback(bool(available))
+
+    def checkAiCliClient(self, tool: str, root_path: str = None, client_version: str = "") -> bool:
+        """選んだ AI CLI が入っていれば接続済みにする (セッションはまだ起動しない)。
+
+        ログインしているかどうかは、この後の updateAiCliClient() が送る確認のターンで
+        分かる。失敗したら AICliClient が状態の変化を知らせる (_onAiCliStatus)。
+        """
         if self.ai_cli_client is None:
-            self.ai_cli_client = AICliClient(root_path=root_path)
+            self.ai_cli_client = AICliClient(root_path=root_path, client_version=client_version)
+            self.ai_cli_client.setStatusCallback(self._onAiCliStatus)
         result = bool(self.ai_cli_client.setTool(tool) and self.ai_cli_client.authenticationCheck())
         if result is False:
             self.ai_cli_client.close()
+        else:
+            self.ai_cli_client.resetBreaker()
         self.ai_cli_connected = result
         return result
 

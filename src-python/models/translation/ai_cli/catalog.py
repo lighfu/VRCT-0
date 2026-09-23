@@ -5,15 +5,17 @@ import shutil
 import subprocess
 
 try:
+    from .base import CliSession
     from utils import errorLogging
 except ImportError:
     import sys
     from os import path as os_path
     sys.path.append(os_path.dirname(os_path.dirname(os_path.dirname(os_path.dirname(os_path.abspath(__file__))))))
+    from models.translation.ai_cli.base import CliSession
     from utils import errorLogging
 
 TOOLS = ("codex", "claude", "agy")
-# claude にはモデル一覧を返すコマンドが無いので別名を固定で並べ。
+# claude にはモデル一覧を返すコマンドが無いので別名を固定で並べる。
 CLAUDE_MODELS = ["haiku", "sonnet", "opus"]
 _LIST_TIMEOUT_SEC = 30
 _CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -33,13 +35,31 @@ def detectInstalledTools() -> list[str]:
     return [tool for tool in TOOLS if resolveExecutable(tool)]
 
 
-def _run(executable: str, args: list[str]) -> str:
-    result = subprocess.run([executable, *args], capture_output=True, text=True, encoding="utf-8",
-                            errors="replace", timeout=_LIST_TIMEOUT_SEC, creationflags=_CREATE_NO_WINDOW)
-    if result.returncode != 0:
-        output = (result.stderr or result.stdout or "")[:200]
-        raise RuntimeError(f"Command failed with exit code {result.returncode}: {output}")
-    return result.stdout or ""
+def _run(executable: str, args: list[str], timeout: float = _LIST_TIMEOUT_SEC) -> str:
+    """コマンドを実行して標準出力を返す。締め切りを過ぎたら子プロセスごと止める。
+
+    `subprocess.run(timeout=...)` は Windows で `codex.cmd` を止め切れない:
+    殺すのは cmd.exe だけで、その後の communicate() が、パイプを握ったままの
+    孫プロセス (node) の終了を無期限に待つ。そこで Popen + communicate(timeout)
+    にして、締め切りを過ぎたら taskkill /T で木ごと止める。
+    """
+    proc = subprocess.Popen([executable, *args], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                            creationflags=_CREATE_NO_WINDOW)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        CliSession._kill(proc)
+        try:
+            # 木ごと止めたのでパイプはすぐ閉じる。残った出力を捨ててパイプを片付ける。
+            proc.communicate(timeout=5)
+        except Exception:
+            pass
+        raise RuntimeError(f"{executable} {' '.join(args)} did not finish in {timeout} seconds") from None
+    if proc.returncode != 0:
+        output = (stderr or stdout or "")[:200]
+        raise RuntimeError(f"Command failed with exit code {proc.returncode}: {output}")
+    return stdout or ""
 
 
 def listModels(tool: str) -> list[str]:
