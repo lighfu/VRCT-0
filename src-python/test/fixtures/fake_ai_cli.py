@@ -18,7 +18,11 @@ def main() -> None:
     parser.add_argument("--error-on")
     parser.add_argument("--permission-on")
     parser.add_argument("--record")
+    parser.add_argument("--no-read", action="store_true")
     args, _unknown = parser.parse_known_args()
+
+    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
 
     def record(obj):
         if args.record:
@@ -30,6 +34,10 @@ def main() -> None:
         sys.stdout.flush()
 
     record({"argv": sys.argv[1:]})
+    if args.no_read:
+        # stdin を一切読まない (書き込み側がブロックし続けるケースの再現用)。
+        time.sleep(3600)
+        return
     for raw in sys.stdin:
         raw = raw.strip()
         if not raw:

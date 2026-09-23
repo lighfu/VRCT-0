@@ -1,9 +1,10 @@
 """CliSession（常駐セッションの共通基底）のテスト。偽 CLI を実際に起動する。"""
 
-import json
 import os
 import sys
 import tempfile
+import threading
+import time
 import unittest
 
 from models.translation.ai_cli.base import AiCliError, CliSession
@@ -99,6 +100,46 @@ class CliSessionTests(unittest.TestCase):
         session.close()
         session.close()
         self.assertFalse(session.isAlive())
+
+    def test_close_from_another_thread_during_hung_turn_returns_quickly(self):
+        session = self._session("--hang-on", "SLOW")
+        session.translate("warm")
+        proc = session._proc
+        result = {}
+
+        def hang():
+            try:
+                session.translate("SLOW", timeout=30)
+            except AiCliError as e:
+                result["error"] = e
+
+        t = threading.Thread(target=hang)
+        t.start()
+        time.sleep(0.3)
+
+        start = time.monotonic()
+        session.close()
+        elapsed = time.monotonic() - start
+
+        t.join(timeout=35)
+        self.assertLess(elapsed, 2.0)
+        self.assertIn("error", result)
+        self.assertIsNotNone(proc.poll())
+
+    def test_write_watchdog_kills_stuck_stdin_write(self):
+        session = self._session("--no-read")
+        session.START_TIMEOUT = 1.0
+        start = time.monotonic()
+        with self.assertRaises(AiCliError):
+            session.translate("x" * 256_000, timeout=1)
+        elapsed = time.monotonic() - start
+        self.assertLess(elapsed, 4.0)
+
+    def test_error_result_then_next_turn_recovers(self):
+        session = self._session("--error-on", "BAD")
+        with self.assertRaises(AiCliError):
+            session.translate("BAD")
+        self.assertEqual(session.translate("again"), "T(again)")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,13 @@
 CLI を翻訳のたびに起動すると 1 回 10〜100 秒かかる (2026-09-24 実測) ため、
 1 本のプロセスを起動したままにして 1 行 1 JSON でターンを送る。
 CLI ごとの違い (起動引数・送る JSON・完了の見分け方) はサブクラスが持つ。
+
+`close()` は `translate()` が握る `_lock` を待たずに割り込めなければならない
+(シャットダウン時に固まった CLI を待ち続けると、呼び出し元ごとタイムアウトする)。
+そのため `_proc` の入れ替えだけを守る `_procLock` を別に持ち、実際にプロセスを
+kill する処理はどちらのロックも保持しないところで行う。加えて各ターン (と
+起動直後のハンドシェイク) には `threading.Timer` の見張り役を付け、
+`proc.stdin.write()` がブロックしたままでも締め切りで確実に殺せるようにする。
 """
 
 import json
@@ -33,6 +40,7 @@ class CliSession:
         self.workspace = workspace
         self.base_instructions = base_instructions
         self._lock = threading.RLock()
+        self._procLock = threading.Lock()
         self._proc: Optional[subprocess.Popen] = None
         self._messages: "queue.Queue" = queue.Queue()
         self._stderr: deque = deque(maxlen=50)
@@ -54,40 +62,60 @@ class CliSession:
 
     # --- 公開メソッド ---
     def isAlive(self) -> bool:
-        return self._proc is not None and self._proc.poll() is None
+        with self._procLock:
+            proc = self._proc
+        return proc is not None and proc.poll() is None
 
     def start(self) -> None:
         with self._lock:
             if self.isAlive():
                 return
             self._spawn()
+            proc = self._proc
+            watchdog = threading.Timer(self.START_TIMEOUT, self._killIfStill, args=(proc,))
+            watchdog.daemon = True
+            watchdog.start()
             try:
                 self._afterStart(time.monotonic() + self.START_TIMEOUT)
             except Exception:
                 self.close()
                 raise
+            finally:
+                watchdog.cancel()
 
     def translate(self, prompt: str, timeout: Optional[float] = None) -> str:
         with self._lock:
-            if self.isAlive() and self._turns >= self.MAX_TURNS:
-                self.close()
-            if not self.isAlive():
-                self.start()
-            # 起動直後の最初のターンはモデルの準備 (claude で約 30 秒) を含むので長めに待つ。
-            limit = self.START_TIMEOUT if self._turns == 0 else (timeout or self.TURN_TIMEOUT)
-            deadline = time.monotonic() + limit
             try:
-                for message in self._turnMessages(prompt):
-                    self._write(message)
-                while True:
-                    verdict = self._interpret(self._next(deadline))
-                    if verdict is None:
-                        continue
-                    self._turns += 1
-                    kind, value = verdict
-                    if kind == "ok":
-                        return str(value).strip()
-                    raise AiCliError(str(value))
+                if self.isAlive() and self._turns >= self.MAX_TURNS:
+                    self.close()
+                if not self.isAlive():
+                    self.start()
+                self._drainStale()
+                if not self.isAlive():
+                    self.start()
+                proc = self._proc
+                # 起動直後の最初のターンはモデルの準備 (claude で約 30 秒) を含むので長めに待つ。
+                limit = self.START_TIMEOUT if self._turns == 0 else (timeout or self.TURN_TIMEOUT)
+                deadline = time.monotonic() + limit
+                # proc.stdin.write() 自体は締め切りで自動的には止まらないので、
+                # 別スレッドの見張り役でターン全体 (書き込みも含む) を締め切りに縛る。
+                watchdog = threading.Timer(limit, self._killIfStill, args=(proc,))
+                watchdog.daemon = True
+                watchdog.start()
+                try:
+                    for message in self._turnMessages(prompt):
+                        self._write(message)
+                    while True:
+                        verdict = self._interpret(self._next(deadline))
+                        if verdict is None:
+                            continue
+                        self._turns += 1
+                        kind, value = verdict
+                        if kind == "ok":
+                            return str(value).strip()
+                        raise AiCliError(str(value))
+                finally:
+                    watchdog.cancel()
             except AiCliError:
                 self.close()
                 raise
@@ -96,22 +124,9 @@ class CliSession:
                 raise AiCliError(str(e)) from e
 
     def close(self) -> None:
-        with self._lock:
-            proc = self._proc
-            self._proc = None
-            if proc is None:
-                return
-            try:
-                if proc.poll() is None:
-                    if os.name == "nt":
-                        # codex.cmd -> node のように子プロセスがいるので木ごと止める。
-                        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
-                                       capture_output=True, creationflags=_CREATE_NO_WINDOW)
-                    else:
-                        proc.kill()
-                proc.wait(timeout=5)
-            except Exception:
-                pass
+        proc = self._detach()
+        if proc is not None:
+            self._kill(proc)
 
     # --- サブクラス向けの補助 ---
     def _write(self, obj: dict) -> None:
@@ -137,6 +152,69 @@ class CliSession:
             raise AiCliError(f"AI CLI exited unexpectedly: {tail}")
         return item
 
+    # --- プロセスの入れ替え・停止 (self._lock を握らずに呼べる) ---
+    def _detach(self, expected: Optional[subprocess.Popen] = None) -> Optional[subprocess.Popen]:
+        """`_proc` を None に入れ替え、切り離した旧プロセスを返す (無ければ None)。
+
+        `expected` を指定すると、現在の `_proc` がそれと同一のときだけ切り離す
+        (見張り役のタイマーが、既に別プロセスに世代交代した後の proc を誤って
+        殺さないようにするため)。
+        """
+        with self._procLock:
+            proc = self._proc
+            if proc is None:
+                return None
+            if expected is not None and proc is not expected:
+                return None
+            self._proc = None
+            return proc
+
+    def _killIfStill(self, proc: subprocess.Popen) -> None:
+        """締め切りを過ぎたときに見張り役タイマーから呼ばれる。"""
+        detached = self._detach(expected=proc)
+        if detached is not None:
+            self._kill(detached)
+
+    @staticmethod
+    def _kill(proc: subprocess.Popen) -> None:
+        """OS プロセス (と Windows での子プロセス) を確実に止める。例外は握りつぶす。
+
+        `proc.stdin` を先に `close()` してはいけない: もし別スレッドが
+        `proc.stdin.write()` の OS 呼び出しでブロックしていると、`close()` は
+        その書き込みスレッドが握っている内部バッファのロックを待ってしまい、
+        ここ自体が止まって taskkill にたどり着けなくなる (実測で確認済み)。
+        先にプロセスを殺せば、詰まっていた書き込みは broken pipe で解放される。
+        """
+        try:
+            if proc.poll() is None:
+                if os.name == "nt":
+                    system_root = os.environ.get("SystemRoot", r"C:\Windows")
+                    taskkill = os.path.join(system_root, "System32", "taskkill.exe")
+                    if not os.path.isfile(taskkill):
+                        taskkill = "taskkill"
+                    # codex.cmd -> node のように子プロセスがいるので木ごと止める。
+                    subprocess.run([taskkill, "/T", "/F", "/PID", str(proc.pid)],
+                                    capture_output=True, timeout=5, creationflags=_CREATE_NO_WINDOW)
+                else:
+                    proc.kill()
+        except Exception:
+            pass
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
+        try:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=2)
+        except Exception:
+            pass
+        try:
+            if proc.stdin is not None:
+                proc.stdin.close()
+        except Exception:
+            pass
+
     # --- 内部 ---
     def _spawn(self) -> None:
         os.makedirs(self.workspace, exist_ok=True)
@@ -149,11 +227,33 @@ class CliSession:
             )
         except OSError as e:
             raise AiCliError(f"failed to start AI CLI: {e}") from e
-        self._proc = proc
-        self._messages = queue.Queue()
+        messages: "queue.Queue" = queue.Queue()
+        stderr: deque = deque(maxlen=50)
+        with self._procLock:
+            self._proc = proc
+        self._messages = messages
+        self._stderr = stderr
         self._turns = 0
-        threading.Thread(target=self._readStdout, args=(proc, self._messages), daemon=True).start()
-        threading.Thread(target=self._readStderr, args=(proc,), daemon=True).start()
+        threading.Thread(target=self._readStdout, args=(proc, messages), daemon=True).start()
+        threading.Thread(target=self._readStderr, args=(proc, stderr), daemon=True).start()
+
+    def _drainStale(self) -> None:
+        """次のターンを送る前に、前のターンの取りこぼしをためずに捨てる。
+
+        途中で _EOF (プロセス終了の印) を見つけたら、古いプロセスを片付けて
+        新しく起動し直す。
+        """
+        saw_eof = False
+        while True:
+            try:
+                item = self._messages.get_nowait()
+            except queue.Empty:
+                break
+            if item is _EOF:
+                saw_eof = True
+        if saw_eof:
+            self.close()
+            self.start()
 
     @staticmethod
     def _readStdout(proc: subprocess.Popen, messages: "queue.Queue") -> None:
@@ -173,9 +273,10 @@ class CliSession:
         finally:
             messages.put(_EOF)
 
-    def _readStderr(self, proc: subprocess.Popen) -> None:
+    @staticmethod
+    def _readStderr(proc: subprocess.Popen, stderr: deque) -> None:
         try:
             for line in proc.stderr:
-                self._stderr.append(line.rstrip())
+                stderr.append(line.rstrip())
         except Exception:
             pass
