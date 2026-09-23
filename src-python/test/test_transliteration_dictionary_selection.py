@@ -1,7 +1,9 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
+from models.transliteration import transliteration_transliterator
 from models.transliteration.transliteration_transliterator import Transliterator
 
 
@@ -25,6 +27,15 @@ class DictionarySelectionTests(unittest.TestCase):
     def test_falls_back_to_core_when_full_dictionary_is_missing(self) -> None:
         transliterator = Transliterator(dict_path=os.path.join("no", "such", "system_full.dic"))
         self.assertEqual(transliterator.dict_type, "core")
+
+    def test_keyboard_interrupt_during_full_dictionary_load_propagates(self) -> None:
+        with patch.object(
+            transliteration_transliterator.dictionary,
+            "Dictionary",
+            side_effect=KeyboardInterrupt,
+        ):
+            with self.assertRaises(KeyboardInterrupt):
+                Transliterator(dict_path="irrelevant.dic")
 
 
 if __name__ == "__main__":

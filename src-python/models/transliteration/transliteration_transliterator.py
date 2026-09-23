@@ -28,10 +28,17 @@ class Transliterator:
             try:
                 self.tokenizer_obj = dictionary.Dictionary(dict=dict_path).create()
                 self.dict_type = "full"
+            except (KeyboardInterrupt, SystemExit, GeneratorExit):
+                # Never swallow control-flow exceptions.
+                raise
             except BaseException:
                 # sudachipy raises pyo3_runtime.PanicException (a BaseException,
-                # not an Exception) when the .dic file is corrupt, so this must
-                # catch BaseException to avoid crashing on a broken full dictionary.
+                # not an Exception) when the .dic file is corrupt. pyo3_runtime
+                # is not a real importable module (confirmed empirically, even
+                # right after triggering the panic), so it cannot be named in
+                # an `except` clause; catching BaseException is the only way
+                # to avoid crashing on a broken full dictionary, hence the
+                # explicit re-raise above for genuine control-flow exceptions.
                 errorLogging()
         if self.tokenizer_obj is None:
             self.tokenizer_obj = dictionary.Dictionary(dict="core").create()
