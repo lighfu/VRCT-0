@@ -48,6 +48,7 @@ from models.transcription.transcription_deepgram import (
     isLanguageSupportedByDeepgramModel,
 )
 from models.transliteration.transliteration_transliterator import Transliterator
+from models.transliteration.transliteration_dictionary import checkSudachiFullDict, downloadSudachiFullDict, sudachiFullDictPath
 from models.overlay.overlay import Overlay
 from models.overlay.overlay_image import OverlayImage
 from models.watchdog.watchdog import Watchdog
@@ -1544,15 +1545,32 @@ class Model:
         self.previous_receive_message = message
         return repeat_flag
 
+    def _transliterationDictPath(self):
+        if config.SUDACHI_DICT_TYPE == "full" and checkSudachiFullDict(config.PATH_LOCAL):
+            return sudachiFullDictPath(config.PATH_LOCAL)
+        return None
+
     def startTransliteration(self):
         self.ensure_initialized()
         if self.transliterator is None:
-            self.transliterator = Transliterator()
+            self.transliterator = Transliterator(dict_path=self._transliterationDictPath())
 
     def stopTransliteration(self):
         self.ensure_initialized()
         if self.transliterator is not None:
             self.transliterator = None
+
+    def restartTransliteration(self):
+        """辞書の種類を変えたとき、読みがなが有効なら新しい辞書で作り直す。"""
+        self.ensure_initialized()
+        if self.transliterator is not None:
+            self.transliterator = Transliterator(dict_path=self._transliterationDictPath())
+
+    def checkSudachiFullDict(self):
+        return checkSudachiFullDict(config.PATH_LOCAL)
+
+    def downloadSudachiFullDict(self, callback=None, end_callback=None):
+        return downloadSudachiFullDict(config.PATH_LOCAL, callback, end_callback)
 
     def convertMessageToTransliteration(self, message: str, hiragana: bool=True, romaji: bool=True) -> list:
         self.ensure_initialized()

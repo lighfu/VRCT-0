@@ -90,6 +90,7 @@ class ErrorCode(str, Enum):
     # ============================================================================
     WEIGHT_CTRANSLATE2_DOWNLOAD = "WEIGHT_CTRANSLATE2_DOWNLOAD"
     WEIGHT_WHISPER_DOWNLOAD = "WEIGHT_WHISPER_DOWNLOAD"
+    WEIGHT_SUDACHI_DICT_DOWNLOAD = "WEIGHT_SUDACHI_DICT_DOWNLOAD"
     
     # ============================================================================
     # バリデーションエラー (VALIDATION_*)
@@ -400,6 +401,7 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
         "severity": "error",
         "user_action_required": True,
     },
+    ErrorCode.WEIGHT_SUDACHI_DICT_DOWNLOAD: {"category": ErrorCategory.WEIGHT, "message": "Sudachi full dictionary download error", "severity": "error", "user_action_required": True},
     
     # バリデーションエラー
     ErrorCode.VALIDATION_MIC_THRESHOLD: {

@@ -224,6 +224,7 @@ _SIMPLE_CONFIG_GETTERS = {
     "getCtranslate2WeightType": "CTRANSLATE2_WEIGHT_TYPE",
     "getSelectedTranslationComputeType": "SELECTED_TRANSLATION_COMPUTE_TYPE",
     "getWhisperWeightType": "WHISPER_WEIGHT_TYPE",
+    "getSudachiDictType": "SUDACHI_DICT_TYPE",
     "getSelectedTranscriptionComputeType": "SELECTED_TRANSCRIPTION_COMPUTE_TYPE",
     "getSendMessageFormatParts": "SEND_MESSAGE_FORMAT_PARTS",
     "getReceivedMessageFormatParts": "RECEIVED_MESSAGE_FORMAT_PARTS",
@@ -923,6 +924,38 @@ class Controller:
                     error_response["result"],
                 )
 
+    class DownloadSudachiDict:
+        def __init__(self, run_mapping: dict, run: Callable[[int, str, Any], None]) -> None:
+            self.run_mapping = run_mapping
+            self.run = run
+            self._last_progress = -1.0
+            self._last_time = 0.0
+
+        def progressBar(self, progress) -> None:
+            if not _shouldEmitDownloadProgress(self, progress):
+                return
+            printLog("Sudachi Full Dictionary Download Progress", progress)
+            self.run(
+                200,
+                self.run_mapping["download_progress_sudachi_dict"],
+                {"weight_type": "full", "progress": progress},
+            )
+
+        def downloaded(self) -> None:
+            if model.checkSudachiFullDict() is True:
+                config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"] = True
+                self.run(200, self.run_mapping["downloaded_sudachi_dict"], "full")
+            else:
+                error_response = VRCTError.create_error_response(
+                    ErrorCode.WEIGHT_SUDACHI_DICT_DOWNLOAD,
+                    data=None
+                )
+                self.run(
+                    error_response["status"],
+                    self.run_mapping["error_sudachi_dict"],
+                    error_response["result"],
+                )
+
     def _processMessage(
         self,
         spec: MessageDirectionSpec,
@@ -1382,6 +1415,10 @@ class Controller:
     @staticmethod
     def getSelectableWhisperWeightTypeDict(*args, **kwargs) -> dict:
         return {"status":200, "result":config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT}
+
+    @staticmethod
+    def getSelectableSudachiDictTypeDict(*args, **kwargs) -> dict:
+        return {"status":200, "result":config.SELECTABLE_SUDACHI_DICT_TYPE_DICT}
 
     # @staticmethod
     # def getMaxMicThreshold(*args, **kwargs) -> dict:
@@ -3166,6 +3203,14 @@ class Controller:
 
     @staticmethod
     @_configValidationErrorResponse(ErrorCode.VALIDATION_CONFIG_VALUE_INVALID)
+    def setSudachiDictType(data, *args, **kwargs) -> dict:
+        config.SUDACHI_DICT_TYPE = str(data)
+        model.restartTransliteration()
+        return {"status":200, "result": config.SUDACHI_DICT_TYPE}
+
+
+    @staticmethod
+    @_configValidationErrorResponse(ErrorCode.VALIDATION_CONFIG_VALUE_INVALID)
     def setSelectedTranscriptionComputeType(data, *args, **kwargs) -> dict:
         config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = str(data)
         return {"status":200, "result":config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE}
@@ -3508,6 +3553,23 @@ class Controller:
         else:
             model.downloadWhisperModelWeight(weight_type, download_whisper.progressBar, download_whisper.downloaded)
         return {"status":200, "result":True}
+
+    def downloadSudachiDict(self, data: str = "full", asynchronous: bool = True, *args, **kwargs) -> dict:
+        handler = self.DownloadSudachiDict(self.run_mapping, self.run)
+        if asynchronous is True:
+            th_download = Thread(
+                target=model.downloadSudachiFullDict,
+                args=(handler.progressBar, handler.downloaded),
+                daemon=True,
+            )
+            th_download.start()
+        else:
+            model.downloadSudachiFullDict(handler.progressBar, handler.downloaded)
+        return {"status":200, "result":True}
+
+    @staticmethod
+    def updateDownloadedSudachiDict() -> None:
+        config.SELECTABLE_SUDACHI_DICT_TYPE_DICT["full"] = model.checkSudachiFullDict()
 
     @staticmethod
     def messageFormatter(format_type:str, translation:list, message:str) -> str:
@@ -4993,6 +5055,7 @@ class Controller:
         # Set Transcription Engine
         printLog("Set Transcription Engine")
         self.updateDownloadedWhisperModelWeight()
+        self.updateDownloadedSudachiDict()
         self.updateTranscriptionEngine()
 
         # Set Transliteration

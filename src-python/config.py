@@ -36,6 +36,8 @@ try:
 except Exception:  # pragma: no cover - optional runtime
     whisper_models = {}  # type: ignore
 
+from models.transliteration.transliteration_dictionary import SUDACHI_DICT_TYPES
+
 from utils import errorLogging, printLog, validateDictStructure, getComputeDeviceList, isValidIpAddress, isWildcardBindAddress
 
 # NOTE: MIC_VAD_FILTER/SPEAKER_VAD_FILTER/MIC_VAD_PARAMETERS/SPEAKER_VAD_PARAMETERS と
@@ -799,6 +801,8 @@ class Config:
     # These are dynamically generated in init_config() based on installed packages/APIs
     SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_DICT = ManagedProperty('SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_DICT', type_=dict, serialize=False, mutable_tracking=True)
     SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = ManagedProperty('SELECTABLE_WHISPER_WEIGHT_TYPE_DICT', type_=dict, serialize=False, mutable_tracking=True)
+    SELECTABLE_SUDACHI_DICT_TYPE_LIST = ManagedProperty('SELECTABLE_SUDACHI_DICT_TYPE_LIST', readonly=True, serialize=False)
+    SELECTABLE_SUDACHI_DICT_TYPE_DICT = ManagedProperty('SELECTABLE_SUDACHI_DICT_TYPE_DICT', type_=dict, serialize=False, mutable_tracking=True)
     SELECTABLE_TRANSLATION_ENGINE_STATUS = ManagedProperty('SELECTABLE_TRANSLATION_ENGINE_STATUS', type_=dict, serialize=False, mutable_tracking=True)
     SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = ManagedProperty('SELECTABLE_TRANSCRIPTION_ENGINE_STATUS', type_=dict, serialize=False, mutable_tracking=True)
     SELECTABLE_PLAMO_MODEL_LIST = ManagedProperty('SELECTABLE_PLAMO_MODEL_LIST', type_=list, serialize=False, mutable_tracking=True)
@@ -967,6 +971,7 @@ class Config:
     SELECTED_RELEASE_CHANNEL = ManagedProperty('SELECTED_RELEASE_CHANNEL', type_=str, allowed=lambda v, inst: v in inst.SELECTABLE_RELEASE_CHANNEL_LIST)
     CTRANSLATE2_WEIGHT_TYPE = ManagedProperty('CTRANSLATE2_WEIGHT_TYPE', type_=str, allowed=lambda v, inst: v in inst.SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_LIST)
     WHISPER_WEIGHT_TYPE = ManagedProperty('WHISPER_WEIGHT_TYPE', type_=str, allowed=lambda v, inst: v in inst.SELECTABLE_WHISPER_WEIGHT_TYPE_LIST)
+    SUDACHI_DICT_TYPE = ManagedProperty('SUDACHI_DICT_TYPE', type_=str, allowed=lambda v, inst: v in inst.SELECTABLE_SUDACHI_DICT_TYPE_LIST)
     SELECTED_PLAMO_MODEL = ManagedProperty('SELECTED_PLAMO_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_PLAMO_MODEL_LIST'))
     SELECTED_GEMINI_MODEL = ManagedProperty('SELECTED_GEMINI_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_GEMINI_MODEL_LIST'))
     SELECTED_OPENAI_MODEL = ManagedProperty('SELECTED_OPENAI_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_OPENAI_MODEL_LIST'))
@@ -1064,6 +1069,8 @@ class Config:
         self._SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {}
         for weight_type in self.SELECTABLE_WHISPER_WEIGHT_TYPE_LIST:
             self._SELECTABLE_WHISPER_WEIGHT_TYPE_DICT[weight_type] = False
+        self._SELECTABLE_SUDACHI_DICT_TYPE_LIST = list(SUDACHI_DICT_TYPES)
+        self._SELECTABLE_SUDACHI_DICT_TYPE_DICT = {"core": True, "full": False}
         self._SELECTABLE_TRANSLATION_ENGINE_STATUS = {}
         for engine in self.SELECTABLE_TRANSLATION_ENGINE_LIST:
             self._SELECTABLE_TRANSLATION_ENGINE_STATUS[engine] = False
@@ -1218,6 +1225,7 @@ class Config:
         self._SELECTED_DEEPGRAM_MODEL = None
         self._SELECTED_TRANSLATION_COMPUTE_TYPE = "auto"
         self._WHISPER_WEIGHT_TYPE = "base"
+        self._SUDACHI_DICT_TYPE = "core"
         self._SELECTED_TRANSCRIPTION_COMPUTE_TYPE = "auto"
         self._AUTO_CLEAR_MESSAGE_BOX = True
         self._SEND_ONLY_TRANSLATED_MESSAGES = False
