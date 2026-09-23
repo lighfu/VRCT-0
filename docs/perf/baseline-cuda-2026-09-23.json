@@ -1,0 +1,248 @@
+{
+  "label": "baseline-cuda",
+  "measured_at": "2026-09-23T22:07:23",
+  "size": {
+    "total_bytes": 3094133409,
+    "top_entries": [
+      {
+        "name": "_internal",
+        "bytes": 3054123969
+      },
+      {
+        "name": "VRCT-sidecar-x86_64-pc-windows-msvc.exe",
+        "bytes": 39982134
+      },
+      {
+        "name": "process.log",
+        "bytes": 27239
+      },
+      {
+        "name": "telemetry_state.json",
+        "bytes": 67
+      },
+      {
+        "name": "crash_trace.log",
+        "bytes": 0
+      },
+      {
+        "name": "freeze_trace.log",
+        "bytes": 0
+      }
+    ],
+    "internal_top_entries": [
+      {
+        "name": "nvidia",
+        "bytes": 1852176720
+      },
+      {
+        "name": "sudachidict_full",
+        "bytes": 359742835
+      },
+      {
+        "name": "sudachidict_core",
+        "bytes": 217171677
+      },
+      {
+        "name": "cv2",
+        "bytes": 129311006
+      },
+      {
+        "name": "rapidocr",
+        "bytes": 83405232
+      },
+      {
+        "name": "av.libs",
+        "bytes": 65593344
+      },
+      {
+        "name": "ctranslate2",
+        "bytes": 64121440
+      },
+      {
+        "name": "numpy.libs",
+        "bytes": 38168576
+      },
+      {
+        "name": "onnxruntime",
+        "bytes": 37547432
+      },
+      {
+        "name": "transformers",
+        "bytes": 37056902
+      },
+      {
+        "name": "fonts",
+        "bytes": 29596528
+      },
+      {
+        "name": "ocr_onnx",
+        "bytes": 12798073
+      },
+      {
+        "name": "grpc",
+        "bytes": 11774007
+      },
+      {
+        "name": "cryptography",
+        "bytes": 9943040
+      },
+      {
+        "name": "hf_xet",
+        "bytes": 7283122
+      },
+      {
+        "name": "lxml",
+        "bytes": 6901432
+      },
+      {
+        "name": "tokenizers",
+        "bytes": 6065152
+      },
+      {
+        "name": "qh3",
+        "bytes": 5878784
+      },
+      {
+        "name": "python311.dll",
+        "bytes": 5800216
+      },
+      {
+        "name": "speech_recognition",
+        "bytes": 5485782
+      }
+    ]
+  },
+  "installer_bytes": null,
+  "startup_seconds": 7.796175499999663,
+  "startup_seconds_runs": [
+    6.597894499998802,
+    8.109952800001338,
+    8.282393299999967,
+    7.796175499999663,
+    7.492013099999895
+  ],
+  "idle_rss_bytes": 429207552,
+  "import_time_top": [
+    {
+      "module": "mainloop",
+      "cumulative_us": 5173161
+    },
+    {
+      "module": "controller",
+      "cumulative_us": 5154132
+    },
+    {
+      "module": "model",
+      "cumulative_us": 4045033
+    },
+    {
+      "module": "models.translation.translation_translator",
+      "cumulative_us": 3248765
+    },
+    {
+      "module": "models.translation.translation_providers",
+      "cumulative_us": 2106969
+    },
+    {
+      "module": "models.translation.translation_gemini",
+      "cumulative_us": 1358776
+    },
+    {
+      "module": "langchain_google_genai",
+      "cumulative_us": 768060
+    },
+    {
+      "module": "models.translation.translation_groq",
+      "cumulative_us": 743860
+    },
+    {
+      "module": "translators",
+      "cumulative_us": 727465
+    },
+    {
+      "module": "device_manager",
+      "cumulative_us": 666362
+    },
+    {
+      "module": "google.genai",
+      "cumulative_us": 589770
+    },
+    {
+      "module": "translators.server",
+      "cumulative_us": 585260
+    },
+    {
+      "module": "models.ocr",
+      "cumulative_us": 560540
+    },
+    {
+      "module": "models.ocr.ocr_pipeline",
+      "cumulative_us": 559981
+    },
+    {
+      "module": "langchain_google_genai.chat_models",
+      "cumulative_us": 504308
+    },
+    {
+      "module": "utils",
+      "cumulative_us": 426983
+    },
+    {
+      "module": "config",
+      "cumulative_us": 421547
+    },
+    {
+      "module": "models.translation.translation_ollama",
+      "cumulative_us": 407671
+    },
+    {
+      "module": "langchain_ollama",
+      "cumulative_us": 407028
+    },
+    {
+      "module": "langchain_ollama.chat_models",
+      "cumulative_us": 399144
+    },
+    {
+      "module": "ollama",
+      "cumulative_us": 392671
+    },
+    {
+      "module": "openai",
+      "cumulative_us": 388770
+    },
+    {
+      "module": "google.genai.types",
+      "cumulative_us": 365678
+    },
+    {
+      "module": "langchain_openai",
+      "cumulative_us": 354236
+    },
+    {
+      "module": "langchain_openai.chat_models",
+      "cumulative_us": 329161
+    },
+    {
+      "module": "langchain_openai.chat_models.azure",
+      "cumulative_us": 328526
+    },
+    {
+      "module": "models.ocr.ocr_engine_rapidocr",
+      "cumulative_us": 326153
+    },
+    {
+      "module": "langchain_openai.chat_models.base",
+      "cumulative_us": 320908
+    },
+    {
+      "module": "langchain_core.callbacks.manager",
+      "cumulative_us": 315459
+    },
+    {
+      "module": "openai.types",
+      "cumulative_us": 309742
+    }
+  ],
+  "model_loaded_rss_bytes": null
+}

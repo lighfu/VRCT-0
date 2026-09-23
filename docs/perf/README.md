@@ -7,3 +7,12 @@ A-1（Python サイドカーのスリム化）の計測結果を置く。
 
 - pytest: 936 passed, 43 warnings in 30.34s
 - 既知の失敗: なし
+
+## 基準値（作業前）
+
+| 版 | bin 合計 | インストーラー | 起動（中央値） | アイドル RSS | モデル読込後 RSS |
+|---|---|---|---|---|---|
+| CPU | 1186.9MB | -（Rust 未導入のため未計測） | 6.72秒 | 264.6MB | - |
+| CUDA | 2950.8MB | -（Rust 未導入のため未計測） | 7.80秒 | 409.3MB | - |
+
+import 時間の上位 5（CPU 版）: mainloop: 4978.2ms, controller: 4956.6ms, model: 3976.1ms, models.translation.translation_translator: 3271.8ms, models.translation.translation_providers: 2344.1ms
