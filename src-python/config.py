@@ -1003,13 +1003,28 @@ class Config:
     @property
     def SELECTED_AI_CLI_MODEL(self):
         """選んでいる CLI のモデル。CLI ごとの値は SELECTED_AI_CLI_MODELS に保存する。"""
-        return self.SELECTED_AI_CLI_MODELS.get(self.SELECTED_AI_CLI_TOOL) or None
+        # config.json を手で書き換えて null にされても壊れないようにする。
+        return (self.SELECTED_AI_CLI_MODELS or {}).get(self.SELECTED_AI_CLI_TOOL) or None
 
     @SELECTED_AI_CLI_MODEL.setter
     def SELECTED_AI_CLI_MODEL(self, value):
-        models = dict(self.SELECTED_AI_CLI_MODELS)
+        models = dict(self.SELECTED_AI_CLI_MODELS or {})
         models[self.SELECTED_AI_CLI_TOOL] = value or ""
         self.SELECTED_AI_CLI_MODELS = models
+
+    def useAiCliToolFallback(self, tool: str) -> None:
+        """保存していた CLI が見つからないとき、この起動の間だけ別の CLI を使う。
+
+        config.json にはユーザーが選んだ CLI を書き続ける (_json_selected_ai_cli_tool)。
+        一時的に見つからなかっただけなら、次の起動で元の CLI に戻る。
+        """
+        if self._AI_CLI_TOOL_PREFERENCE is None:
+            self._AI_CLI_TOOL_PREFERENCE = self.SELECTED_AI_CLI_TOOL
+        self.SELECTED_AI_CLI_TOOL = tool
+
+    def clearAiCliToolFallback(self) -> None:
+        """ユーザーが CLI を選び直したら、それを保存値にする。"""
+        self._AI_CLI_TOOL_PREFERENCE = None
     SELECTED_GROQ_WHISPER_MODEL = ManagedProperty('SELECTED_GROQ_WHISPER_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_GROQ_WHISPER_MODEL_LIST'))
     SELECTED_OPENAI_WHISPER_MODEL = ManagedProperty('SELECTED_OPENAI_WHISPER_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_OPENAI_WHISPER_MODEL_LIST'))
     SELECTED_CUSTOM_WHISPER_MODEL = ManagedProperty('SELECTED_CUSTOM_WHISPER_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_CUSTOM_WHISPER_MODEL_LIST'))
@@ -1252,6 +1267,8 @@ class Config:
         self._SELECTED_OPENAI_COMPATIBLE_MODEL = None
         self._SELECTED_OLLAMA_MODEL = None
         self._SELECTED_AI_CLI_TOOL = "claude"
+        # 起動時に保存値の CLI が見つからず別の CLI を使っている間の、保存値 (useAiCliToolFallback)。
+        self._AI_CLI_TOOL_PREFERENCE = None
         self._SELECTED_AI_CLI_MODELS = {"codex": "", "claude": "haiku", "agy": ""}
         self._SELECTED_GROQ_WHISPER_MODEL = None
         self._SELECTED_OPENAI_WHISPER_MODEL = None
@@ -1450,6 +1467,12 @@ class Config:
                         setattr(self, sel_attr, None)
             except Exception:
                 errorLogging()
+
+@json_serializable('SELECTED_AI_CLI_TOOL')
+def _json_selected_ai_cli_tool(self):
+    # 起動時に保存値の CLI が見つからず別の CLI を一時的に使っているときは、保存値を書く。
+    return getattr(self, "_AI_CLI_TOOL_PREFERENCE", None) or self.SELECTED_AI_CLI_TOOL
+
 
 # Auto-register all descriptors after Config class definition
 _auto_register_descriptors()

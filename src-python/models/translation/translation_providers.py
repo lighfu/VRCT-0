@@ -192,13 +192,17 @@ TRANSLATION_PROVIDER_REGISTRY: Dict[str, TranslationEngineSpec] = {
 class ConnectionEngineSpec:
     """認証キーを持たず、疎通確認 (URL指定 または ローカル自動検出) で
     モデル一覧を取得する翻訳エンジン1つ分のメタデータ。対象は
-    `LMStudio`/`Ollama` の2エンジンのみ。
+    `LMStudio`/`Ollama`/`AI_CLI` の3エンジン。
 
     `TranslationEngineSpec` (認証キー型) と異なり「接続呼び出し自体に
-    渡す引数」がエンジンごとに違う (LMStudioはbase_url、Ollamaは引数なし)
+    渡す引数」がエンジンごとに違う (LMStudioはbase_url、Ollama/AI_CLIは引数なし)
     ため、その差異は呼び出し側 (controller.py の各薄い委譲メソッド) が
     `connect_kwargs` として都度組み立てて渡す — このスペック自体には
     含めない。
+
+    `keep_selected_model_on_failure` が真のエンジンは、接続確認に失敗しても
+    保存している選択モデルを消さない (UI には None を送る)。AI_CLI は CLI ごとに
+    選んだモデルを覚えているので、一度の失敗でそれを失わないようにする。
 
     `selectable_model_list_attr`/`selected_model_attr`/`error_model_invalid`
     は `TranslationEngineSpec` と同じ意味・同じフィールド名を持たせてあり、
@@ -214,6 +218,7 @@ class ConnectionEngineSpec:
     selected_model_attr: str  # config.SELECTED_X_MODEL の属性名
     run_mapping_selectable_key: str  # mainloop.run_mapping の対応キー
     run_mapping_selected_key: str  # mainloop.run_mapping の対応キー
+    keep_selected_model_on_failure: bool = False  # 接続確認の失敗で選択モデルを消さない
 
 
 CONNECTION_PROVIDER_REGISTRY: Dict[str, ConnectionEngineSpec] = {
@@ -243,5 +248,6 @@ CONNECTION_PROVIDER_REGISTRY: Dict[str, ConnectionEngineSpec] = {
         selected_model_attr="SELECTED_AI_CLI_MODEL",
         run_mapping_selectable_key="selectable_ai_cli_model_list",
         run_mapping_selected_key="selected_ai_cli_model",
+        keep_selected_model_on_failure=True,
     ),
 }

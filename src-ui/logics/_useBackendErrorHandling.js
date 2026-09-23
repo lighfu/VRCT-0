@@ -63,6 +63,7 @@ export const _useBackendErrorHandling = () => {
 
         updateSelectedOllamaModel,
 
+        updateSelectedAiCliTool,
         updateSelectedAiCliModel,
     } = useTranslation();
 
@@ -290,7 +291,13 @@ export const _useBackendErrorHandling = () => {
                 showNotification_Error(message, { category_id: error_code });
                 return;
             case "CONNECTION_AI_CLI_FAILED":
-                updateIsAiCliConnected(false);
+                if (endpoint === "/set/data/selected_ai_cli_tool") {
+                    // 選んだ CLI が見つからず切り替えなかった。data は今の (動いている) CLI なので、
+                    // 選択を元に戻すだけで接続状態は変えない。
+                    updateSelectedAiCliTool(data);
+                } else {
+                    updateIsAiCliConnected(false);
+                }
                 showNotification_Error(message, { category_id: error_code });
                 return;
             case "CONNECTION_LMSTUDIO_URL_INVALID":

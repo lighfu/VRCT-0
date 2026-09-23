@@ -1,6 +1,6 @@
 from typing import Callable, Any, List, Optional
 from subprocess import Popen
-from threading import Thread, Lock
+from threading import Thread, Lock, RLock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 import copy
@@ -113,6 +113,13 @@ _ENGINE_MODEL_BINDINGS = {
         "update_client": "updateTranslatorAiCliClient",
     },
 }
+
+# AI CLI のエンドポイント (CLI の切り替え・接続確認・モデルの選択) と、起動時の
+# AI CLI の確認をひとつずつ実行するためのロック。SELECTED_AI_CLI_MODEL は
+# 「今選んでいる CLI」の欄に書き込むので、CLI の切り替えと並行して走ると、
+# ある CLI のモデルを別の CLI の欄に保存してしまう (mainloop のロックは
+# エンドポイントごとなので、これらを互いには止めない)。
+_AI_CLI_LOCK = RLock()
 
 
 def _configValidationErrorResponse(error_code: ErrorCode):
@@ -467,9 +474,11 @@ class Controller:
         # 以上生き残った場合に「正常終了なのに freeze_trace.log へフリーズ
         # ダンプが出る」。この計装はフリーズ調査の一次情報源なので汚さない。
         self._stopServiceForShutdown(model.stopWatchdog, "watchdog")
+        # AI CLI の常駐プロセス (codex / claude / agy) を止める。翻訳の常設プールより
+        # 先に止めて、翻訳中のターンを待たずに終わらせる。
+        self._stopServiceForShutdown(model.closeTranslatorAiCli, "AI CLI sessions")
         # 翻訳の常設プール。非デーモンスレッドなので、止めないと
         # インタプリタ終了時の atexit join で終了が止まりうる。
-        self._stopServiceForShutdown(model.closeTranslatorAiCli, "AI CLI sessions")
         self._stopServiceForShutdown(model.stopTranslationExecutor, "translation executor")
         try:
             # A setting changed in the last few seconds may still be sitting
@@ -2749,17 +2758,32 @@ class Controller:
         return response
 
     def _checkTranslationEngineConnection(self, engine_key: str, connect_kwargs: dict) -> dict:
-        """CONNECTION_PROVIDER_REGISTRY 登録エンジン (LMStudio/Ollama) 共通の
+        """CONNECTION_PROVIDER_REGISTRY 登録エンジン (LMStudio/Ollama/AI_CLI) 共通の
         疎通確認処理。`connect_kwargs` は接続呼び出しに渡す追加引数
-        (LMStudio: `{"base_url": config.LMSTUDIO_URL}`、Ollama: `{}`)。
+        (LMStudio: `{"base_url": config.LMSTUDIO_URL}`、Ollama/AI_CLI: `{}`)。
 
         接続 SDK の例外や、接続後に利用可能なモデルが無い場合も、UI には
         `error_connection_failed` を返す。例外の詳細は errorLogging() に
         記録し、レスポンスには含めない。
+
+        失敗したときは UI にモデル一覧 [] と選択モデル None を送る。保存している
+        選択モデルは、スペックの `keep_selected_model_on_failure` が偽なら消す。
+        AI_CLI は CLI ごとに覚えたモデルを保存しているので消さない (一度の
+        失敗でユーザーの選択が失われ、次に成功したとき一覧の先頭に戻るのを防ぐ)。
         """
         spec = CONNECTION_PROVIDER_REGISTRY[engine_key]
         bindings = _ENGINE_MODEL_BINDINGS[engine_key]
         printLog(f"Check Translator {engine_key} Connection")
+
+        def resetOnFailure() -> None:
+            config.SELECTABLE_TRANSLATION_ENGINE_STATUS[engine_key] = False
+            setattr(config, spec.selectable_model_list_attr, [])
+            if not spec.keep_selected_model_on_failure:
+                setattr(config, spec.selected_model_attr, None)
+            self.run(200, self.run_mapping[spec.run_mapping_selectable_key], [])
+            self.run(200, self.run_mapping[spec.run_mapping_selected_key], None)
+            self.updateTranslationEngineAndEngineList()
+
         try:
             result = getattr(model, bindings["authenticate"])(**connect_kwargs)
             if result is True:
@@ -2777,24 +2801,14 @@ class Controller:
                 self.updateTranslationEngineAndEngineList()
                 response = {"status":200, "result":True}
             else:
-                config.SELECTABLE_TRANSLATION_ENGINE_STATUS[engine_key] = False
-                setattr(config, spec.selectable_model_list_attr, [])
-                setattr(config, spec.selected_model_attr, None)
-                self.run(200, self.run_mapping[spec.run_mapping_selectable_key], getattr(config, spec.selectable_model_list_attr))
-                self.run(200, self.run_mapping[spec.run_mapping_selected_key], getattr(config, spec.selected_model_attr))
-                self.updateTranslationEngineAndEngineList()
+                resetOnFailure()
                 response = VRCTError.create_error_response(
                     spec.error_connection_failed,
                     data=False
                 )
         except Exception:
             errorLogging()
-            config.SELECTABLE_TRANSLATION_ENGINE_STATUS[engine_key] = False
-            setattr(config, spec.selectable_model_list_attr, [])
-            setattr(config, spec.selected_model_attr, None)
-            self.run(200, self.run_mapping[spec.run_mapping_selectable_key], getattr(config, spec.selectable_model_list_attr))
-            self.run(200, self.run_mapping[spec.run_mapping_selected_key], getattr(config, spec.selected_model_attr))
-            self.updateTranslationEngineAndEngineList()
+            resetOnFailure()
             response = VRCTError.create_error_response(
                 spec.error_connection_failed,
                 data=False,
@@ -3192,7 +3206,8 @@ class Controller:
         return {"status":200, "result":model.getTranslatorAiCliConnected()}
 
     def checkTranslatorAiCliConnection(self, *args, **kwargs) -> dict:
-        return self._checkTranslationEngineConnection("AI_CLI", connect_kwargs={})
+        with _AI_CLI_LOCK:
+            return self._checkTranslationEngineConnection("AI_CLI", connect_kwargs={})
 
     def getTranslatorAiCliModelList(self, *args, **kwargs) -> dict:
         return self._getTranslationEngineModelList("AI_CLI")
@@ -3201,7 +3216,8 @@ class Controller:
         return self._getTranslationEngineModel("AI_CLI")
 
     def setTranslatorAiCliModel(self, data, *args, **kwargs) -> dict:
-        return self._setTranslationEngineModel("AI_CLI", data)
+        with _AI_CLI_LOCK:
+            return self._setTranslationEngineModel("AI_CLI", data)
 
     @staticmethod
     def getSelectableAiCliToolList(*args, **kwargs) -> dict:
@@ -3213,38 +3229,120 @@ class Controller:
 
     def setSelectedAiCliTool(self, data, *args, **kwargs) -> dict:
         tool = str(data)
-        if tool not in config.SELECTABLE_AI_CLI_TOOL_LIST:
-            return VRCTError.create_error_response(
-                ErrorCode.CONNECTION_AI_CLI_FAILED,
-                data=config.SELECTED_AI_CLI_TOOL,
-            )
-        config.SELECTED_AI_CLI_TOOL = tool
-        model.setTranslatorAiCliTool(tool)
-        # CLI を替えたらモデル一覧と選択モデルを取り直し、接続状態を UI に知らせる。
-        result = self._checkTranslationEngineConnection("AI_CLI", connect_kwargs={})
-        self.run(200, self.run_mapping["ai_cli_connection"], result.get("status") == 200)
-        return {"status":200, "result":config.SELECTED_AI_CLI_TOOL}
+        with _AI_CLI_LOCK:
+            if tool not in config.SELECTABLE_AI_CLI_TOOL_LIST:
+                return VRCTError.create_error_response(
+                    ErrorCode.CONNECTION_AI_CLI_FAILED,
+                    data=config.SELECTED_AI_CLI_TOOL,
+                )
+            # ユーザーが選んだので、起動時の一時的な代わりの CLI (_checkAiCliAtStartup) は終わり。
+            config.clearAiCliToolFallback()
+            config.SELECTED_AI_CLI_TOOL = tool
+            model.setTranslatorAiCliTool(tool)
+            # CLI を替えたらモデル一覧と選択モデルを取り直し、接続状態を UI に知らせる。
+            result = self._checkTranslationEngineConnection("AI_CLI", connect_kwargs={})
+            self.run(200, self.run_mapping["ai_cli_connection"], result.get("status") == 200)
+            return {"status":200, "result":config.SELECTED_AI_CLI_TOOL}
+
+    def _onAiCliStatusChange(self, available: bool) -> None:
+        """AI CLI が使えなくなった (起動・最初のターンの失敗) /立ち直ったときに呼ばれる。
+
+        「接続済み」の表示を実際の状態に合わせる。使えなくなったときは
+        CONNECTION_AI_CLI_FAILED を送り、UI に通知を出させる。翻訳エンジンの
+        選択自体は変えない (失敗した翻訳は CTranslate2 で訳され、CLI が
+        立ち直れば同じ設定のまま AI CLI に戻る)。
+        """
+        try:
+            if available:
+                self.run(200, self.run_mapping["ai_cli_connection"], True)
+            else:
+                error_response = VRCTError.create_error_response(
+                    ErrorCode.CONNECTION_AI_CLI_FAILED,
+                    data=False,
+                )
+                self.run(error_response["status"], self.run_mapping["ai_cli_connection"], error_response["result"])
+        except Exception:
+            errorLogging()
 
     @staticmethod
-    def _checkAiCliAtStartup() -> tuple:
+    def _checkAiCliAtStartup(list_models: bool = True) -> tuple:
         """起動時の AI CLI の確認。(status, model_list, selected_model) を返す。
 
         CLI が 1 つも無ければ使えない扱いにする (init() の `case _:` に落ちると
         ネット接続だけで使える扱いになってしまう)。
+
+        `list_models` が偽 (どのタブも AI CLI を使っていない) なら、CLI が入って
+        いるかだけを確かめ、モデル一覧の取得 (`codex debug models` などは数秒
+        かかる) は起動の後に回す (_listAiCliModelsInBackground)。そのときの
+        model_list は None。
+
+        保存していた CLI が見つからない場合は、見つかった最初の CLI をこの起動の
+        間だけ使う (保存値は書き換えない。一時的に見つからなかっただけなら、
+        次の起動で元の CLI に戻る)。
         """
         tools = model.getTranslatorAiCliInstalledTools()
         config.SELECTABLE_AI_CLI_TOOL_LIST = tools
         if not tools:
             return False, None, None
         if config.SELECTED_AI_CLI_TOOL not in tools:
-            config.SELECTED_AI_CLI_TOOL = tools[0]
+            config.useAiCliToolFallback(tools[0])
         if model.authenticationTranslatorAiCli() is not True:
             return False, None, None
+        if not list_models:
+            return True, None, None
         model_list = model.getTranslatorAiCliModelList()
         if len(model_list) == 0:
             return False, model_list, None
         selected = config.SELECTED_AI_CLI_MODEL if config.SELECTED_AI_CLI_MODEL in model_list else model_list[0]
         return True, model_list, selected
+
+    @staticmethod
+    def _applyAiCliStartupResult(model_list: list, selected_model: str) -> None:
+        """起動時の確認で取れたモデル一覧と選択モデルを反映する (init() から呼ぶ)。"""
+        with _AI_CLI_LOCK:
+            config.SELECTABLE_AI_CLI_MODEL_LIST = model_list
+            config.SELECTED_AI_CLI_MODEL = selected_model
+            # 一覧は AICliClient が覚えているので、ここで取り直さない。
+            model.setTranslatorAiCliModel(selected_model)
+            # 常駐セッションは、AI CLI がどこかのタブで翻訳エンジンに選ばれているときだけ起動しておく。
+            if "AI_CLI" in config.SELECTED_TRANSLATION_ENGINES.values():
+                model.updateTranslatorAiCliClient()
+
+    def _listAiCliModelsInBackground(self) -> Optional[Thread]:
+        """起動の後で、選んでいる CLI のモデル一覧を取って UI に送る。
+
+        どのタブも AI CLI を使っていないときは、起動を遅らせないように起動中には
+        一覧を取らない (_checkAiCliAtStartup(list_models=False))。ここで取り直し、
+        保存していたモデル (無ければ一覧の先頭) を選ぶ。一覧が取れなければ
+        AI CLI を使えない扱いにするが、保存していたモデルは消さない。
+        """
+        if config.SELECTABLE_TRANSLATION_ENGINE_STATUS.get("AI_CLI") is not True:
+            return None
+        if config.SELECTABLE_AI_CLI_MODEL_LIST:
+            return None
+
+        def run() -> None:
+            try:
+                with _AI_CLI_LOCK:
+                    model_list = model.getTranslatorAiCliModelList()
+                    config.SELECTABLE_AI_CLI_MODEL_LIST = model_list
+                    self.run(200, self.run_mapping["selectable_ai_cli_model_list"], model_list)
+                    if not model_list:
+                        config.SELECTABLE_TRANSLATION_ENGINE_STATUS["AI_CLI"] = False
+                        self.run(200, self.run_mapping["selected_ai_cli_model"], None)
+                        self.run(200, self.run_mapping["ai_cli_connection"], False)
+                        self.updateTranslationEngineAndEngineList()
+                        return
+                    if config.SELECTED_AI_CLI_MODEL not in model_list:
+                        config.SELECTED_AI_CLI_MODEL = model_list[0]
+                    model.setTranslatorAiCliModel(config.SELECTED_AI_CLI_MODEL)
+                    self.run(200, self.run_mapping["selected_ai_cli_model"], config.SELECTED_AI_CLI_MODEL)
+            except Exception:
+                errorLogging()
+
+        thread = Thread(target=run, name="ai-cli-model-list", daemon=True)
+        thread.start()
+        return thread
 
 
     @staticmethod
@@ -4623,6 +4721,11 @@ class Controller:
             self._model.setMicMuteStatusChangeCallback(self._changeMicTranscriptStatusLocked)
         except Exception:
             errorLogging()
+        try:
+            # AI CLI が使えなくなった/立ち直ったことを UI の接続表示に反映する。
+            self._model.setTranslatorAiCliStatusCallback(self._onAiCliStatusChange)
+        except Exception:
+            errorLogging()
 
     def init(self, *args, **kwargs) -> None:
         removeLog()
@@ -4866,7 +4969,11 @@ class Controller:
                                 selected_model = config.SELECTED_OLLAMA_MODEL if config.SELECTED_OLLAMA_MODEL in model_list else model_list[0]
                                 status = True
                     case "AI_CLI":
-                        status, model_list, selected_model = Controller._checkAiCliAtStartup()
+                        # どのタブも AI CLI を使っていなければ、モデル一覧は起動の後で取る。
+                        with _AI_CLI_LOCK:
+                            status, model_list, selected_model = Controller._checkAiCliAtStartup(
+                                list_models="AI_CLI" in config.SELECTED_TRANSLATION_ENGINES.values()
+                            )
                     case _:
                         status = connected_network is True
             except Exception as e:
@@ -4965,12 +5072,7 @@ class Controller:
                         model.setTranslatorOllamaModel(selected_model)
                         model.updateTranslatorOllamaClient()
                     case "AI_CLI":
-                        config.SELECTABLE_AI_CLI_MODEL_LIST = model_list
-                        config.SELECTED_AI_CLI_MODEL = selected_model
-                        model.setTranslatorAiCliModel(selected_model)
-                        # 常駐セッションは、AI CLI がどこかのタブで翻訳エンジンに選ばれているときだけ起動しておく。
-                        if "AI_CLI" in config.SELECTED_TRANSLATION_ENGINES.values():
-                            model.updateTranslatorAiCliClient()
+                        self._applyAiCliStartupResult(model_list, selected_model)
 
             printLog(f"{engine} check completed")
 
@@ -5265,6 +5367,9 @@ class Controller:
         # Update Settings
         printLog("Update settings")
         self.updateConfigSettings()
+
+        # どのタブも AI CLI を使っていないときに後回しにした、AI CLI のモデル一覧の取得。
+        self._listAiCliModelsInBackground()
 
         printLog("End Initialization")
 

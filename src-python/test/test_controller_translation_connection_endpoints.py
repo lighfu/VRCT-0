@@ -340,6 +340,57 @@ class AiCliConnectionEndpointTests(_ConnectionEndpointTestMixin, unittest.TestCa
         config.SELECTED_AI_CLI_TOOL = self._orig_tool
         config.SELECTED_AI_CLI_MODELS = self._orig_models
 
+    # AI_CLI は CLI ごとに選んだモデルを覚えているので、接続確認に失敗しても
+    # 保存しているモデルは消さない (UI には None を送る)。親クラスの2つの
+    # 「失敗したら選択モデルも None に戻る」テストをこの点だけ置き換える。
+    def _recordRuns(self) -> list:
+        runs = []
+        self.controller.run = lambda *args, **kwargs: runs.append(args)
+        return runs
+
+    @patch("controller.model")
+    def test_check_connection_success_but_empty_model_list_resets_everything(self, mock_model) -> None:
+        config.SELECTED_AI_CLI_TOOL = "claude"
+        config.SELECTED_AI_CLI_MODEL = "sonnet"
+        runs = self._recordRuns()
+        getattr(mock_model, self.AUTHENTICATE_MOCK).return_value = True
+        getattr(mock_model, self.GET_MODEL_LIST_MOCK).return_value = []
+
+        response = self._check_method()()
+
+        self.assertEqual(response["status"], 400)
+        self.assertEqual(
+            response["result"]["error_code"],
+            CONNECTION_PROVIDER_REGISTRY[self.ENGINE_KEY].error_connection_failed.value,
+        )
+        self.assertFalse(config.SELECTABLE_TRANSLATION_ENGINE_STATUS[self.ENGINE_KEY])
+        self.assertEqual(getattr(config, self.MODEL_LIST_ATTR), [])
+        self.assertEqual(config.SELECTED_AI_CLI_MODEL, "sonnet")
+        self.assertIn((200, "/run/selected_ai_cli_model", None), runs)
+
+    @patch("controller.model")
+    def test_check_connection_failure_resets_everything(self, mock_model) -> None:
+        config.SELECTED_AI_CLI_TOOL = "claude"
+        getattr(mock_model, self.AUTHENTICATE_MOCK).return_value = False
+        config.SELECTABLE_TRANSLATION_ENGINE_STATUS[self.ENGINE_KEY] = True
+        setattr(config, self.MODEL_LIST_ATTR, ["stale-model"])
+        setattr(config, self.MODEL_ATTR, "stale-model")
+        runs = self._recordRuns()
+
+        response = self._check_method()()
+
+        self.assertEqual(response["status"], 400)
+        self.assertEqual(
+            response["result"]["error_code"],
+            CONNECTION_PROVIDER_REGISTRY[self.ENGINE_KEY].error_connection_failed.value,
+        )
+        self.assertFalse(config.SELECTABLE_TRANSLATION_ENGINE_STATUS[self.ENGINE_KEY])
+        self.assertEqual(getattr(config, self.MODEL_LIST_ATTR), [])
+        self.assertEqual(getattr(config, self.MODEL_ATTR), "stale-model")
+        self.assertIn((200, "/run/selectable_ai_cli_model_list", []), runs)
+        self.assertIn((200, "/run/selected_ai_cli_model", None), runs)
+        getattr(mock_model, self.GET_MODEL_LIST_MOCK).assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
