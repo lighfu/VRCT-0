@@ -96,5 +96,12 @@ class TransformersRemovedTests(unittest.TestCase):
                 self.assertIn("transformers", _specExcludes(spec_filename))
 
 
+class SudachiDictionaryTests(unittest.TestCase):
+    def test_only_the_core_dictionary_is_bundled(self) -> None:
+        names = _requirementNames()
+        self.assertIn("sudachidict-core", names)
+        self.assertNotIn("sudachidict-full", names)
+
+
 if __name__ == "__main__":
     unittest.main()

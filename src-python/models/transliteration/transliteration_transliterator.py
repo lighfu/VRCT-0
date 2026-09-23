@@ -1,6 +1,6 @@
 from sudachipy import tokenizer
 from sudachipy import dictionary
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import threading
 try:
     from .transliteration_kana_to_hepburn import katakana_to_hepburn
@@ -10,10 +10,31 @@ try:
     from .transliteration_context_rules import apply_context_rules
 except ImportError:
     from transliteration_context_rules import apply_context_rules
+try:
+    from utils import errorLogging
+except ImportError:
+    import sys
+    from os import path as os_path
+    sys.path.append(os_path.dirname(os_path.dirname(os_path.dirname(os_path.abspath(__file__)))))
+    from utils import errorLogging
 
 class Transliterator:
-    def __init__(self) -> None:
-        self.tokenizer_obj = dictionary.Dictionary(dict_type="full").create()
+    def __init__(self, dict_path: Optional[str] = None) -> None:
+        # 標準は同梱の core 辞書。設定で full を選び、ダウンロード済みなら
+        # そのファイル (system_full.dic) を読む。読めなければ core に戻す。
+        self.dict_type = "core"
+        self.tokenizer_obj = None
+        if dict_path is not None:
+            try:
+                self.tokenizer_obj = dictionary.Dictionary(dict=dict_path).create()
+                self.dict_type = "full"
+            except BaseException:
+                # sudachipy raises pyo3_runtime.PanicException (a BaseException,
+                # not an Exception) when the .dic file is corrupt, so this must
+                # catch BaseException to avoid crashing on a broken full dictionary.
+                errorLogging()
+        if self.tokenizer_obj is None:
+            self.tokenizer_obj = dictionary.Dictionary(dict="core").create()
         self.mode = tokenizer.Tokenizer.SplitMode.C
         # Lock to prevent concurrent access to sudachipy tokenizer which may
         # internally use Rust/PyO3 borrow semantics and raise "Already borrowed".

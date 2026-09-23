@@ -32,7 +32,6 @@ openai==1.109.1  # used directly by the LLM translation clients (was a langchain
 google-genai==1.45.0
 SudachiPy==0.6.10
 SudachiDict-core==20250825
-SudachiDict-full==20250825
 # used by translators (not imported directly)
 niquests==3.21.0
 # used by translators (not imported directly)
