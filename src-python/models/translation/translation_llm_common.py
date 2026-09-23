@@ -85,6 +85,17 @@ class OpenAIChat:
 class GeminiChat:
     """Gemini の generate_content を 1 往復だけ呼ぶ。system メッセージは system_instruction に渡す。"""
 
+    # langchain-google-genai==2.1.10's ChatGoogleGenerativeAI (_BaseGoogleGenerativeAI in
+    # langchain_google_genai/_common.py) used to apply these defaults for us:
+    # temperature=0.7, max_retries=6 (verified by downloading the wheel with
+    # `pip download langchain-google-genai==2.1.10 --no-deps` and reading its source; not
+    # installed, since we removed the langchain dependency entirely). Now that we call the
+    # google-genai SDK directly, reproduce temperature via GenerateContentConfig. For
+    # retries, google-genai 1.45.0's HttpRetryOptions(attempts=...) is a cheap equivalent
+    # to langchain's max_retries, so we set it to the same value (6) via HttpOptions.
+    _DEFAULT_TEMPERATURE = 0.7
+    _DEFAULT_MAX_RETRIES = 6
+
     def __init__(self, api_key: str, model: str) -> None:
         from google import genai
         self._client = genai.Client(api_key=api_key)
@@ -97,6 +108,12 @@ class GeminiChat:
         response = self._client.models.generate_content(
             model=self._model,
             contents=contents,
-            config=types.GenerateContentConfig(system_instruction=system_instruction or None),
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction or None,
+                temperature=self._DEFAULT_TEMPERATURE,
+                http_options=types.HttpOptions(
+                    retry_options=types.HttpRetryOptions(attempts=self._DEFAULT_MAX_RETRIES),
+                ),
+            ),
         )
         return extractText(response.text)

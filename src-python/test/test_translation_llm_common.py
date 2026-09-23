@@ -92,6 +92,11 @@ class GeminiChatTests(unittest.TestCase):
         self.assertEqual(kwargs["model"], "gemini-x")
         self.assertEqual(kwargs["contents"], ["hello"])
         self.assertEqual(kwargs["config"].system_instruction, "sys")
+        self.assertEqual(kwargs["config"].temperature, common.GeminiChat._DEFAULT_TEMPERATURE)
+        self.assertEqual(
+            kwargs["config"].http_options.retry_options.attempts,
+            common.GeminiChat._DEFAULT_MAX_RETRIES,
+        )
 
 
 if __name__ == "__main__":
