@@ -1,0 +1,248 @@
+{
+  "label": "final-cuda",
+  "measured_at": "2026-09-24T00:50:14",
+  "size": {
+    "total_bytes": 2660047844,
+    "top_entries": [
+      {
+        "name": "_internal",
+        "bytes": 2639335509
+      },
+      {
+        "name": "VRCT-sidecar-x86_64-pc-windows-msvc.exe",
+        "bytes": 20685208
+      },
+      {
+        "name": "process.log",
+        "bytes": 27060
+      },
+      {
+        "name": "telemetry_state.json",
+        "bytes": 67
+      },
+      {
+        "name": "crash_trace.log",
+        "bytes": 0
+      },
+      {
+        "name": "freeze_trace.log",
+        "bytes": 0
+      }
+    ],
+    "internal_top_entries": [
+      {
+        "name": "nvidia",
+        "bytes": 1852176720
+      },
+      {
+        "name": "sudachidict_core",
+        "bytes": 217171677
+      },
+      {
+        "name": "cv2",
+        "bytes": 129311006
+      },
+      {
+        "name": "rapidocr",
+        "bytes": 83405232
+      },
+      {
+        "name": "av.libs",
+        "bytes": 65593344
+      },
+      {
+        "name": "ctranslate2",
+        "bytes": 64121440
+      },
+      {
+        "name": "numpy.libs",
+        "bytes": 38168576
+      },
+      {
+        "name": "onnxruntime",
+        "bytes": 37547432
+      },
+      {
+        "name": "fonts",
+        "bytes": 29596528
+      },
+      {
+        "name": "ocr_onnx",
+        "bytes": 12798073
+      },
+      {
+        "name": "cryptography",
+        "bytes": 9943040
+      },
+      {
+        "name": "hf_xet",
+        "bytes": 7283122
+      },
+      {
+        "name": "lxml",
+        "bytes": 6901432
+      },
+      {
+        "name": "tokenizers",
+        "bytes": 6065152
+      },
+      {
+        "name": "qh3",
+        "bytes": 5878784
+      },
+      {
+        "name": "python311.dll",
+        "bytes": 5800216
+      },
+      {
+        "name": "speech_recognition",
+        "bytes": 5485782
+      },
+      {
+        "name": "numpy",
+        "bytes": 5286400
+      },
+      {
+        "name": "libcrypto-3.dll",
+        "bytes": 5191960
+      },
+      {
+        "name": "pydantic_core",
+        "bytes": 5148672
+      }
+    ]
+  },
+  "installer_bytes": null,
+  "startup_seconds": 3.5324340000006487,
+  "startup_seconds_runs": [
+    3.691965199999686,
+    3.503794399999606,
+    3.5324340000006487,
+    3.7485425000013493,
+    3.264944500002457
+  ],
+  "idle_rss_bytes": 309428224,
+  "import_time_top": [
+    {
+      "module": "mainloop",
+      "cumulative_us": 976939
+    },
+    {
+      "module": "controller",
+      "cumulative_us": 962228
+    },
+    {
+      "module": "config",
+      "cumulative_us": 415130
+    },
+    {
+      "module": "device_manager",
+      "cumulative_us": 320513
+    },
+    {
+      "module": "model",
+      "cumulative_us": 212385
+    },
+    {
+      "module": "utils",
+      "cumulative_us": 140016
+    },
+    {
+      "module": "ctranslate2",
+      "cumulative_us": 136168
+    },
+    {
+      "module": "requests",
+      "cumulative_us": 135143
+    },
+    {
+      "module": "urllib3",
+      "cumulative_us": 100001
+    },
+    {
+      "module": "urllib3._async.connectionpool",
+      "cumulative_us": 90585
+    },
+    {
+      "module": "models.translation.translation_utils",
+      "cumulative_us": 82895
+    },
+    {
+      "module": "urllib3._request_methods",
+      "cumulative_us": 69795
+    },
+    {
+      "module": "pkg_resources",
+      "cumulative_us": 67680
+    },
+    {
+      "module": "urllib3._async.response",
+      "cumulative_us": 66863
+    },
+    {
+      "module": "models.ocr",
+      "cumulative_us": 65597
+    },
+    {
+      "module": "models.ocr.ocr_pipeline",
+      "cumulative_us": 65269
+    },
+    {
+      "module": "models.ocr.ocr_bubble_detector",
+      "cumulative_us": 62382
+    },
+    {
+      "module": "ctranslate2.converters",
+      "cumulative_us": 61930
+    },
+    {
+      "module": "urllib3._typing",
+      "cumulative_us": 59864
+    },
+    {
+      "module": "huggingface_hub._local_folder",
+      "cumulative_us": 58606
+    },
+    {
+      "module": "ctranslate2.converters.converter",
+      "cumulative_us": 57993
+    },
+    {
+      "module": "ctranslate2.specs.model_spec",
+      "cumulative_us": 57634
+    },
+    {
+      "module": "ctranslate2.specs",
+      "cumulative_us": 57616
+    },
+    {
+      "module": "huggingface_hub.utils",
+      "cumulative_us": 57180
+    },
+    {
+      "module": "ctranslate2.specs.attention_spec",
+      "cumulative_us": 55919
+    },
+    {
+      "module": "urllib3.backend",
+      "cumulative_us": 54334
+    },
+    {
+      "module": "numpy",
+      "cumulative_us": 54184
+    },
+    {
+      "module": "urllib3.backend.hface",
+      "cumulative_us": 50058
+    },
+    {
+      "module": "onnxruntime",
+      "cumulative_us": 43130
+    },
+    {
+      "module": "onnxruntime.capi._pybind_state",
+      "cumulative_us": 40710
+    }
+  ],
+  "model_loaded_rss_bytes": null
+}

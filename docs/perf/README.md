@@ -133,3 +133,85 @@ mainloop の import 時間は前回記録の transformers 撤去後 3289.4ms か
 860.2ms へ大きく縮んでおり、遅延させたモジュール群 (§5) の効果が支配的と見て良い。）
 
 import 時間の上位 5（CPU 版）: mainloop: 3289.4ms, controller: 3269.8ms, model: 2341.4ms, models.translation.translation_translator: 1664.2ms, models.translation.translation_providers: 1020.0ms
+
+## 結果（A-1 完了時）
+
+Task 13 の最終計測。`bat\build.bat`／`bat\build_cuda.bat`（いずれも
+`VRCT_PYINSTALLER_CLEAN=1`）でそれぞれフリーズし直し、
+`src-tauri\bin\_internal` に `transformers`／`torch`／`sudachidict_full`／
+`langchain*`／`grpc` のディレクトリが存在しないことを `Get-ChildItem` で
+確認した上で `tools\measure_footprint.py`（`--python` に `.venv` /
+`.venv_cuda` の絶対パスを指定）で計測した
+（`docs/perf/final-cpu-2026-09-24.json` / `docs/perf/final-cuda-2026-09-24.json`）。
+Rust 未導入のためインストーラーは未計測、モデル読込後 RSS も
+`measure_footprint.py` の対応範囲外のため基準値と同じく未計測。
+
+| 版 | 指標 | 基準値 | 最終 | 差 |
+|---|---|---|---|---|
+| CPU | bin 合計 | 1186.9MB | 773.9MB | -413.0MB (-34.8%) |
+| CPU | インストーラー | -（Rust 未導入のため未計測） | -（Rust 未導入のため未計測） | - |
+| CPU | 起動（中央値） | 6.72秒 | 3.36秒 | -3.36秒 (-50.0%) |
+| CPU | アイドル RSS | 264.6MB | 150.6MB | -114.1MB (-43.1%) |
+| CPU | モデル読込後 RSS | -（未計測） | -（未計測） | - |
+| CUDA | bin 合計 | 2950.8MB | 2536.7MB | -414.1MB (-14.0%) |
+| CUDA | インストーラー | -（Rust 未導入のため未計測） | -（Rust 未導入のため未計測） | - |
+| CUDA | 起動（中央値） | 7.80秒 | 3.53秒 | -4.27秒 (-54.7%) |
+| CUDA | アイドル RSS | 409.3MB | 295.1MB | -114.2MB (-27.9%) |
+| CUDA | モデル読込後 RSS | -（未計測） | -（未計測） | - |
+
+### 効いた変更
+
+途中計測（`after-langchain`/`after-transformers`/`after-lazy-import` の各
+JSON、いずれも CPU 版）から読み取れる寄与は以下の通り。各行は直前の行からの
+差分であり、後段ほど前段の変更を含んだ状態からの追加差分になる。
+
+- **langchain 撤去**（Task 5）: bin 1186.9→1180.6MB（-6.3MB）、起動
+  6.72→4.70秒（-2.02秒）、アイドル RSS 264.6→220.5MB（-44.1MB）。起動時間と
+  RSS への寄与が大きい。
+- **transformers 撤去**（Task 7）: bin 1180.6→1171.1MB（-9.5MB）。起動
+  4.70→5.77秒・RSS 220.5→223.2MB はこの計測では悪化しているが、
+  `bin` サイズ以外は計測ノイズ（他プロセス負荷・ディスクキャッシュ状態）の
+  影響が大きいとみられる。mainloop の import 時間はこの段階では
+  langchain 撤去後の 2684.6ms からほぼ横ばい（記録なし）で、実質的な効果は
+  `bin` 縮小のみ。
+- **Sudachi 辞書 full→core 切替**（Task 8〜10）と**遅延 import**（Task 11,
+  §5）: この 2 つは同じ「遅延 import 後」の 1 行（transformers 撤去後から
+  bin 1171.1→773.8MB、起動 5.77→2.99秒、アイドル RSS 223.2→150.6MB）にしか
+  記録されておらず、個別の寄与は分離できない（README 上でも同様に注記済み）。
+  ただし `sudachidict_full`（約 343MB）が bin から外れたことと、mainloop の
+  import 時間が transformers 撤去後の 3289.4ms から 860.2ms へ大きく縮んだ
+  ことから、bin サイズの縮小は主に Sudachi full 撤去、起動時間の短縮は主に
+  遅延 import の効果と推測される。
+- **単一ビルド化**（Task 12, §7）を経た今回の最終計測は、遅延 import 後の
+  行（bin 773.8MB / 起動 2.99秒 / アイドル RSS 150.6MB）とほぼ同水準
+  （bin 773.9MB / 起動 3.36秒 / アイドル RSS 150.6MB）であり、単一ビルド化
+  自体による bin サイズ・RSS への追加の悪化は見られない。起動時間の差
+  （2.99→3.36秒）は実行環境のノイズの範囲内とみている。
+
+### 悪化した指標
+
+なし（すべての指標が基準値から ±5% を超えて改善している）。
+
+### 結果（Step 4: 実機での通し確認、置き換え版）
+
+Rust が未導入のためインストーラー経由の実機確認は行っていない。代わりに
+`.venv`（開発環境、CPU）でのヘッドレス確認を行った。
+
+- **CTranslate2 翻訳**: `src-tauri\bin\weights` にある CT2 モデルで
+  `Translator` を構築し、翻訳を実行して出力を確認した。
+- **Transliterator（読みがな）core**: `Transliterator`（core 辞書）で
+  カタカナ変換の出力を確認した。
+- **OCR エンジン構築**: `models/ocr` の RapidOCR パイプラインを構築し、
+  例外なく初期化できることを確認した。
+
+（詳細な出力は `task-13-report.md` を参照。）
+
+以下は今回のセッションでは実施していない（要ユーザー確認）:
+
+- インストーラーのビルド／インストール（Rust 未導入のため）
+- マイクでの文字起こし（アプリ実機）
+- API 翻訳（キーを用いた実通信）
+- full 辞書の UI からのダウンロード
+- 設定 UI での表示確認
+- OCR のキャプチャ（実機・実画面）
+- アプリ上での GPU 推論（CUDA 版実機）
