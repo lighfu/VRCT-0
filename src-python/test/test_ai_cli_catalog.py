@@ -52,6 +52,20 @@ class ListModelsTests(unittest.TestCase):
         with patch.object(catalog, "resolveExecutable", return_value=None):
             self.assertEqual(catalog.listModels("codex"), [])
 
+    def test_codex_non_zero_exit_returns_empty_and_logs(self):
+        with patch.object(catalog, "resolveExecutable", return_value="codex.cmd"), \
+             patch.object(catalog.subprocess, "run", return_value=subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="Error: not logged in")), \
+             patch.object(catalog, "errorLogging") as mock_error_log:
+            self.assertEqual(catalog.listModels("codex"), [])
+            mock_error_log.assert_called_once()
+
+    def test_agy_non_zero_exit_with_tab_output_returns_empty_and_logs(self):
+        with patch.object(catalog, "resolveExecutable", return_value="agy.exe"), \
+             patch.object(catalog.subprocess, "run", return_value=subprocess.CompletedProcess(args=[], returncode=1, stdout="model-id\tDescription", stderr="Error")), \
+             patch.object(catalog, "errorLogging") as mock_error_log:
+            self.assertEqual(catalog.listModels("agy"), [])
+            mock_error_log.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

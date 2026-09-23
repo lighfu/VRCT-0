@@ -36,6 +36,9 @@ def detectInstalledTools() -> list[str]:
 def _run(executable: str, args: list[str]) -> str:
     result = subprocess.run([executable, *args], capture_output=True, text=True, encoding="utf-8",
                             errors="replace", timeout=_LIST_TIMEOUT_SEC, creationflags=_CREATE_NO_WINDOW)
+    if result.returncode != 0:
+        output = (result.stderr or result.stdout or "")[:200]
+        raise RuntimeError(f"Command failed with exit code {result.returncode}: {output}")
     return result.stdout or ""
 
 
