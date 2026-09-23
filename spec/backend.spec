@@ -41,6 +41,19 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# pyinstaller-hooks-contrib ships hook-sudachipy.py, which collects
+# sudachidict_full's data files (the ~1GB full dictionary) whenever the
+# sudachidict_full package happens to be importable in the build venv --
+# regardless of whether the app imports it, and regardless of the
+# `excludes=` list above (excludes only stops modulegraph from following
+# an import; it does not stop a hook's collect_data_files() call). The
+# full dictionary is meant to be an optional user download, not something
+# bundled into the installer, so filter its TOC entries out here as a
+# second line of defense against a stale/dirty .venv. TOC entries are
+# (dest_name, src_name, typecode) tuples (PyInstaller 6.10).
+a.datas = [d for d in a.datas if not d[0].replace("\\", "/").startswith("sudachidict_full")]
+a.binaries = [b for b in a.binaries if not b[0].replace("\\", "/").startswith("sudachidict_full")]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(

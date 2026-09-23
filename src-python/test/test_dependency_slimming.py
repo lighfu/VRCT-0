@@ -102,6 +102,29 @@ class SudachiDictionaryTests(unittest.TestCase):
         self.assertIn("sudachidict-core", names)
         self.assertNotIn("sudachidict-full", names)
 
+    def test_specs_filter_sudachidict_full_from_the_toc(self) -> None:
+        # pyinstaller-hooks-contrib's hook-sudachipy.py collects
+        # sudachidict_full's data files whenever the package is importable
+        # in the build venv, regardless of `excludes=`. Both specs must
+        # filter it out of a.datas/a.binaries after Analysis() as a second
+        # line of defense against a stale/dirty .venv.
+        for spec_filename in ("backend.spec", "backend_cuda.spec"):
+            with self.subTest(spec=spec_filename):
+                spec_path = os.path.join(_REPO_ROOT, "spec", spec_filename)
+                with open(spec_path, encoding="utf-8") as f:
+                    source = f.read()
+                self.assertIn("sudachidict_full", source)
+                self.assertRegex(
+                    source,
+                    r"a\.datas\s*=\s*\[.*sudachidict_full",
+                    msg=f"{spec_filename} does not filter sudachidict_full out of a.datas",
+                )
+                self.assertRegex(
+                    source,
+                    r"a\.binaries\s*=\s*\[.*sudachidict_full",
+                    msg=f"{spec_filename} does not filter sudachidict_full out of a.binaries",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

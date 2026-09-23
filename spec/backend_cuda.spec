@@ -39,6 +39,14 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# See spec/backend.spec for why this filter is needed: pyinstaller-hooks-
+# contrib's hook-sudachipy.py collects sudachidict_full's data files
+# whenever the package is importable in the build venv, bypassing
+# `excludes=`. TOC entries are (dest_name, src_name, typecode) tuples
+# (PyInstaller 6.10).
+a.datas = [d for d in a.datas if not d[0].replace("\\", "/").startswith("sudachidict_full")]
+a.binaries = [b for b in a.binaries if not b[0].replace("\\", "/").startswith("sudachidict_full")]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
