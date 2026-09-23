@@ -18,11 +18,15 @@ app-server はユーザーの `~/.codex/config.toml` を読む (MCP サーバー
    1 つずつ `enabled = false` にする。実機で MCP サーバーの子プロセスが
    起動しなくなることを確認した。
 3. thread/start の `ephemeral: true`: スレッドを保存しない (ユーザーの
-   `~/.codex/sessions` にも履歴 DB にも翻訳した発話が残らない)。
+   `~/.codex/sessions` にもスレッドの履歴 DB にも翻訳した発話が残らない)。
 
-ユーザーの `~/.codex/AGENTS.md` は設定では外せない (`project_doc_max_bytes=0`
-で外れるのは作業フォルダ側の AGENTS.md だけ)。翻訳の指示は毎ターンのプロンプトで
-明示しているが、AGENTS.md の指示が混ざる可能性は残る (設計書に記載)。
+外せないもの (設計書に記載し、UI の説明文で知らせる):
+- ユーザーの `~/.codex/AGENTS.md` (`project_doc_max_bytes=0` で外れるのは作業フォルダ側の
+  AGENTS.md だけ)。翻訳の指示は毎ターンのプロンプトで明示しているが、混ざる可能性は残る。
+- codex のデバッグ用ログ (`~/.codex/logs_2.sqlite`) には、送ったターンの本文が
+  DEBUG で記録される (codex が一定期間で消す)。`-c sqlite_home=...` で VRCT の
+  フォルダに移せるが、初回の起動が 44 秒かかり、ユーザーのスレッドの一覧
+  (題名・最初のメッセージ) を移した先にコピーするので採らない (2026-09-24 実測)。
 
 実行時の見張り: userMessage / agentMessage / reasoning / contextCompaction 以外の
 item (commandExecution・mcpToolCall・webSearch・fileChange など) や、

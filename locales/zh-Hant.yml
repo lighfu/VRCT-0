@@ -230,7 +230,7 @@ config_page:
             connection_required:
         ai_cli_tool:
             label: "AI CLI"
-            desc: "Translate with an AI CLI installed on this PC (codex / claude / agy). You need to be logged in to the CLI."
+            desc: "Translate with an AI CLI installed on this PC (codex / claude / agy). You need to be logged in to the CLI. Translations use your CLI account's quota, and codex keeps the text it is sent in its own debug log for a while."
             not_installed: "No supported CLI found"
         ai_cli_connection_check:
             label: "Check AI CLI Connection"
