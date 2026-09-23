@@ -2388,6 +2388,12 @@ class Model:
 
     def feedWatchdog(self):
         self.ensure_initialized()
+        # UI は spawn 直後から feed を送るが、別スレッドで init() が走っている
+        # 最中は ensure_initialized() が何もせず戻る (init() は開始時に
+        # _init_failed を立てるため)。watchdog は init() で作られ
+        # startWatchdog() で動き出すので、それより前の feed は捨ててよい。
+        if not getattr(self, "_inited", False):
+            return
         self.watchdog.feed()
         self._armFreezeDump()
 
