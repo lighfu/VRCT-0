@@ -63,12 +63,13 @@
 
 - `data\` は `current\` の 1 つ上にあるので更新では消えず、削除ではフォルダごと消える（Velopack の仕様）。
 - VRCT-0 はこのフォルダの外に何も書かない。WebView2 のデータ（今は `%LOCALAPPDATA%\com.vrct.app`）も `data\webview` に移す。
+  ただし Velopack 自身のログは、Velopack の既定でフォルダの外の `%LocalAppData%\velopack\` に書かれ、削除しても残る（Setup は `velopack.log`、Update.exe と導入先の直下の `VRCT-0.exe` は `velopack_VRCT-0.log`。2026-09-24 に実機で確認）。
 - 開発中にリポジトリから起動するとき（Velopack で入れていないとき）は、今までどおり実行ファイルのフォルダをデータ置き場にする。
 
 ## 2. 導入と削除
 
 **導入**（`VRCT-0-win-Setup.exe`）
-- ページを出さずに `%LocalAppData%\VRCT-0` に入れ、スタートメニューとデスクトップにショートカットを作って起動する。入れている間は VRCT-0 の画像と進み具合を出す（`vpk pack --splashImage`）。
+- ページを出さずに `%LocalAppData%\VRCT-0` に入れ、スタートメニューとデスクトップにショートカットを作って起動する。入れている間は VRCT-0 の画像と進み具合を出す（`vpk pack --splashImage`）。文字は出さないので、Setup の表示言語は問題にならない（2026-09-24 に実機で確認）。
 - 今インストーラーで選ばせているものはなくす:
   - 言語: 初回起動時（config.json が無いとき）に OS の表示言語（`GetUserDefaultUILanguage`）から決める。今はこの処理が無い（既定は英語）ので新しく作る。`installer_language.txt` の受け渡しは廃止。
   - CPU / GPU: サブプロジェクト 1 では CPU 版のみ。
@@ -78,7 +79,8 @@
 
 **削除**（Windows の「設定 → アプリ」から）
 - Velopack が `%LocalAppData%\VRCT-0` を丸ごと消す（ショートカットと Windows のアンインストール登録も消える）。`data\` も中にあるので、設定・モデル・辞書・ログ・CUDA 部品・AI CLI の作業フォルダまで消える。
-- 削除の直前のフック（Velopack の決まりで 30 秒以内に終える）で、このフォルダから動いているプロセス（本体・サイドカー）を止める。AI CLI の子プロセスはサイドカーが終わると標準入力の終わりを受けて自分で終了する（2026-09-24 に実機で確認済み）。
+- 削除では、Velopack の Update.exe が先に、このフォルダから動いているプロセス（本体・サイドカー）を止め、そのあとで削除の直前のフック（Velopack の決まりで 30 秒以内に終える）を呼ぶ。フックでも同じプロセスを止めるが、実機（2026-09-24）ではその時点で止める対象は残っていなかった（念のための処理として残す）。AI CLI の子プロセスはサイドカーが終わると標準入力の終わりを受けて自分で終了する（実機では 1 秒以内）。
+- 削除の間は Velopack の進み具合の画面（日本語の「VRCT-0 をアンインストールしています」）が出て、終わると自分で閉じる。フォルダは Update.exe が終わってから約 3 秒後に消える。
 - AI CLI 自身が自分の保存場所に書くもの（例: codex のデバッグログ `~/.codex/logs_2.sqlite`）は VRCT-0 のものではないので消さない。
 
 **捨てるもの**
@@ -96,8 +98,9 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 **流れ**
 1. 起動して画面が出たあと、裏で 1 回だけ新しい版を確かめる。見つかったら「新しい版 vX.Y.Z が出ています（約 N MB）」とリリースノートへのリンクを通知する（サイズは差分があれば差分）。
 2. 「更新」を押すと裏でダウンロードする。進み具合は更新の設定欄に出し、その間もアプリは使える。差分が使えないときは Velopack が丸ごとのパッケージに切り替える。
-3. 落とし終えたら「今すぐ再起動して更新」と「終了するときに更新」の説明を出す。何も押さなければ、次にアプリを閉じたときに黙って入れ替える（再起動はしない）。アプリが落ちて閉じる処理を通らなかった場合は、次の起動時に Velopack が自動で入れ替える（Velopack の既定の動き。計画の段階で `VelopackApp::run()` の実装を読んで確認）。
-4. 入れ替えに失敗しても、旧版の `current\` はそのまま残って起動する（実装計画で Velopack の適用処理の振る舞いを確かめ、実機でも確かめる）。次の確認でまた通知する。
+3. 落とし終えたら「今すぐ再起動して更新」と「終了するときに更新」の説明を出す。何も押さなければ、次にアプリを閉じたときに黙って入れ替える（再起動はしない）。アプリが落ちて閉じる処理を通らなかった場合は、次の起動時に Velopack が自動で入れ替える（Velopack の既定の動き。計画の段階で `VelopackApp::run()` の実装を読んで確認し、2026-09-24 に実機でも確認。入れ替えたあと新しい版で起動し直す）。
+   閉じてから入れ替えが終わるまで（実機で 5〜9 秒）のあいだにもう一度起動すると、起動したアプリは入れ替え中の Update.exe に止められ、入れ替えのあとは起動しないまま残る（もう一度起動すれば新しい版で動く）。
+4. 入れ替えに失敗しても、旧版の `current\` はそのまま残って起動する。Velopack は壊れたパッケージを消すので、次の起動で入れ替えをやり直すことはなく、次の確認でまた通知する。このときは差分の元にするパッケージも消えているので、丸ごとのパッケージを落とす。失敗は画面には出ず、Velopack のログにだけ残る（2026-09-24 に実機で確認）。
 
 **設定欄**（今の「更新」セクションを作り直す）
 - チャンネル（安定版／ベータ版）: 今の `SELECTED_RELEASE_CHANNEL` を使う。画面が Rust のコマンドに渡す。初回（config.json に値が無いとき）の既定値は、この版がプレリリースならベータ版、そうでなければ安定版（ベータ版の Setup で入れた人に、いきなり安定版へ戻す更新を勧めないため）。起動のたびに版からチャンネルを上書きする NSIS 由来の処理はやめる。
@@ -117,9 +120,9 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 - Python は `PATH_LOCAL` を 2 つに分ける:
   - `PATH_APP`: アプリに同梱したもの（実行ファイルのフォルダ）
   - `PATH_DATA`: 設定・ログ・モデル・辞書・AI CLI の作業フォルダなど（`VRCT_DATA_DIR` があればそこ、無ければ実行ファイルのフォルダ）
-- 今 `PATH_LOCAL` を使っている 37 か所（`model.py` 29、`config.py` 7、`controller.py` 1）を 1 つずつどちらかに振り分ける。AI CLI の作業フォルダは `PATH_DATAi_cli_workspace` に、プロンプトの設定は `PATH_APP` から読む。
+- 今 `PATH_LOCAL` を使っている 37 か所（`model.py` 29、`config.py` 7、`controller.py` 1）を 1 つずつどちらかに振り分ける。AI CLI の作業フォルダは `PATH_DATA\ai_cli_workspace` に、プロンプトの設定は `PATH_APP` から読む。
 - サイドカーが相対パスで書くログ（`process.log`・`error.log`・`crash_trace.log`・`freeze_trace.log`）は、作業フォルダが `data\` になることで `data\` に入る。
-- CUDA の DLL の外部フォルダ（今は元の VRCT の `%LOCALAPPDATA%\VRCT\cudain` を読んでいる）を `VRCT_DATA_DIR\cudain` に移す（元の VRCT のフォルダを読まないため。取得処理はサブプロジェクト 2）。
+- CUDA の DLL の外部フォルダ（今は元の VRCT の `%LOCALAPPDATA%\VRCT\cuda\bin` を読んでいる）を `VRCT_DATA_DIR\cuda\bin` に移す（元の VRCT のフォルダを読まないため。取得処理はサブプロジェクト 2）。
 
 **リリースの作り方**（`.github/workflows/release.yml` を作り直す）
 1. `v*` のタグで動く。版の一致の確認（`package.json`・`tauri.conf.json`・`config.py`）は残す。
@@ -147,6 +150,7 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
    - 削除すると `%LocalAppData%\VRCT-0` が丸ごと消え、フォルダの外に VRCT-0 のものが残らないこと
    - AI CLI を動かしている最中に削除しても、プロセスもファイルも残らないこと
    - 元の VRCT が入っている場合、それに触れていないこと
+   - 2026-09-24 に確かめた。結果は `docs/perf/README.md` の「追記（Velopack のインストーラー）」。未解決: 入れた版が `%LOCALAPPDATA%\com.lighfu.vrct0\.cookies`（tauri-plugin-http のクッキーの保存先）に書き、削除しても残る。
 2. GitHub Releases からの更新は、公開用の最初のリリースを出すときに確かめる（テスト用のリリースを公開リポジトリに出さないため）。
 3. 起動テストのスキル `run-vrct` に、Velopack で入れた版を起動する手順を足す。
 
@@ -155,7 +159,7 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 - `velopack` 1.2.158 の Rust API に `VelopackApp`（削除前のフック `on_before_uninstall_fast_callback`）、`UpdateManager`、`sources::GithubSource::new(repo, token, prerelease)`、`sources::FileSource` がある。Velopack で入れていないと `UpdateManager::new` がエラーを返すので、開発版の判定に使える。
 - `vpk pack --framework webview2` は受け付けられる。
 - Tauri 2.5.1 は `WebviewWindowBuilder::data_directory` で WebView2 のデータ置き場を指定できる（ウィンドウを `create: false` にして Rust で作る）。
-- 残り（入れ替えの失敗時の振る舞い、削除時のプロセスの扱い、Setup の表示言語）は実機での確認で確かめる。
+- 残り（入れ替えの失敗時の振る舞い、削除時のプロセスの扱い、Setup の表示言語）は 2026-09-24 に実機で確かめ、結果を上の各節に書いた。
 
 当初の一覧:
 

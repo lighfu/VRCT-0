@@ -357,3 +357,112 @@ Rust を導入して `npm run build` を実行した（CPU 版、develop `b87f7e
   UI に送る。これは単体テストで確認）。以後の翻訳は CLI を呼ばずに即座に（1 ms 未満で）失敗する（アプリでは CTranslate2 で訳される）。
 
 プロセスの後片付け: 2 回のサイドカーの実行とも、終了後に起動した CLI・VRCT のプロセスは残らなかった。
+
+## 追記（Velopack のインストーラー）: 手元の PC での確認（2026-09-24）
+
+`feat/installer-velopack`（`bbb2ee57`）で作った `3.5.1-beta.1` の Setup で入れ、手元のフォルダを更新元
+（`VRCT_UPDATE_FEED_DIR`）にして、更新・入れ替えの失敗・削除を確かめた。公開はしていない。
+Windows 11（表示言語は日本語）。画面の操作はすべて UI オートメーションで行い、マウスとキーボードは使っていない。
+
+更新用の `3.5.1-beta.2`〜`beta.6` は作り直さず、`src-tauri\target\release` の同じ中身に版ごとの目印のファイル
+（`_internal\velopack_test_marker.txt`）を足して `vpk pack` した（`utils/pack_release.py` の `stage()` と `pack_args()` を使用）。
+そのため画面の版の表示はどれも `v3.5.1-beta.1` のままで、版は `current\sq.version` と目印のファイルで確かめた。
+差分に入るのは `sq.version` と目印のファイルだけなので、本物のリリースの差分はこれより大きくなる。
+
+### 大きさ
+
+| もの | 大きさ |
+|---|---|
+| `VRCT-0-win-Setup.exe` | 399,790,000 バイト（381.3 MiB） |
+| `VRCT-0-3.5.1-beta.1-full.nupkg` | 392,257,968 バイト（374.1 MiB） |
+| 差分 `*-delta.nupkg`（beta.2〜beta.6） | 664,319〜664,576 バイト（0.63 MiB。画面では「約 1 MB」） |
+| 入れたあとの `current\`（アンインストールの登録の EstimatedSize） | 832,519 KB（813 MiB） |
+| `packages\`（最新の full.nupkg を 1 つ置く） | 374 MiB |
+| `data\weights`（初回起動で取る NLLB-600M と Whisper base） | 780 MB |
+
+`vpk pack` は 1 回 86〜122 秒（差分づくりを含む）。
+
+### 導入
+
+- `VRCT-0-win-Setup.exe` を開くと、ページもダイアログも出ず、VRCT-0 の画像（150% 表示で 768×768）と緑の進み具合だけが出て、
+  7.3 秒でアプリが起動した（`startup.log` の「Main window is ready」まで 7.8 秒）。文字を出さないので、Setup の表示言語は問題にならない。
+  WebView2 は入っていたので何も聞かれなかった。
+- 初回起動の画面は日本語（`UI_LANGUAGE: ja`。OS の表示言語どおり）。チャンネルは Beta版（プレリリースの版のため）。
+- `%LocalAppData%\VRCT-0\` に `current\`・`data\`・`packages\`・`Update.exe`・`VRCT-0.exe` ができた。
+  `data\` には `config.json`・`logs\startup.log`・`process.log`・`webview\`・`weights\`。`current\` にはログも設定も書かれなかった。
+- スタートメニューとデスクトップに `VRCT-0.lnk`、`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\VRCT-0` ができた
+  （DisplayName `VRCT-0`、UninstallString `"...\Update.exe" --uninstall`。DisplayVersion は `3.5.1` で、`-beta.1` は付かない）。
+- 設定を 1 つ変え（メッセージ送信ボタンを「表示し、エンターキーでの送信を無効」に）、翻訳を 1 通送った
+  （CTranslate2。「Hello. It's a nice day today.」）。UI サイズのスライダーは UI オートメーションで動かせなかったので、この設定で代えた。
+
+### 更新
+
+| 場面 | 落とした大きさ | 「更新」→ 準備完了 | 閉じる操作のあと | 結果 |
+|---|---|---|---|---|
+| beta.1→2、今すぐ再起動 | 差分 | 31.2 秒 | 2.3 秒で旧版が終了、15.4 秒で新版のプロセス、22.4 秒で画面 | beta.2 で起動。設定とモデルは残った |
+| beta.2→3、終了時（×ボタン） | 差分 | 28.7 秒 | 2.3 秒でアプリが終了、9.2 秒で Update.exe が終了（再起動しない） | 次に起動すると beta.3 |
+| beta.4→5、終了時（WM_CLOSE。Alt+F4 と同じ経路） | 差分 | 24.8 秒 | 0.3 秒でアプリが終了、6.7 秒で Update.exe が終了 | 次に起動すると beta.5 |
+| beta.3→4、強制終了（`Stop-Process`） | 丸ごと 374 MiB | 0.75 秒（手元のフォルダから） | 次の起動で VelopackApp が入れ替えて起動し直す。起動から 6.0 秒で新版のプロセス | beta.4 で起動 |
+
+- 通知は、起動して画面が出てから 0.5 秒で出た（「新しい版 3.5.1-beta.2 が出ています（約 1 MB）」）。「更新を確認」を押したときは 0.1 秒。
+- 差分のときの「ダウンロード」の時間は、ほとんどが Update.exe が差分から丸ごとのパッケージ（392 MB）を組み立て直す時間（約 27 秒）。
+  進み具合は 70% まで一瞬で進み、組み立てのあいだ 70% のまま止まる。
+- 「今すぐ再起動」で起動し直したアプリにも `VRCT_UPDATE_FEED_DIR` が引き継がれた（`VELOPACK_RESTART=true` も付く）。
+  起動用の `VRCT-0.exe`（導入先の直下）から起動したときも引き継がれる。
+- どの閉じ方でも、終了時に起動した Update.exe は「Failed to wait for process (…) to exit (アクセスが拒否されました)」と記録し、
+  アプリの終了を待たずに展開を始める。展開のあとで導入先から動いているプロセスを止めるので、入れ替えは失敗しなかった
+  （×ボタンと WM_CLOSE では、その時点で止める対象は残っていなかった）。
+- 強制終了のあと、サイドカーは親がいないまま動き続け、約 12 秒後に次の起動の Update.exe に止められた。
+- 翻訳エンジンを AI CLI（claude）にしていた場面も含め、どの閉じ方のあとも claude の子プロセスは残らなかった。
+
+### 入れ替えの失敗
+
+- beta.4 を落とし終えたあと、`packages\VRCT-0-3.5.1-beta.4-full.nupkg`（392,258,606 バイト）の真ん中
+  （196,129,303 バイト目。`onnxruntime.dll` の圧縮データの中）の 1 バイトを 0x87 から 0x78 に書き換え、×ボタンで閉じた。
+- Update.exe は 2 秒で「Error applying package: IO error: Invalid checksum」で失敗し、その nupkg を
+  「to prevent update loop」として消した。`current\` は beta.3 のまま。画面には何も出ない。
+- 次の起動は普通に beta.3 で動き（入れ替えのやり直しは起きない）、設定とモデルも残っていた。
+  次の確認で beta.4 がまた通知されたが、差分の元にする beta.3 の nupkg もダウンロードのときに消えているので、丸ごと（約 374 MB）になった。
+
+### 入れ替え中にもう一度起動した場合
+
+beta.5→6 で、×ボタンで閉じて旧版が終わった直後（Update.exe が展開している最中）に起動し直した。
+
+- 起動したアプリ（beta.5）の VelopackApp が落としてある beta.6 を見つけて入れ替えようとし、2 つ目の Update.exe は
+  ロックを取れずに失敗して、beta.5 を起動し直した。
+- その beta.5 は起動し直してから約 6 秒で、最初の Update.exe の「導入先から動いているプロセスを止める」処理に止められた。
+  入れ替えは終わったが、アプリは起動しないまま残った（ユーザーからは、開いたアプリが消えたように見える）。もう一度起動すれば beta.6 で動く。
+- 閉じてから入れ替えが終わるまでは、この PC で 5〜9 秒。
+
+### 動いたまま削除する
+
+- 翻訳エンジンを AI CLI（claude）にして起動すると、起動から約 4 秒で `claude.exe` が立ち上がった（親はサイドカー、その親は VRCT-0.exe）。
+  1 通送ると 2.8 秒で「Good morning. This is a test.」が返った。
+- そのまま、登録されているアンインストールのコマンド（`Update.exe --uninstall`）を実行した。
+  日本語の進み具合の画面（「VRCT-0 をアンインストールしています」）が出て、終わると自分で閉じた。
+- Update.exe は削除の直前のフックを呼ぶ前に、導入先から動いているプロセス（本体とサイドカー）を自分で止める。
+  claude と WebView2 のプロセスも含めて、0.9 秒ですべて終わった。フックも呼ばれたが、止める対象は残っていなかった。
+- ショートカットは 1.6 秒、アンインストールの登録は 3.6 秒で消えた。Update.exe は 10.9 秒で終わり、
+  `%LocalAppData%\VRCT-0` は 14.1 秒で丸ごと消えた（Update.exe が終わってから 3 秒待って `rmdir` する）。
+- 元の VRCT（`%LOCALAPPDATA%\VRCT`、5,811 項目）のファイルの一覧と更新時刻は、確認の前後で同じだった。
+
+### 導入先の外に書かれたもの
+
+- `%LocalAppData%\velopack\velopack.log`: Setup のログ。Velopack を使う他のアプリの Setup と同じファイルに追記する。削除しても残る。
+- `%LocalAppData%\velopack\velopack_VRCT-0.log`: Update.exe（差分の組み立て・入れ替え・起動・削除）と、導入先の直下の `VRCT-0.exe` のログ。
+  削除しても残る（確認のあと手で消した）。入れ替えの失敗はここにだけ記録される。`%TEMP%` にはログは無かった。
+- `%TEMP%\velopack_VRCT-0`: Velopack の一時フォルダ。削除のときに消える。
+- `%LOCALAPPDATA%\com.lighfu.vrct0\.cookies`: **不具合（未修正）**。tauri-plugin-http（既定で `cookies` 機能が入る）は起動時に
+  `app_cache_dir()`（Windows では `%LOCALAPPDATA%\com.lighfu.vrct0`）の `.cookies` を開き、アプリを閉じるたびに書く。
+  入れた版でも `data\` ではなくここに書き、削除しても残る。この PC では開発版が作ったフォルダが先にあったため、
+  中身が空から `[]` に変わったこと、更新時刻がアプリを閉じた時刻（12:41:59）、アクセス時刻が起動した時刻（12:48:15）になったことで見つけた。
+
+### 確かめられなかったこと
+
+- Windows の「設定 → アプリ」の画面からの削除（登録されている `Update.exe --uninstall` を直接実行した。Windows 自身の確認ダイアログは見ていない）。
+- GitHub Releases からの更新と、ネットワーク越しのダウンロード時間（最初の公開リリースのときに確かめる）。
+- 本物のリリースの大きさの差分（今回の差分は `sq.version` と目印のファイルだけ）。
+- WebView2 が入っていない PC（Windows 10）での Setup。
+- ダウンロード中のスリープやネットワークの切り替え。
+- UI サイズの変更（スライダーを UI オートメーションで動かせなかったので、別の設定で代えた）。
+- 強制終了のあとに残ったサイドカーが、入れ替えが無いときにいつまで動くか。
