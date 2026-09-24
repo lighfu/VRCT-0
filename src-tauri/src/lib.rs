@@ -2,6 +2,21 @@ pub mod app_paths;
 pub mod uninstall;
 pub mod updater;
 
+/// テストの共通部品。
+#[cfg(test)]
+pub(crate) mod test_support {
+    use std::sync::{Mutex, MutexGuard};
+
+    static PROCESS_STATE: Mutex<()> = Mutex::new(());
+
+    /// 環境変数や作業フォルダ (プロセス全体で 1 つ) を変えるテストは、これを持っている間だけ変える。
+    /// cargo test はテストを並列に走らせるので、持たずに変えると別のテストの途中で値が変わる。
+    pub(crate) fn lock_process_state() -> MutexGuard<'static, ()> {
+        // 別のテストが失敗して毒が回っても、ロックとしては使い続ける。
+        PROCESS_STATE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::{Error, Write};
 use std::sync::Arc;
@@ -34,6 +49,10 @@ pub fn run() {
         .ok()
         .and_then(|exe| app_paths::prepare_data_dir(&exe));
     startup_log("VRCT-0 startup began");
+    if let Some(dir) = data_dir.as_ref().filter(|dir| !dir.is_dir()) {
+        // ここに書けないならこのログも残らないが、書ける場合 (途中で作れた等) のために試す。
+        startup_log(&format!("Could not create the data folder {}", dir.display()));
+    }
     let updater = updater::Updater::new(Arc::new(updater::VelopackBackend::new(updater::REPO_URL)));
     let exit_updater = updater.clone();
     let result = tauri::Builder::default()
