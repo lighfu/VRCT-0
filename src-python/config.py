@@ -845,6 +845,10 @@ class Config:
     CONVERT_MESSAGE_TO_HIRAGANA = ManagedProperty('CONVERT_MESSAGE_TO_HIRAGANA', type_=bool)
     MAIN_WINDOW_SIDEBAR_COMPACT_MODE = ManagedProperty('MAIN_WINDOW_SIDEBAR_COMPACT_MODE', type_=bool)
 
+    # GPU 部品 (インストーラー サブプロジェクト 2)
+    CUDA_PACK_PROMPTED = ManagedProperty('CUDA_PACK_PROMPTED', type_=bool)
+    CUDA_PACK_SELECT_GPU_ON_NEXT_START = ManagedProperty('CUDA_PACK_SELECT_GPU_ON_NEXT_START', type_=bool)
+
     ## Config Window
     TRANSPARENCY = ManagedProperty('TRANSPARENCY', type_=int)
     UI_SCALING = ManagedProperty('UI_SCALING', type_=int)
@@ -1358,6 +1362,8 @@ class Config:
         self._OBS_BROWSER_SOURCE_FONT_OUTLINE_COLOR = "#000000"
         self._ENABLE_CLIPBOARD = False
         self._ENABLE_TELEMETRY = True
+        self._CUDA_PACK_PROMPTED = False
+        self._CUDA_PACK_SELECT_GPU_ON_NEXT_START = False
 
         # OCR defaults (VRChat chat-bubble text capture)
         self._ENABLE_OCR_CAPTURE = False

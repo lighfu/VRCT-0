@@ -49,6 +49,7 @@ from models.obs.obs_browser_source_server import ObsBrowserSourceServer
 from models.clipboard.clipboard import Clipboard
 from models.ocr import OcrPipeline, ocr_engine_rapidocr
 from models.ocr.ocr_languages import SELECTABLE_LANGUAGES as OCR_SELECTABLE_LANGUAGES, isSupported as isSupportedOcrLanguage
+from models import cuda_pack
 from models.telemetry import Telemetry
 from utils import errorLogging, errorLog, setupLogger, printLog
 from errors import AudioPipelineError, AudioPipelineFailure, ERROR_METADATA, ErrorCode
@@ -1586,6 +1587,18 @@ class Model:
 
     def downloadSudachiFullDict(self, callback=None, end_callback=None):
         return downloadSudachiFullDict(config.PATH_DATA, callback, end_callback)
+
+    def cudaPackStatus(self, downloading: bool = False) -> str:
+        return cuda_pack.status(downloading=downloading)
+
+    def downloadCudaPack(self, callback=None, end_callback=None) -> bool:
+        return cuda_pack.downloadCudaPack(callback, end_callback)
+
+    def isCudaPackInstalled(self) -> bool:
+        return cuda_pack.isInstalled()
+
+    def requestCudaPackRemoval(self) -> None:
+        cuda_pack.requestRemoval()
 
     def convertMessageToTransliteration(self, message: str, hiragana: bool=True, romaji: bool=True) -> list:
         self.ensure_initialized()

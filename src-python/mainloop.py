@@ -84,6 +84,10 @@ run_mapping = {
     "download_progress_sudachi_dict":"/run/download_progress_sudachi_dict",
     "downloaded_sudachi_dict":"/run/downloaded_sudachi_dict",
     "error_sudachi_dict":"/run/error_sudachi_dict",
+    "cuda_pack_status":"/run/cuda_pack_status",
+    "download_progress_cuda_pack":"/run/download_progress_cuda_pack",
+    "downloaded_cuda_pack":"/run/downloaded_cuda_pack",
+    "error_cuda_pack":"/run/error_cuda_pack",
 
     "selected_mic_host":"/run/selected_mic_host",
     "selected_mic_device":"/run/selected_mic_device",
@@ -455,6 +459,10 @@ mapping = {
     "/get/data/selected_sudachi_dict_type": {"status": True, "variable":controller.getSudachiDictType},
     "/set/data/selected_sudachi_dict_type": {"status": True, "variable":controller.setSudachiDictType},
     "/run/download_sudachi_dict": {"status": True, "variable":controller.downloadSudachiDict},
+    "/get/data/cuda_pack_status": {"status": True, "variable":controller.getCudaPackStatus},
+    "/run/download_cuda_pack": {"status": True, "variable":controller.downloadCudaPack},
+    "/run/remove_cuda_pack": {"status": True, "variable":controller.removeCudaPack},
+    "/run/mark_cuda_pack_prompted": {"status": True, "variable":controller.markCudaPackPrompted},
 
     # VR
     "/get/data/overlay_small_log": {"status": True, "variable":controller.getOverlaySmallLog},

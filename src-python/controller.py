@@ -312,6 +312,9 @@ class Controller:
         # 取るため、start*Message の中から呼ぶとデッドロックする)。
         self.mic_lifecycle_lock: Lock = Lock()
         self.speaker_lifecycle_lock: Lock = Lock()
+        self._cuda_pack_lock = Lock()
+        self._cuda_pack_downloading = False
+        self._cuda_pack_gpu_missing = False
 
     def _is_overlay_available(self) -> bool:
         """Safe check whether overlay is present and initialized.
@@ -972,6 +975,20 @@ class Controller:
                     self.run_mapping["error_sudachi_dict"],
                     error_response["result"],
                 )
+
+    class DownloadCudaPack:
+        def __init__(self, controller: "Controller") -> None:
+            self.controller = controller
+            self._last_progress = -1.0
+            self._last_time = 0.0
+
+        def progressBar(self, progress) -> None:
+            if not _shouldEmitDownloadProgress(self, progress):
+                return
+            self.controller.run(200, self.controller.run_mapping["download_progress_cuda_pack"], {"progress": progress})
+
+        def downloaded(self) -> None:
+            self.controller.finishCudaPackDownload()
 
     def _processMessage(
         self,
@@ -3699,6 +3716,72 @@ class Controller:
             model.downloadSudachiFullDict(handler.progressBar, handler.downloaded)
         return {"status":200, "result":True}
 
+    def _cudaPackStatusPayload(self) -> dict:
+        return {
+            "status": model.cudaPackStatus(downloading=self._cuda_pack_downloading),
+            "prompted": bool(config.CUDA_PACK_PROMPTED),
+        }
+
+    def _pushCudaPackStatus(self) -> None:
+        self.run(200, self.run_mapping["cuda_pack_status"], self._cudaPackStatusPayload())
+
+    def getCudaPackStatus(self, *args, **kwargs) -> dict:
+        return {"status": 200, "result": self._cudaPackStatusPayload()}
+
+    def downloadCudaPack(self, *args, **kwargs) -> dict:
+        with self._cuda_pack_lock:
+            if self._cuda_pack_downloading or model.cudaPackStatus() != "not_installed":
+                return {"status": 200, "result": self._cudaPackStatusPayload()}
+            self._cuda_pack_downloading = True
+        self._pushCudaPackStatus()
+        handler = self.DownloadCudaPack(self)
+        Thread(target=model.downloadCudaPack, args=(handler.progressBar, handler.downloaded), daemon=True).start()
+        return {"status": 200, "result": self._cudaPackStatusPayload()}
+
+    def finishCudaPackDownload(self) -> None:
+        with self._cuda_pack_lock:
+            self._cuda_pack_downloading = False
+        if model.isCudaPackInstalled() is True:
+            config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
+            self.run(200, self.run_mapping["downloaded_cuda_pack"], True)
+        else:
+            error_response = VRCTError.create_error_response(ErrorCode.CUDA_PACK_DOWNLOAD, data=None)
+            self.run(error_response["status"], self.run_mapping["error_cuda_pack"], error_response["result"])
+        self._pushCudaPackStatus()
+
+    def removeCudaPack(self, *args, **kwargs) -> dict:
+        if model.cudaPackStatus() in ("installed", "installed_restart_required"):
+            model.requestCudaPackRemoval()
+        self._pushCudaPackStatus()
+        return {"status": 200, "result": self._cudaPackStatusPayload()}
+
+    def markCudaPackPrompted(self, *args, **kwargs) -> dict:
+        config.CUDA_PACK_PROMPTED = True
+        return {"status": 200, "result": True}
+
+    def applyCudaPackGpuSelection(self) -> None:
+        """GPU 部品を導入した直後の起動で、翻訳と文字起こしのデバイスを GPU にする (1 回だけ)。"""
+        if config.CUDA_PACK_SELECT_GPU_ON_NEXT_START is not True:
+            return
+        config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = False
+        gpu = next((d for d in config.SELECTABLE_COMPUTE_DEVICE_LIST if d.get("device") == "cuda"), None)
+        if gpu is None:
+            errorLog("GPU parts were installed but no GPU device is available; staying on the CPU.")
+            self._cuda_pack_gpu_missing = True
+            return
+        config.SELECTED_TRANSLATION_COMPUTE_DEVICE = copy.deepcopy(gpu)
+        config.SELECTED_TRANSLATION_COMPUTE_TYPE = "auto"
+        config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE = copy.deepcopy(gpu)
+        config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = "auto"
+
+    def reportCudaPackNotLoaded(self) -> None:
+        """applyCudaPackGpuSelection が GPU を見つけられなかったら、画面が出たあとに 1 回だけ知らせる。"""
+        if not self._cuda_pack_gpu_missing:
+            return
+        self._cuda_pack_gpu_missing = False
+        error_response = VRCTError.create_error_response(ErrorCode.CUDA_PACK_NOT_LOADED, data=None)
+        self.run(error_response["status"], self.run_mapping["error_cuda_pack"], error_response["result"])
+
     @staticmethod
     def updateDownloadedSudachiDict() -> None:
         is_full_available = model.checkSudachiFullDict()
@@ -5201,6 +5284,9 @@ class Controller:
         printLog("Transcription Engine Status Init completed")
         self.initializationProgress(2)
 
+        # GPU 部品を導入した直後の起動なら、デバイスを GPU にする (設定を集めて送る前に)。
+        self.applyCudaPackGpuSelection()
+
         # Set Translation Engine
         printLog("Set Translation Engine")
         self.updateDownloadedCTranslate2ModelWeight()
@@ -5318,6 +5404,7 @@ class Controller:
         # Update Settings
         printLog("Update settings")
         self.updateConfigSettings()
+        self.reportCudaPackNotLoaded()
 
         # どのタブも AI CLI を使っていないときに後回しにした、AI CLI のモデル一覧の取得。
         self._listAiCliModelsInBackground()
