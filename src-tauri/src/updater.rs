@@ -6,8 +6,20 @@
 //! 落とし終えた更新は、アプリを閉じるとき (RunEvent::Exit) に Velopack の
 //! Update.exe へ渡して入れ替える。「今すぐ再起動」を選んだときだけ再起動する。
 //! 閉じる前に落ちた場合は、次の起動時に VelopackApp が入れ替える (Velopack の既定)。
+//! ただしこれは版が上がる更新だけで、版を下げる更新 (ベータ版→安定版) は VelopackApp が
+//! 落としたパッケージを消すので入れ替わらず、次の確認でまた通知する。
+//!
+//! Velopack の GitHub のソースには通信の時間切れが無い。スリープからの復帰やネットワークの
+//! 切り替えで通信が止まると、確認がいつまでも終わらない。確認は CHECK_TIMEOUT で諦める。
+//! ダウンロードの止まりはまだ扱っていない (Velopack のロックを持ったまま止まるので、
+//! やり直すにはアプリの再起動が要る。最初の公開リリースの前に手当てする)。
 
-use std::sync::{Arc, Mutex};
+use std::any::Any;
+use std::collections::HashMap;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 
 use serde::Serialize;
 
@@ -15,6 +27,10 @@ pub const STATE_EVENT: &str = "app-update://state";
 pub const REPO_URL: &str = "https://github.com/lighfu/VRCT-0";
 /// 実機確認用: 設定すると、このフォルダ (vpk pack の出力) を更新元にする。
 pub const FEED_DIR_ENV: &str = "VRCT_UPDATE_FEED_DIR";
+/// 新しい版の確認を待つ長さ。これを過ぎたら諦める (起動時なら何も出さず、手で押したなら失敗と出す)。
+pub const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
+/// 確認が時間切れになったときの Failed の message。
+pub const CHECK_TIMEOUT_MESSAGE: &str = "timeout";
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -65,10 +81,10 @@ pub trait UpdateBackend: Send + Sync {
     fn is_installed(&self) -> bool;
     fn current_version(&self) -> String;
     fn check(&self, query: &UpdateQuery) -> Result<Option<Offer>, String>;
-    /// 直前の check が返した版を落とす。戻る前に進み具合の通知を出し終える。
-    fn download(&self, progress: Progress) -> Result<(), String>;
-    /// 落とした版を、このプロセスが終わったあとに入れ替えてもらう。
-    fn apply_after_exit(&self, restart: bool) -> Result<(), String>;
+    /// check が返した版 `version` を落とす。戻る前に進み具合の通知を出し終える。
+    fn download(&self, version: &str, progress: Progress) -> Result<(), String>;
+    /// 落とした版 `version` を、このプロセスが終わったあとに入れ替えてもらう。
+    fn apply_after_exit(&self, version: &str, restart: bool) -> Result<(), String>;
 }
 
 type Emitter = Arc<dyn Fn(&UpdateState) + Send + Sync>;
@@ -77,6 +93,21 @@ struct Inner {
     backend: Arc<dyn UpdateBackend>,
     state: Mutex<UpdateState>,
     emitter: Mutex<Option<Emitter>>,
+    check_timeout: Duration,
+}
+
+/// 別のスレッドが持ったまま落ちても (毒が回っても) 使い続ける。更新の状態が固まらないように。
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn panic_message(what: &str, payload: Box<dyn Any + Send>) -> String {
+    let detail = payload
+        .downcast_ref::<&str>()
+        .map(|text| text.to_string())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "unknown panic".to_string());
+    format!("{what} stopped unexpectedly: {detail}")
 }
 
 #[derive(Clone)]
@@ -86,29 +117,38 @@ pub struct Updater {
 
 impl Updater {
     pub fn new(backend: Arc<dyn UpdateBackend>) -> Self {
+        Self::with_check_timeout(backend, CHECK_TIMEOUT)
+    }
+
+    pub fn with_check_timeout(backend: Arc<dyn UpdateBackend>, check_timeout: Duration) -> Self {
         let initial = if backend.is_installed() { UpdateState::Idle } else { UpdateState::NotInstalled };
         Updater {
-            inner: Arc::new(Inner { backend, state: Mutex::new(initial), emitter: Mutex::new(None) }),
+            inner: Arc::new(Inner {
+                backend,
+                state: Mutex::new(initial),
+                emitter: Mutex::new(None),
+                check_timeout,
+            }),
         }
     }
 
     pub fn set_emitter(&self, emitter: Emitter) {
-        *self.inner.emitter.lock().unwrap() = Some(emitter);
+        *lock(&self.inner.emitter) = Some(emitter);
     }
 
     pub fn state(&self) -> UpdateState {
-        self.inner.state.lock().unwrap().clone()
+        lock(&self.inner.state).clone()
     }
 
     /// 今の状態から次の状態を決めて置き換え、画面へ送る。None なら何もしない。
     fn transition(&self, decide: impl FnOnce(&UpdateState) -> Option<UpdateState>) -> Option<UpdateState> {
         let next = {
-            let mut state = self.inner.state.lock().unwrap();
+            let mut state = lock(&self.inner.state);
             let next = decide(&state)?;
             *state = next.clone();
             next
         };
-        let emitter = self.inner.emitter.lock().unwrap().clone();
+        let emitter = lock(&self.inner.emitter).clone();
         if let Some(emit) = emitter {
             emit(&next);
         }
@@ -128,20 +168,44 @@ impl Updater {
             return;
         }
         let query = update_query(channel, &self.inner.backend.current_version());
-        let next = match self.inner.backend.check(&query) {
+        let next = match self.check_with_timeout(query) {
             Ok(Some(offer)) => UpdateState::Available {
                 version: offer.version,
                 size_bytes: offer.size_bytes,
                 is_downgrade: offer.is_downgrade,
             },
             Ok(None) => UpdateState::UpToDate,
-            Err(message) if manual => UpdateState::Failed { stage: FailedStage::Check, message, version: None },
             Err(message) => {
-                crate::startup_log(&format!("Update check failed: {message}"));
-                UpdateState::Idle
+                let kind = if manual { "manual" } else { "automatic" };
+                crate::startup_log(&format!("Update check failed ({kind}): {message}"));
+                if manual {
+                    UpdateState::Failed { stage: FailedStage::Check, message, version: None }
+                } else {
+                    UpdateState::Idle
+                }
             }
         };
         self.transition(|_| Some(next));
+    }
+
+    /// 確認を別のスレッドで動かし、check_timeout を過ぎたら諦める。止まったスレッドはそのまま
+    /// 残るが、あとで結果が出ても受け取り口がもう無いので捨てられる (状態は変えない)。
+    fn check_with_timeout(&self, query: UpdateQuery) -> Result<Option<Offer>, String> {
+        let backend = self.inner.backend.clone();
+        let (sender, receiver) = mpsc::channel();
+        let worker = std::thread::Builder::new().name("update-check".into()).spawn(move || {
+            let result = catch_unwind(AssertUnwindSafe(|| backend.check(&query)))
+                .unwrap_or_else(|payload| Err(panic_message("the update check", payload)));
+            let _ = sender.send(result);
+        });
+        if let Err(error) = worker {
+            return Err(format!("could not start the update check: {error}"));
+        }
+        match receiver.recv_timeout(self.inner.check_timeout) {
+            Ok(result) => result,
+            Err(RecvTimeoutError::Timeout) => Err(CHECK_TIMEOUT_MESSAGE.to_string()),
+            Err(RecvTimeoutError::Disconnected) => Err("the update check stopped unexpectedly".to_string()),
+        }
     }
 
     /// 見つかった版を落とす。失敗したあとの再試行もここから。
@@ -166,9 +230,14 @@ impl Updater {
                 _ => None,
             });
         });
-        let next = match self.inner.backend.download(progress) {
+        let result = catch_unwind(AssertUnwindSafe(|| self.inner.backend.download(&version, progress)))
+            .unwrap_or_else(|payload| Err(panic_message("the update download", payload)));
+        let next = match result {
             Ok(()) => UpdateState::Ready { version, restart_requested: false },
-            Err(message) => UpdateState::Failed { stage: FailedStage::Download, message, version: Some(version) },
+            Err(message) => {
+                crate::startup_log(&format!("Update download of {version} failed: {message}"));
+                UpdateState::Failed { stage: FailedStage::Download, message, version: Some(version) }
+            }
         };
         self.transition(|_| Some(next));
     }
@@ -186,8 +255,8 @@ impl Updater {
 
     /// アプリを閉じるときに呼ぶ。落とし終えた版があれば入れ替えを頼む。
     pub fn apply_on_exit(&self) {
-        if let UpdateState::Ready { restart_requested, .. } = self.state() {
-            if let Err(message) = self.inner.backend.apply_after_exit(restart_requested) {
+        if let UpdateState::Ready { version, restart_requested } = self.state() {
+            if let Err(message) = self.inner.backend.apply_after_exit(&version, restart_requested) {
                 crate::startup_log(&format!("Applying the update failed: {message}"));
             }
         }
@@ -197,12 +266,18 @@ impl Updater {
 /// Velopack の UpdateManager を使う本物。
 pub struct VelopackBackend {
     repo_url: String,
-    pending: Mutex<Option<(velopack::UpdateManager, velopack::UpdateInfo)>>,
+    /// check が見つけた版ごとの UpdateManager と UpdateInfo。時間切れのあとに遅れて終わった確認が
+    /// 別の版を置いても、画面に出ている版 (download に渡される版) とは取り違えない。
+    found: Mutex<HashMap<String, (velopack::UpdateManager, velopack::UpdateInfo)>>,
 }
 
 impl VelopackBackend {
     pub fn new(repo_url: &str) -> Self {
-        VelopackBackend { repo_url: repo_url.to_string(), pending: Mutex::new(None) }
+        VelopackBackend { repo_url: repo_url.to_string(), found: Mutex::new(HashMap::new()) }
+    }
+
+    fn found(&self, version: &str) -> Option<(velopack::UpdateManager, velopack::UpdateInfo)> {
+        lock(&self.found).get(version).cloned()
     }
 
     fn manager(&self, query: &UpdateQuery) -> Result<velopack::UpdateManager, String> {
@@ -250,15 +325,15 @@ impl UpdateBackend for VelopackBackend {
         match manager.check_for_updates().map_err(|e| e.to_string())? {
             velopack::UpdateCheck::UpdateAvailable(info) => {
                 let offer = offer_from(&info);
-                *self.pending.lock().unwrap() = Some((manager, *info));
+                lock(&self.found).insert(offer.version.clone(), (manager, *info));
                 Ok(Some(offer))
             }
             _ => Ok(None),
         }
     }
 
-    fn download(&self, progress: Progress) -> Result<(), String> {
-        let (manager, info) = self.pending.lock().unwrap().clone().ok_or("no update to download")?;
+    fn download(&self, version: &str, progress: Progress) -> Result<(), String> {
+        let (manager, info) = self.found(version).ok_or_else(|| format!("no update {version} to download"))?;
         let (sender, receiver) = std::sync::mpsc::channel::<i16>();
         let relay = std::thread::spawn(move || {
             for percent in receiver {
@@ -270,8 +345,8 @@ impl UpdateBackend for VelopackBackend {
         result
     }
 
-    fn apply_after_exit(&self, restart: bool) -> Result<(), String> {
-        let (manager, info) = self.pending.lock().unwrap().clone().ok_or("no downloaded update")?;
+    fn apply_after_exit(&self, version: &str, restart: bool) -> Result<(), String> {
+        let (manager, info) = self.found(version).ok_or_else(|| format!("no downloaded update {version}"))?;
         manager
             .wait_exit_then_apply_updates(&info, !restart, restart, Vec::<String>::new())
             .map_err(|e| e.to_string())
@@ -303,6 +378,8 @@ pub fn updater_restart_now(updater: tauri::State<'_, Updater>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc::{Receiver, Sender};
+    use std::time::Instant;
 
     struct FakeBackend {
         installed: bool,
@@ -312,7 +389,16 @@ mod tests {
         progress_steps: Vec<u8>,
         last_query: Mutex<Option<UpdateQuery>>,
         download_calls: Mutex<u32>,
-        applied: Mutex<Vec<bool>>,
+        downloaded: Mutex<Vec<String>>,
+        applied: Mutex<Vec<(String, bool)>>,
+        /// あると、次の check はこれに何か届くか送り手が消えるまで止まる (通信が止まった状態)。
+        check_gate: Mutex<Option<Receiver<()>>>,
+        /// check が終わるたびに知らせる。
+        check_done: Mutex<Option<Sender<()>>>,
+        /// あると、次の download は進み具合を出したあとで止まる。
+        download_gate: Mutex<Option<Receiver<()>>>,
+        check_panics: bool,
+        download_panics: bool,
     }
 
     impl FakeBackend {
@@ -325,7 +411,13 @@ mod tests {
                 progress_steps: vec![10, 10, 50, 100],
                 last_query: Mutex::new(None),
                 download_calls: Mutex::new(0),
+                downloaded: Mutex::new(Vec::new()),
                 applied: Mutex::new(Vec::new()),
+                check_gate: Mutex::new(None),
+                check_done: Mutex::new(None),
+                download_gate: Mutex::new(None),
+                check_panics: false,
+                download_panics: false,
             }
         }
     }
@@ -343,28 +435,63 @@ mod tests {
         }
         fn check(&self, query: &UpdateQuery) -> Result<Option<Offer>, String> {
             *self.last_query.lock().unwrap() = Some(query.clone());
-            self.check_result.lock().unwrap().clone()
+            if self.check_panics {
+                panic!("fake check blew up");
+            }
+            let gate = self.check_gate.lock().unwrap().take();
+            if let Some(gate) = gate {
+                let _ = gate.recv();
+            }
+            let result = self.check_result.lock().unwrap().clone();
+            if let Some(done) = self.check_done.lock().unwrap().as_ref() {
+                let _ = done.send(());
+            }
+            result
         }
-        fn download(&self, progress: Progress) -> Result<(), String> {
+        fn download(&self, version: &str, progress: Progress) -> Result<(), String> {
             *self.download_calls.lock().unwrap() += 1;
+            self.downloaded.lock().unwrap().push(version.to_string());
+            if self.download_panics {
+                panic!("fake download blew up");
+            }
             for step in &self.progress_steps {
                 progress(*step);
             }
+            let gate = self.download_gate.lock().unwrap().take();
+            if let Some(gate) = gate {
+                let _ = gate.recv();
+            }
             self.download_result.lock().unwrap().clone()
         }
-        fn apply_after_exit(&self, restart: bool) -> Result<(), String> {
-            self.applied.lock().unwrap().push(restart);
+        fn apply_after_exit(&self, version: &str, restart: bool) -> Result<(), String> {
+            self.applied.lock().unwrap().push((version.to_string(), restart));
             Ok(())
         }
     }
 
     fn updater_with(backend: FakeBackend) -> (Updater, Arc<FakeBackend>, Arc<Mutex<Vec<UpdateState>>>) {
+        updater_with_timeout(backend, Duration::from_secs(10))
+    }
+
+    fn updater_with_timeout(
+        backend: FakeBackend,
+        timeout: Duration,
+    ) -> (Updater, Arc<FakeBackend>, Arc<Mutex<Vec<UpdateState>>>) {
         let backend = Arc::new(backend);
-        let updater = Updater::new(backend.clone());
+        let updater = Updater::with_check_timeout(backend.clone(), timeout);
         let seen = Arc::new(Mutex::new(Vec::new()));
         let sink = seen.clone();
         updater.set_emitter(Arc::new(move |state| sink.lock().unwrap().push(state.clone())));
         (updater, backend, seen)
+    }
+
+    /// 条件が成り立つまで待つ (最長 5 秒)。
+    fn wait_for(what: &str, condition: impl Fn() -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !condition() {
+            assert!(Instant::now() < deadline, "timed out waiting for {what}");
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 
     #[test]
@@ -428,8 +555,80 @@ mod tests {
     }
 
     #[test]
+    fn manual_check_that_hangs_times_out_as_failed() {
+        let fake = FakeBackend::new();
+        let (_hold, gate) = mpsc::channel::<()>();
+        *fake.check_gate.lock().unwrap() = Some(gate);
+        let (updater, _, _) = updater_with_timeout(fake, Duration::from_millis(100));
+        let started = Instant::now();
+        updater.check("stable", true);
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert_eq!(
+            updater.state(),
+            UpdateState::Failed {
+                stage: FailedStage::Check,
+                message: CHECK_TIMEOUT_MESSAGE.into(),
+                version: None
+            }
+        );
+    }
+
+    #[test]
+    fn automatic_check_that_hangs_goes_back_to_idle() {
+        let fake = FakeBackend::new();
+        let (_hold, gate) = mpsc::channel::<()>();
+        *fake.check_gate.lock().unwrap() = Some(gate);
+        let (updater, _, seen) = updater_with_timeout(fake, Duration::from_millis(100));
+        updater.check("stable", false);
+        assert_eq!(updater.state(), UpdateState::Idle);
+        assert_eq!(*seen.lock().unwrap(), vec![UpdateState::Checking, UpdateState::Idle]);
+    }
+
+    #[test]
+    fn a_hung_check_does_not_block_the_next_one_and_its_late_result_is_dropped() {
+        let fake = FakeBackend::new();
+        let (release, gate) = mpsc::channel::<()>();
+        let (done_sender, done) = mpsc::channel::<()>();
+        *fake.check_gate.lock().unwrap() = Some(gate);
+        *fake.check_done.lock().unwrap() = Some(done_sender);
+        let (updater, backend, _) = updater_with_timeout(fake, Duration::from_millis(100));
+
+        updater.check("beta", true);
+        assert!(matches!(updater.state(), UpdateState::Failed { stage: FailedStage::Check, .. }));
+
+        // 止まった確認が残っていても、もう一度確かめられる。
+        *backend.check_result.lock().unwrap() = Ok(None);
+        updater.check("stable", true);
+        assert_eq!(updater.state(), UpdateState::UpToDate);
+        done.recv_timeout(Duration::from_secs(5)).expect("second check finished");
+
+        // 止まっていた確認があとで結果 (新しい版) を返しても、状態は変わらない。
+        *backend.check_result.lock().unwrap() = Ok(Some(offer("9.9.9")));
+        release.send(()).unwrap();
+        done.recv_timeout(Duration::from_secs(5)).expect("hung check finished");
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(updater.state(), UpdateState::UpToDate);
+    }
+
+    #[test]
+    fn a_panicking_check_ends_in_failed_or_idle() {
+        let mut fake = FakeBackend::new();
+        fake.check_panics = true;
+        let (updater, _, _) = updater_with(fake);
+        updater.check("stable", true);
+        match updater.state() {
+            UpdateState::Failed { stage: FailedStage::Check, message, version: None } => {
+                assert!(message.contains("fake check blew up"), "{message}")
+            }
+            other => panic!("unexpected state {other:?}"),
+        }
+        updater.check("stable", false);
+        assert_eq!(updater.state(), UpdateState::Idle);
+    }
+
+    #[test]
     fn download_reports_progress_then_ready() {
-        let (updater, _, seen) = updater_with(FakeBackend::new());
+        let (updater, backend, seen) = updater_with(FakeBackend::new());
         updater.check("stable", false);
         updater.download();
         assert_eq!(updater.state(), UpdateState::Ready { version: "3.6.0".into(), restart_requested: false });
@@ -444,6 +643,38 @@ mod tests {
             .collect();
         // 同じ値 (10) は 2 回送らない。
         assert_eq!(percents, vec![0, 10, 50, 100]);
+        // 画面に出した版を落とす。
+        assert_eq!(*backend.downloaded.lock().unwrap(), vec!["3.6.0".to_string()]);
+    }
+
+    #[test]
+    fn downloading_state_holds_while_the_download_runs() {
+        let mut fake = FakeBackend::new();
+        fake.progress_steps = vec![10, 50];
+        let (release, gate) = mpsc::channel::<()>();
+        *fake.download_gate.lock().unwrap() = Some(gate);
+        let (updater, backend, _) = updater_with(fake);
+        updater.check("stable", false);
+
+        let worker = updater.clone();
+        let download = std::thread::spawn(move || worker.download());
+        let downloading = UpdateState::Downloading { version: "3.6.0".into(), percent: 50 };
+        wait_for("downloading 50%", || updater.state() == downloading);
+
+        // ダウンロード中は、確認・2 回目のダウンロード・再起動の依頼をどれも受け付けない。
+        *backend.last_query.lock().unwrap() = None;
+        updater.check("beta", true);
+        updater.download();
+        assert!(!updater.request_restart());
+        updater.apply_on_exit();
+        assert_eq!(updater.state(), downloading);
+        assert!(backend.last_query.lock().unwrap().is_none());
+        assert_eq!(*backend.download_calls.lock().unwrap(), 1);
+        assert!(backend.applied.lock().unwrap().is_empty());
+
+        release.send(()).unwrap();
+        download.join().unwrap();
+        assert_eq!(updater.state(), UpdateState::Ready { version: "3.6.0".into(), restart_requested: false });
     }
 
     #[test]
@@ -464,6 +695,25 @@ mod tests {
         *backend.download_result.lock().unwrap() = Ok(());
         updater.download();
         assert_eq!(updater.state(), UpdateState::Ready { version: "3.6.0".into(), restart_requested: false });
+        assert_eq!(*backend.download_calls.lock().unwrap(), 2);
+        assert_eq!(*backend.downloaded.lock().unwrap(), vec!["3.6.0".to_string(), "3.6.0".to_string()]);
+    }
+
+    #[test]
+    fn a_panicking_download_ends_in_failed_and_can_be_retried() {
+        let mut fake = FakeBackend::new();
+        fake.download_panics = true;
+        let (updater, backend, _) = updater_with(fake);
+        updater.check("stable", false);
+        updater.download();
+        match updater.state() {
+            UpdateState::Failed { stage: FailedStage::Download, message, version } => {
+                assert!(message.contains("fake download blew up"), "{message}");
+                assert_eq!(version, Some("3.6.0".into()));
+            }
+            other => panic!("unexpected state {other:?}"),
+        }
+        updater.download();
         assert_eq!(*backend.download_calls.lock().unwrap(), 2);
     }
 
@@ -495,7 +745,7 @@ mod tests {
         assert!(backend.applied.lock().unwrap().is_empty());
         updater.download();
         updater.apply_on_exit();
-        assert_eq!(*backend.applied.lock().unwrap(), vec![false]);
+        assert_eq!(*backend.applied.lock().unwrap(), vec![("3.6.0".to_string(), false)]);
     }
 
     #[test]
@@ -506,20 +756,45 @@ mod tests {
         updater.download();
         assert!(updater.request_restart());
         updater.apply_on_exit();
-        assert_eq!(*backend.applied.lock().unwrap(), vec![true]);
+        assert_eq!(*backend.applied.lock().unwrap(), vec![("3.6.0".to_string(), true)]);
     }
 
     #[test]
-    fn state_json_shape() {
-        let json = serde_json::to_value(UpdateState::Downloading { version: "3.6.0".into(), percent: 5 }).unwrap();
-        assert_eq!(json, serde_json::json!({"status": "downloading", "version": "3.6.0", "percent": 5}));
-        let json = serde_json::to_value(UpdateState::Failed {
-            stage: FailedStage::Check,
-            message: "x".into(),
-            version: None,
-        })
-        .unwrap();
-        assert_eq!(json, serde_json::json!({"status": "failed", "stage": "check", "message": "x", "version": null}));
+    fn state_json_shape_covers_every_variant() {
+        use serde_json::json;
+        let cases = [
+            (UpdateState::NotInstalled, json!({"status": "not_installed"})),
+            (UpdateState::Idle, json!({"status": "idle"})),
+            (UpdateState::Checking, json!({"status": "checking"})),
+            (UpdateState::UpToDate, json!({"status": "up_to_date"})),
+            (
+                UpdateState::Available { version: "3.6.0".into(), size_bytes: 1234, is_downgrade: true },
+                json!({"status": "available", "version": "3.6.0", "size_bytes": 1234, "is_downgrade": true}),
+            ),
+            (
+                UpdateState::Downloading { version: "3.6.0".into(), percent: 5 },
+                json!({"status": "downloading", "version": "3.6.0", "percent": 5}),
+            ),
+            (
+                UpdateState::Ready { version: "3.6.0".into(), restart_requested: true },
+                json!({"status": "ready", "version": "3.6.0", "restart_requested": true}),
+            ),
+            (
+                UpdateState::Failed { stage: FailedStage::Check, message: "x".into(), version: None },
+                json!({"status": "failed", "stage": "check", "message": "x", "version": null}),
+            ),
+            (
+                UpdateState::Failed {
+                    stage: FailedStage::Download,
+                    message: "y".into(),
+                    version: Some("3.6.0".into()),
+                },
+                json!({"status": "failed", "stage": "download", "message": "y", "version": "3.6.0"}),
+            ),
+        ];
+        for (state, expected) in cases {
+            assert_eq!(serde_json::to_value(&state).unwrap(), expected, "{state:?}");
+        }
     }
 
     #[test]
