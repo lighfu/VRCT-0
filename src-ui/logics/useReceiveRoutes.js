@@ -29,7 +29,7 @@ export const STATIC_ROUTE_META_LIST = [
     { endpoint: "/get/data/connected_ai_cli", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_AiCli" },
     { endpoint: "/run/ai_cli_connection", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_AiCli" },
 
-    // CUDA Pack (GPU 部品)
+    // CUDA Pack (GPU 高速化パック)
     { endpoint: "/get/data/cuda_pack_status", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackStatus" },
     { endpoint: "/run/cuda_pack_status", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackStatus" },
     { endpoint: "/run/download_progress_cuda_pack", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackProgress" },

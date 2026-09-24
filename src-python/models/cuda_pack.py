@@ -1,7 +1,7 @@
-"""GPU 部品 (CUDA の cuBLAS / cuDNN) の状態・取得・削除 (インストーラー サブプロジェクト 2)。
+"""GPU 高速化パック (CUDA の cuBLAS / cuDNN) の状態・取得・削除 (インストーラー サブプロジェクト 2)。
 
-アプリは CPU 版だけを配り、NVIDIA の GPU がある人だけがここで部品を導入する。
-部品は NVIDIA が PyPI に公開している公式の wheel から取り、版と SHA-256 は
+アプリは CPU 版だけを配り、NVIDIA の GPU がある人だけがここでパックを導入する。
+パックは NVIDIA が PyPI に公開している公式の wheel から取り、版と SHA-256 は
 WHEELS に固定する (版を変えるときは WHEELS と utils.CUDA_PACK_ID を一緒に変える)。
 wheel の中の nvidia/*/bin/*.dll だけを <データの置き場所>\\cuda\\bin に展開する。
 DLL は起動時に 1 回だけ読み込まれる (utils._registerCudaLibraries) ので、
@@ -155,7 +155,7 @@ def _downloadWheelWithRetry(wheel: Wheel, path: str, on_bytes: Callable[[int], N
                 os.remove(path)
             if attempt >= _DOWNLOAD_MAX_ATTEMPTS:
                 raise
-            printLog(f"GPU parts download failed, retrying ({attempt}/{_DOWNLOAD_MAX_ATTEMPTS - 1})")
+            printLog(f"GPU acceleration pack download failed, retrying ({attempt}/{_DOWNLOAD_MAX_ATTEMPTS - 1})")
             sleep(_DOWNLOAD_RETRY_BACKOFF * attempt)
 
 
@@ -207,7 +207,7 @@ def downloadCudaPack(
     end_callback: Optional[Callable[[str], None]] = None,
     directory: Optional[str] = None,
 ) -> bool:
-    """GPU 部品を取得・検証・展開する。失敗しても前から入っていた部品は残す。
+    """GPU 高速化パックを取得・検証・展開する。失敗しても前から入っていたパックは残す。
 
     end_callback には結果 (RESULT_INSTALLED / RESULT_IN_USE / RESULT_FAILED) を渡す。
     """
@@ -220,11 +220,11 @@ def downloadCudaPack(
     try:
         os.makedirs(directory, exist_ok=True)
         if shutil.disk_usage(directory).free < REQUIRED_FREE_BYTES:
-            printLog("GPU parts: not enough free disk space")
+            printLog("GPU acceleration pack: not enough free disk space")
             return False
         # 古い bin を置き換えられないなら、1.28 GB を落とす前に止める。
         if _binInUse(final_bin):
-            printLog("GPU parts: the old DLLs are in use by another process")
+            printLog("GPU acceleration pack: the old DLLs are in use by another process")
             result = RESULT_IN_USE
             return False
         shutil.rmtree(download_dir, ignore_errors=True)
@@ -254,7 +254,7 @@ def downloadCudaPack(
         # 置き換えは全部そろってから。落としているあいだに古い bin が使われ始めていたら、
         # 何も消さずに止める。pack.json は最後に書く (これがあれば導入済み)。
         if _binInUse(final_bin):
-            printLog("GPU parts: the old DLLs are in use by another process")
+            printLog("GPU acceleration pack: the old DLLs are in use by another process")
             result = RESULT_IN_USE
             return False
         if os_path.exists(manifest_path):

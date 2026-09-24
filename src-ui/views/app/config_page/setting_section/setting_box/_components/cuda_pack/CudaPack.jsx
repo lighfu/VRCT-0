@@ -4,7 +4,7 @@ import { useCudaPack } from "@logics_common";
 import { LabelComponent } from "../index";
 import styles from "./CudaPack.module.scss";
 
-// 翻訳と文字起こしのデバイス欄の下に出す「GPU 部品」欄。GPU が無ければ出さない。
+// 翻訳と文字起こしのデバイス欄の下に出す「GPU 高速化パック」欄。GPU が無ければ出さない。
 export const CudaPack = () => {
     const { t } = useI18n();
     const { currentCudaPack, downloadCudaPack, removeCudaPack, restartApp } = useCudaPack();

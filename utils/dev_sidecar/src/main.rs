@@ -8,7 +8,7 @@
 // against src-python/mainloop.py directly, so a Python edit only costs a
 // process restart.
 // VRCT_DEV_VENV may only be .venv (the default). There is no CUDA venv any
-// more: the GPU runs on the GPU parts installed from the app (<data>\cuda\bin).
+// more: the GPU runs on the GPU acceleration pack installed from the app (<data>\cuda\bin).
 //
 // Behaviour parity with the frozen backend:
 //   - stdin/stdout/stderr are inherited so the Tauri <-> sidecar JSON
@@ -32,7 +32,7 @@ fn main() {
     let venv = match env::var("VRCT_DEV_VENV").as_deref() {
         Ok(".venv") | Err(env::VarError::NotPresent) => ".venv",
         _ => {
-            eprintln!("dev-sidecar: VRCT_DEV_VENV must be .venv (install the GPU parts from the app to use the GPU)");
+            eprintln!("dev-sidecar: VRCT_DEV_VENV must be .venv (install the GPU acceleration pack from the app to use the GPU)");
             std::process::exit(127);
         }
     };

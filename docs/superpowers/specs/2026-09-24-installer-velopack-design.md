@@ -42,7 +42,7 @@
 ## サブプロジェクトの分け方
 
 1. **基盤**（この spec）: Velopack の導入、データの置き場所、ワンクリック導入、アプリ内更新、削除、CI でのリリース。
-2. **GPU 部品の後入れ**: アプリ本体を CPU 版の 1 種類にまとめ、CUDA の DLL（約 1.2 GB）は必要な人だけがアプリから取る。
+2. **GPU 高速化パックの後入れ**: アプリ本体を CPU 版の 1 種類にまとめ、CUDA の DLL（約 1.2 GB）は必要な人だけがアプリから取る。
 3. **元の VRCT からの取り込み**: 初回起動時に、元の VRCT の設定とモデルを取り込むか尋ねる。
 
 2 が終わるまで公開リリースは出さない（出すと GPU 版の利用者が困るため）。
@@ -55,7 +55,7 @@
 ```
 %LocalAppData%\VRCT-0\
   current\     アプリ本体（更新のたびに丸ごと入れ替わる）
-  data\        設定・ログ・モデル・辞書・CUDA 部品・AI CLI の作業フォルダ・WebView2 のデータ・起動ログ
+  data\        設定・ログ・モデル・辞書・GPU 高速化パック・AI CLI の作業フォルダ・WebView2 のデータ・起動ログ
   packages\    Velopack が落とした更新
   Update.exe
   VRCT-0.exe   起動用の小さな実行ファイル（Velopack が置く）
@@ -94,7 +94,7 @@
 - WebView2: Windows 11 には入っている。Windows 10 で無い場合に備えて `vpk pack --framework webview2` で前提として入れる（2026-09-24 に vpk 1.2.0 で指定できることを確認）。
 
 **削除**（Windows の「設定 → アプリ」から）
-- Velopack が `%LocalAppData%\VRCT-0` を丸ごと消す（ショートカットと Windows のアンインストール登録も消える）。`data\` も中にあるので、設定・モデル・辞書・ログ・CUDA 部品・AI CLI の作業フォルダまで消える。
+- Velopack が `%LocalAppData%\VRCT-0` を丸ごと消す（ショートカットと Windows のアンインストール登録も消える）。`data\` も中にあるので、設定・モデル・辞書・ログ・GPU 高速化パック・AI CLI の作業フォルダまで消える。
 - 削除では、Velopack の Update.exe が先に、このフォルダから動いているプロセス（本体・サイドカー）を止め、そのあとで削除の直前のフック（Velopack の決まりで 30 秒以内に終える）を呼ぶ。フックでも同じプロセスを止めるが、実機（2026-09-24）ではその時点で止める対象は残っていなかった（念のための処理として残す）。AI CLI の子プロセスはサイドカーが終わると標準入力の終わりを受けて自分で終了する（実機では 1 秒以内）。
 - 削除の間は Velopack の進み具合の画面（日本語の「VRCT-0 をアンインストールしています」）が出て、終わると「アンインストール完了」の画面に替わり、
   OK を押すまで残る（2026-09-24 の修正後の確認で 3 回とも。45 秒待っても閉じなかった）。フォルダは OK を押して Update.exe が終わってから約 3 秒後に消える。
@@ -155,7 +155,7 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 5. `vpk upload github` で公開する（ベータ版は `--pre`）。公開されるファイル: `VRCT-0-win-Setup.exe`、`*-full.nupkg`、`*-delta.nupkg`、`releases.win.json`。
 6. 2 GiB を超えるファイルが無いかの確認は残す（CPU 版は約 360 MB）。
 - CI には .NET SDK と `vpk` を入れる。手元では `npm run release` で 1〜4（公開の手前まで）ができるようにする。
-- `release-cuda`・`release-all`・`utils/zip.py` による zip 作成と `VRCT_cuda.zip` はやめる。`backend_cuda.spec` と `.venv_cuda` はサブプロジェクト 2 で CUDA 部品を作るのに使うので残す。
+- `release-cuda`・`release-all`・`utils/zip.py` による zip 作成と `VRCT_cuda.zip` はやめる。`backend_cuda.spec` と `.venv_cuda` はサブプロジェクト 2 で GPU 高速化パックを作るのに使うので残す。
 
 ## 5. テストと確認
 
@@ -198,7 +198,7 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 
 ## 範囲外
 
-- GPU 部品の後入れ（サブプロジェクト 2）
+- GPU 高速化パックの後入れ（サブプロジェクト 2）
 - 元の VRCT からの取り込み（サブプロジェクト 3）
 - コード署名（`vpk pack --signParams` / Azure Trusted Signing で後から足せる）
 - PyInstaller の置き換え

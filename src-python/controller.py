@@ -3747,7 +3747,7 @@ class Controller:
             config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
             self.run(200, self.run_mapping["downloaded_cuda_pack"], True)
         else:
-            # 古い部品を使っているプロセスが残っていて置き換えられないときは、原因に合った文言にする。
+            # 古いパックを使っているプロセスが残っていて置き換えられないときは、原因に合った文言にする。
             error_code = ErrorCode.CUDA_PACK_IN_USE if result == CUDA_PACK_RESULT_IN_USE else ErrorCode.CUDA_PACK_DOWNLOAD
             error_response = VRCTError.create_error_response(error_code, data=None)
             self.run(error_response["status"], self.run_mapping["error_cuda_pack"], error_response["result"])
@@ -3757,7 +3757,7 @@ class Controller:
         if model.cudaPackStatus() in ("installed", "installed_restart_required"):
             model.requestCudaPackRemoval()
             # 導入して再起動する前に削除したとき、次の起動で GPU へ切り替えようとして
-            # 「GPU 部品を読み込めませんでした」を出さないように。
+            # 「GPU 高速化パックを読み込めませんでした」を出さないように。
             config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = False
         self._pushCudaPackStatus()
         return {"status": 200, "result": self._cudaPackStatusPayload()}
@@ -3767,13 +3767,13 @@ class Controller:
         return {"status": 200, "result": True}
 
     def applyCudaPackGpuSelection(self) -> None:
-        """GPU 部品を導入した直後の起動で、翻訳と文字起こしのデバイスを GPU にする (1 回だけ)。"""
+        """GPU 高速化パックを導入した直後の起動で、翻訳と文字起こしのデバイスを GPU にする (1 回だけ)。"""
         if config.CUDA_PACK_SELECT_GPU_ON_NEXT_START is not True:
             return
         config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = False
         gpu = next((d for d in config.SELECTABLE_COMPUTE_DEVICE_LIST if d.get("device") == "cuda"), None)
         if gpu is None:
-            errorLog("GPU parts were installed but no GPU device is available; staying on the CPU.")
+            errorLog("The GPU acceleration pack was installed but no GPU device is available; staying on the CPU.")
             self._cuda_pack_gpu_missing = True
             return
         compute_types = gpu.get("compute_types") or []
@@ -5310,7 +5310,7 @@ class Controller:
         printLog("Transcription Engine Status Init completed")
         self.initializationProgress(2)
 
-        # GPU 部品を導入した直後の起動なら、デバイスを GPU にする (設定を集めて送る前に)。
+        # GPU 高速化パックを導入した直後の起動なら、デバイスを GPU にする (設定を集めて送る前に)。
         self.applyCudaPackGpuSelection()
 
         # Set Translation Engine

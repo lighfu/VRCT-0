@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useCudaPack, useIsBackendReady } from "@logics_common";
 import { useStore_OpenedQuickSetting } from "@store";
 
-// 起動して状態を受け取ったら、GPU があって部品が未導入で、まだ尋ねていなければ 1 回だけ尋ねる。
+// 起動して状態を受け取ったら、GPU があって GPU 高速化パックが未導入で、まだ尋ねていなければ 1 回だけ尋ねる。
 // 出した時点で「尋ねた」と記録する (どちらのボタンでも、閉じただけでも 2 回目は出さない)。
 export const CudaPackPromptController = () => {
     const { currentCudaPack, markCudaPackPrompted } = useCudaPack();

@@ -93,7 +93,7 @@ class ErrorCode(str, Enum):
     WEIGHT_SUDACHI_DICT_DOWNLOAD = "WEIGHT_SUDACHI_DICT_DOWNLOAD"
 
     # ============================================================================
-    # GPU 部品 (CUDA_PACK_*)
+    # GPU 高速化パック (CUDA_PACK_*)
     # ============================================================================
     CUDA_PACK_DOWNLOAD = "CUDA_PACK_DOWNLOAD"
     CUDA_PACK_IN_USE = "CUDA_PACK_IN_USE"
@@ -412,10 +412,10 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
     },
     ErrorCode.WEIGHT_SUDACHI_DICT_DOWNLOAD: {"category": ErrorCategory.WEIGHT, "message": "Sudachi full dictionary download error", "severity": "error", "user_action_required": True},
 
-    # GPU 部品
-    ErrorCode.CUDA_PACK_DOWNLOAD: {"category": ErrorCategory.DEVICE, "message": "GPU parts download error", "severity": "error", "user_action_required": True},
-    ErrorCode.CUDA_PACK_IN_USE: {"category": ErrorCategory.DEVICE, "message": "GPU parts are in use and cannot be replaced", "severity": "error", "user_action_required": True},
-    ErrorCode.CUDA_PACK_NOT_LOADED: {"category": ErrorCategory.DEVICE, "message": "GPU parts could not be loaded", "severity": "warning", "user_action_required": False},
+    # GPU 高速化パック
+    ErrorCode.CUDA_PACK_DOWNLOAD: {"category": ErrorCategory.DEVICE, "message": "GPU acceleration pack download error", "severity": "error", "user_action_required": True},
+    ErrorCode.CUDA_PACK_IN_USE: {"category": ErrorCategory.DEVICE, "message": "GPU acceleration pack is in use and cannot be replaced", "severity": "error", "user_action_required": True},
+    ErrorCode.CUDA_PACK_NOT_LOADED: {"category": ErrorCategory.DEVICE, "message": "GPU acceleration pack could not be loaded", "severity": "warning", "user_action_required": False},
 
     # バリデーションエラー
     ErrorCode.VALIDATION_MIC_THRESHOLD: {

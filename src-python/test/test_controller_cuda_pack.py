@@ -1,4 +1,4 @@
-"""GPU 部品のエンドポイント、導入後の GPU への切り替え、エラーの送り方のテスト。"""
+"""GPU 高速化パックのエンドポイント、導入後の GPU への切り替え、エラーの送り方のテスト。"""
 
 import copy
 import inspect
@@ -129,7 +129,7 @@ class CudaPackControllerTests(unittest.TestCase):
         self.model.requestCudaPackRemoval.assert_not_called()
 
     def test_remove_before_the_restart_cancels_the_gpu_switch(self) -> None:
-        # 導入 → 再起動の前に「削除」→ 再起動、で「GPU 部品を読み込めませんでした」を出さない。
+        # 導入 → 再起動の前に「削除」→ 再起動、で「GPU 高速化パックを読み込めませんでした」を出さない。
         self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
         self.model.cudaPackStatus.return_value = "installed_restart_required"
         self.controller.removeCudaPack()

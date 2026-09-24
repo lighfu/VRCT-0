@@ -514,13 +514,14 @@ beta.5→6 で、×ボタンで閉じて旧版が終わった直後（Update.exe
 渡した置き場所（入れた版では `data\weights\rapidocr`）に入り、同梱の cls はパッケージの中のものをそのまま使った。
 配るパッケージの `rapidocr\models` は wheel のモデル 3 つだけになり、full.nupkg は 374.1 MiB から 319.3 MiB に、Setup は 381.3 MiB から 326.5 MiB になった。
 
-## 追記（GPU 部品の後入れ）: 手元の PC での確認（2026-09-24）
+## 追記（GPU 高速化パックの後入れ）: 手元の PC での確認（2026-09-24）
 
 `feat/cuda-pack`（`9d83a613`）を消さない手順（`clean.py --soft` → `build-python` → `vite-build` → `tauri build --no-bundle` →
-`pack_release.py`）で `3.5.1-beta.1` にして Setup で入れ、GPU 部品（cuBLAS / cuDNN の wheel）を本物の PyPI
+`pack_release.py`）で `3.5.1-beta.1` にして Setup で入れ、GPU 高速化パック（cuBLAS / cuDNN の wheel）を本物の PyPI
 （`files.pythonhosted.org`）から取った。公開はしていない。この PC は Windows 11、RTX 3070（VRAM 8 GB）、
 NVIDIA のドライバー 581.94（CUDA 13.0）。画面の操作はすべて UI オートメーション（Invoke・SetValue・SelectionItem・ScrollIntoView）で、
 マウスとキーボードは使っていない。更新用の `3.5.1-beta.2` は前の追記と同じく、目印のファイルを足して `vpk pack` し直した。
+画面の文言は、あとで名前を「GPU 高速化パック」に変えたいまの文言で書いている（この確認のときの画面は別の名前だった）。
 
 ### 大きさ
 
@@ -532,14 +533,14 @@ NVIDIA のドライバー 581.94（CUDA 13.0）。画面の操作はすべて UI
 | 展開後の `data\cuda\bin`（DLL 11 個） | 1,852,176,720 バイト（1,766.4 MiB） |
 | そのうち大きいもの | `cublasLt64_12.dll` 674,667,520、`cudnn_engines_precompiled64_9.dll` 528,766,000、`cudnn_adv64_9.dll` 326,072,352 |
 | `data\cuda\pack.json` | 309 バイト（`{"pack_id": "cu12.8-cudnn9.7", "files": [11 個]}`） |
-| この版の `VRCT-0-win-Setup.exe` / `full.nupkg` | 342,327,706 / 334,795,674 バイト（GPU 部品は入っていない） |
+| この版の `VRCT-0-win-Setup.exe` / `full.nupkg` | 342,327,706 / 334,795,674 バイト（GPU 高速化パックは入っていない） |
 
 ### 初回の問いかけと導入
 
 - Setup を開いてから 12 秒でアプリが起動した。初回は既定のモデル（Whisper base と NLLB-600M）を取るので、初期化が終わるまで 60 秒。
-  終わった直後に「GPU で翻訳と文字起こしを速くする部品を導入しますか？」が出た（ボタンは「導入する」「今はしない」）。
+  終わった直後に「GPU 高速化パックを導入して、翻訳と文字起こしを GPU で動かしますか？」が出た（ボタンは「導入する」「今はしない」）。
   出た時点で `/run/mark_cuda_pack_prompted` が送られ、`config.json` の `CUDA_PACK_PROMPTED` が true になった。
-- 「導入する」を押すと問いかけが閉じ、設定の「翻訳」の GPU 部品欄に「ダウンロード中… N%」と進み具合の棒が出た
+- 「導入する」を押すと問いかけが閉じ、設定の「翻訳」の GPU 高速化パック欄に「ダウンロード中… N%」と進み具合の棒が出た
   （表示は 5% から 100% まで 1〜3% 刻みで変わった。サイドカーからの進み具合の通知は 163 回）。終わると欄が「再起動して GPU を使う」に替わった。
 - 取得の途中、`data\cuda\download\` の wheel はファイルを閉じるまで大きさ 0 に見え、閉じたときに固定した大きさになった。
   展開のあいだは `bin.tmp\` に DLL が 1 つずつ増え、最後に `bin\` と `pack.json` ができて `download\`・`bin.tmp\` が消えた。
@@ -557,7 +558,7 @@ NVIDIA のドライバー 581.94（CUDA 13.0）。画面の操作はすべて UI
 - 押してから 2.1 秒で新しいアプリのプロセス、3.0 秒で新しいサイドカー、6.6 秒で初期化が終わった（旧アプリは 2.5 秒で終了）。
 - `config.json` の翻訳と文字起こしのデバイスが `{"device": "cuda", "device_index": 0, "device_name": "NVIDIA GeForce RTX 3070", ...}`、
   計算の種類が `auto` になり、`CUDA_PACK_SELECT_GPU_ON_NEXT_START` は false に戻った。起動時の状態は `installed`、`compute_mode` は `cuda`。
-  設定のデバイス欄は「NVIDIA GeForce RTX 3070」「自動」、GPU 部品欄は「削除」、左下の版の表示に「CUDA」が付いた。
+  設定のデバイス欄は「NVIDIA GeForce RTX 3070」「自動」、GPU 高速化パック欄は「削除」、左下の版の表示に「CUDA」が付いた。
 - サイドカーが読み込んだ DLL（`(Get-Process -Id <サイドカー>).Modules`）: `data\cuda\bin\cublas64_12.dll`、`data\cuda\bin\cublasLt64_12.dll`、
   `nvcuda.dll`。`cudnn64_9.dll` は CPU のときから CTranslate2 に同梱のもの（`current\_internal\ctranslate2\`）が読まれていて、
   `data\cuda\bin` の cuDNN はこの確認のあいだ一度も読まれなかった（NLLB の翻訳は cuDNN を使わず、文字起こしは声を入れていないため）。
@@ -581,33 +582,33 @@ CTranslate2（NLLB-200-distilled-600M int8）、日本語→英語、計算の�
 
 ### 文字起こし
 
-- 文字起こしのデバイス欄と GPU 部品欄は、音声認識エンジンが Whisper のときだけ出る（既定のエンジンは Google）。
-  Whisper に切り替えると、デバイスは「NVIDIA GeForce RTX 3070」「自動」、GPU 部品欄は「削除」だった。
+- 文字起こしのデバイス欄と GPU 高速化パック欄は、音声認識エンジンが Whisper のときだけ出る（既定のエンジンは Google）。
+  Whisper に切り替えると、デバイスは「NVIDIA GeForce RTX 3070」「自動」、GPU 高速化パック欄は「削除」だった。
 - マイク入力をオンにすると、サイドカーは Whisper base をデバイス `cuda` で作る。エラーは出ず（`error.log` に記録なし）、2 回目にオンにしたとき専用 GPU メモリが 875 MB から 939 MB に増えた。
   マイク（既定の Virtual Desktop Audio）に声が入らないので、実際の文字起こし（cuDNN を使う推論）は確かめていない。確認のあと Google に戻した。
 
 ### 削除（不具合あり）
 
 「削除」→「次の起動で削除します。」と「再起動」→「再起動」で、`remove_pending` が置かれ、押してから 6.6 秒で初期化が終わった。
-デバイスは CPU に戻り、GPU 部品欄は「導入する」、起動時の状態は `not_installed` になった。ところが **`data\cuda\bin` に
+デバイスは CPU に戻り、GPU 高速化パック欄は「導入する」、起動時の状態は `not_installed` になった。ところが **`data\cuda\bin` に
 `cublas64_12.dll` と `cublasLt64_12.dll`（合わせて 788,383,744 バイト）が残った**（`remove_pending` と `pack.json` と残りの DLL は消えた）。
 再起動の前のサイドカーが終わらずに残り、この 2 つを読み込んだままだったため（下の「見つかった不具合」）。
 
 この状態でもう一度「導入する」を押すと、1.28 GB を落として展開したあと、古い `bin\` を消すところ
 （`models\cuda_pack.py` 210 行の `shutil.rmtree(final_bin)`）で `PermissionError: [WinError 5] アクセスが拒否されました。: '...\cuda\bin\cublas64_12.dll'`
-になり、「GPU 部品を導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。」が出た。
+になり、「GPU 高速化パックを導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。」が出た。
 失敗の片付けは働き、`download\` と `bin.tmp\` は消え、アプリは CPU のまま動き続けた。残ったサイドカーを止めると、次の導入は成功した。
 
 ### 準備済みの更新があるときの再起動
 
 手元の更新元に `3.5.1-beta.2` を足し、「更新を確認」→「更新」で準備完了にした（差分、約 1 MB、25.4 秒）。
-その状態で GPU 部品欄の「再起動して GPU を使う」を押した。
+その状態で GPU 高速化パック欄の「再起動して GPU を使う」を押した。
 
 - 2.4 秒で旧サイドカーが終わり、2.7 秒で Update.exe（`apply --package ...beta.2-full.nupkg --waitPid <旧アプリ>`）が始まり、
   7.6 秒で新しいアプリ（親は Update.exe）、9 秒で新しいサイドカー、11.8 秒で初期化が終わった。
 - `current\sq.version` は `3.5.1-beta.2`、目印のファイルもあり、`VRCT_UPDATE_FEED_DIR` も引き継がれた。
   デバイスは GPU（自動）、状態は `installed`、サイドカーは `data\cuda\bin` の cuBLAS を読み込み、翻訳は GPU の速さだった（上の表）。
-  更新と部品の読み込みが 1 回の再起動で済んだ。旧サイドカーは残らなかった。
+  更新とパックの読み込みが 1 回の再起動で済んだ。旧サイドカーは残らなかった。
 - `startup.log` では、この道は「Restart requested from the UI」のあとに「VRCT-0 event loop ended」が出る（普通に閉じたときと同じ）。
 
 ### 途中で止めた場合
@@ -618,13 +619,13 @@ CTranslate2（NLLB-200-distilled-600M int8）、日本語→英語、計算の�
   起動し直すと状態は `not_installed` で、残ったものはそのままだった。
 - 次の「導入する」で、始めに `download\` と `bin.tmp\` が作り直され（途中の wheel は 1.5 秒以内に新しいファイルに替わった）、
   成功したあとは `download\`・`bin.tmp\` が消え、`bin\` は 11 個の新しい DLL に置き換わった。
-- サイドカーが止まっているあいだ、GPU 部品欄は「ダウンロード中… 6%」のままだった（サイドカーが落ちたときに画面が何も知らせないのは、ほかの機能と同じ）。
+- サイドカーが止まっているあいだ、GPU 高速化パック欄は「ダウンロード中… 6%」のままだった（サイドカーが落ちたときに画面が何も知らせないのは、ほかの機能と同じ）。
 
 ### アプリの削除
 
 - ×ボタンで閉じると 2.3 秒でアプリとサイドカーが終わった（`startup.log` に「VRCT-0 event loop ended」）。
 - `Update.exe --uninstall` の前の導入先は 1,960 ファイル、3,821,227,283 バイト（`data\cuda` を含む）。
-  削除は 3.2 秒で「アンインストール完了」になり、OK を押すと `%LocalAppData%\VRCT-0` は部品ごと消えた。
+  削除は 3.2 秒で「アンインストール完了」になり、OK を押すと `%LocalAppData%\VRCT-0` はパックごと消えた。
   退避フォルダ・アンインストールの登録・ショートカットも残らなかった。
 - 元の VRCT（`%LOCALAPPDATA%\VRCT`、5,811 項目）の一覧と更新時刻、`%USERPROFILE%\.cache\huggingface`（21 項目）、
   `%APPDATA%\NVIDIA\ComputeCache` は、確認の前後で同じだった。`%LocalAppData%\velopack\velopack.log` には Setup のログが追記され、
@@ -658,4 +659,4 @@ CTranslate2（NLLB-200-distilled-600M int8）、日本語→英語、計算の�
 - 文字起こしの GPU での推論（声を入れられない。Whisper のモデルを GPU に作るところまで）と、cuDNN の DLL の読み込み。
 - GPU が無い PC（欄を出さない）と、ドライバーが古い PC（`driver_too_old`）の表示。
 - 通信の失敗・SHA-256 の不一致・空き容量の不足での失敗（自動テストの範囲。実機ではファイルのロックによる失敗で、片付けと再試行を確かめた）。
-- GitHub Releases からの更新と、公開の更新元での GPU 部品と更新の組み合わせ。
+- GitHub Releases からの更新と、公開の更新元での GPU 高速化パックと更新の組み合わせ。

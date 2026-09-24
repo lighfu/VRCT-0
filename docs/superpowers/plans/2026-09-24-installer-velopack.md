@@ -412,7 +412,7 @@ def externalCudaLibraryDir() -> Optional[str]:
     """後から入れた CUDA ライブラリの置き場所 (存在すれば)。
 
     Velopack で入れた版では <導入先>\\data\\cuda\\bin (VRCT_DATA_DIR\\cuda\\bin)。
-    取得処理はサブプロジェクト 2 (GPU 部品の後入れ) で作る。
+    取得処理はサブプロジェクト 2 (GPU 高速化パックの後入れ) で作る。
     元の VRCT のフォルダ (%LOCALAPPDATA%\\VRCT) は見ない (並べて入れるため)。
     """
     data_dir = os.environ.get(DATA_DIR_ENV, "").strip()

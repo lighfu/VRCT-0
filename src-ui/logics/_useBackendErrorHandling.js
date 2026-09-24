@@ -151,7 +151,7 @@ export const _useBackendErrorHandling = () => {
                 return;
 
             // ============================================================================
-            // GPU 部品ダウンロード関連エラー (CUDA_PACK_*)
+            // GPU 高速化パックの導入関連エラー (CUDA_PACK_*)
             // ============================================================================
             case "CUDA_PACK_DOWNLOAD":
                 showNotification_Error(t("common_error.failed_download_cuda_pack"), { category_id: error_code });

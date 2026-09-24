@@ -1,9 +1,9 @@
-"""/run/shutdown のあと、サイドカーが自分で終わることのテスト (GPU 部品の最終修正 C1)。
+"""/run/shutdown のあと、サイドカーが自分で終わることのテスト (GPU 高速化パックの最終修正 C1)。
 
 画面は /run/shutdown を送って 2 秒後に閉じる (または起動し直す)。普通は Tauri
 (tauri-plugin-shell) がそこでサイドカーを止める。ところが画面からの再起動が
 RunEvent::Exit を通らなかったとき、誰もサイドカーを止めず、watchdog も
-controller.shutdown() で止まっているので、前のサイドカーが RAM と GPU 部品の DLL を
+controller.shutdown() で止まっているので、前のサイドカーが RAM と GPU 高速化パックの DLL を
 掴んだまま残り続けた (2026-09-24 の実機確認)。/run/shutdown の処理が、止める処理の
 あとで自分の終わりを予約していれば、親が止めなくても終わる。
 

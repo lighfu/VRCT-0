@@ -3,7 +3,7 @@ import { useCudaPack } from "@logics_common";
 import { useStore_OpenedQuickSetting } from "@store";
 import styles from "./CudaPackPrompt.module.scss";
 
-// 初回起動で 1 回だけ出す「GPU 部品を導入しますか？」。
+// 初回起動で 1 回だけ出す「GPU 高速化パックを導入して…？」。
 export const CudaPackPrompt = () => {
     const { t } = useI18n();
     const { downloadCudaPack, notifyCudaPackDownloadStarted } = useCudaPack();

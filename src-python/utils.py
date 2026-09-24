@@ -31,8 +31,8 @@ def dataDirectory(app_dir: str) -> str:
     return data_dir if data_dir else app_dir
 
 
-# GPU 部品 (インストーラー サブプロジェクト 2)。版の印は models/cuda_pack.py の
-# WHEELS と一緒に変える。印が違う部品は読み込まない (導入し直すときに bin を
+# GPU 高速化パック (インストーラー サブプロジェクト 2)。版の印は models/cuda_pack.py の
+# WHEELS と一緒に変える。印が違うパックは読み込まない (導入し直すときに bin を
 # 置き換えられるよう、古い DLL を使用中にしないため)。
 CUDA_PACK_ID = "cu12.8-cudnn9.7"
 CUDA_PACK_MANIFEST = "pack.json"
@@ -49,12 +49,12 @@ def _appDirectory() -> str:
 
 
 def cudaPackDirectory() -> str:
-    """GPU 部品の置き場所 (<データの置き場所>\\cuda)。元の VRCT のフォルダは見ない。"""
+    """GPU 高速化パックの置き場所 (<データの置き場所>\\cuda)。元の VRCT のフォルダは見ない。"""
     return os.path.join(dataDirectory(_appDirectory()), "cuda")
 
 
 def installedCudaPackId(directory: Optional[str] = None) -> Optional[str]:
-    """入っている GPU 部品の版の印。bin か pack.json が無ければ None。"""
+    """入っている GPU 高速化パックの版の印。bin か pack.json が無ければ None。"""
     directory = directory or cudaPackDirectory()
     if not os.path.isdir(os.path.join(directory, "bin")):
         return None
@@ -67,7 +67,7 @@ def installedCudaPackId(directory: Optional[str] = None) -> Optional[str]:
 
 
 def externalCudaLibraryDir() -> Optional[str]:
-    """読み込む GPU 部品の bin (版の印が今のものと一致し、削除を頼まれていないときだけ)。"""
+    """読み込む GPU 高速化パックの bin (版の印が今のものと一致し、削除を頼まれていないときだけ)。"""
     directory = cudaPackDirectory()
     if os.path.isfile(os.path.join(directory, CUDA_PACK_REMOVE_MARKER)):
         return None
@@ -83,7 +83,7 @@ _CUDA_PACK_REMOVAL_RETRY_SEC = 0.5
 
 
 def processPendingCudaPackRemoval() -> bool:
-    """削除を頼まれていた GPU 部品を消す。DLL を読み込む前 (import 時) に呼ぶ。
+    """削除を頼まれていた GPU 高速化パックを消す。DLL を読み込む前 (import 時) に呼ぶ。
 
     pack.json を先に消し、bin が消えてから印 (remove_pending) を消す。bin を消しきれない
     (前のサイドカーが DLL を読んだまま残っているなど) ときは印を残すので、状態は
@@ -121,7 +121,7 @@ def cleanupInterruptedCudaPackDownload() -> None:
 
 
 def cudaPackLoaded() -> bool:
-    """この起動で GPU 部品の DLL を検索パスに載せたか。"""
+    """この起動で GPU 高速化パックの DLL を検索パスに載せたか。"""
     return _cuda_pack_loaded
 
 
@@ -161,7 +161,7 @@ def _registerCudaLibraries() -> None:
     (実測: PATH 無しだと "Could not locate cudnn_ops64_9.dll" で落ちる)。
 
     手元の venv に `nvidia-*` が入っていればその bin も載せる。アプリの
-    GPU 部品は externalCudaLibraryDir()。
+    GPU 高速化パックは externalCudaLibraryDir()。
     """
     global _cuda_pack_loaded
     _cuda_pack_loaded = False
@@ -522,7 +522,7 @@ def isWildcardBindAddress(ip_address: str) -> bool:
 # ctranslate2.dll は GPU 実行時に cuBLAS を LoadLibrary で遅延ロードする
 # (ctranslate2.dll 内の文字列テーブルに "cublas64_12.dll" が入っている)。
 # cuDNN は ctranslate2 の wheel に同梱されているが cuBLAS は入っておらず、
-# GPU 部品 (data\\cuda\\bin) を導入したときだけこれを持つ。つまり
+# GPU 高速化パック (data\\cuda\\bin) を導入したときだけこれを持つ。つまり
 # 「cuBLASを引けるか」がそのままこのビルドでGPU実行できるかの判定になる。
 # torch を使っていた頃は torch.cuda.is_available() が偶然この役目を
 # 果たしていた (CPU版には CPU 版 torch が入るので常に False だった)。

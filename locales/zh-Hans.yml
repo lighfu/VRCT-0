@@ -8,8 +8,8 @@ common:
     default_label: "默认"
 
 cuda_pack_prompt:
-    title: "Install the parts that make translation and transcription faster on your GPU?"
-    desc: "An NVIDIA GPU was found. With these parts, translation and transcription run faster on the GPU (about 1.3 GB download, 1.8 GB on disk). You can also install them later from the device settings for translation and transcription."
+    title: "Install the GPU acceleration pack to run translation and transcription on your GPU?"
+    desc: "An NVIDIA GPU was found. With the GPU acceleration pack, translation and transcription run faster on the GPU (about 1.3 GB download, 1.8 GB on disk). You can also install it later from the device settings for translation and transcription."
     install_button: "Install"
     later_button: "Not now"
 
@@ -35,9 +35,9 @@ common_error:
 
     invalid_hex_color: "请输入有效的 HEX 颜色代码（例：{{brand_color_hex}}）格式。"
 
-    failed_download_cuda_pack: "Could not install the GPU parts. Check your connection and free disk space (about 3.1 GB needed), then try again."
-    cuda_pack_in_use: "The GPU parts are in use and can't be replaced. Restart the app and try again."
-    cuda_pack_not_loaded: "Could not load the GPU parts. The app runs on the CPU."
+    failed_download_cuda_pack: "Could not install the GPU acceleration pack. Check your connection and free disk space (about 3.1 GB needed), then try again."
+    cuda_pack_in_use: "The GPU acceleration pack is in use and can't be replaced. Restart the app and try again."
+    cuda_pack_not_loaded: "Could not load the GPU acceleration pack. The app runs on the CPU."
 
 common_warning:
     unable_to_use_osc_query: "由于 OSC IP Address 的设置无法接收 OSC 数据，以下功能已自动禁用。"
@@ -124,17 +124,17 @@ config_page:
         warning_labels:
             unable_to_use_osc_query: "由于 OSC IP Address 的设置无法接收 OSC 数据，目前无法使用此功能。"
         cuda_pack:
-            label: "GPU parts"
-            desc: "Parts that make translation and transcription faster on NVIDIA GPUs (about 1.3 GB download, 1.8 GB on disk). They take effect after a restart."
+            label: "GPU acceleration pack"
+            desc: "Makes translation and transcription faster on NVIDIA GPUs (about 1.3 GB download, 1.8 GB on disk). It takes effect after a restart."
             driver_too_old: "Your NVIDIA driver is too old. Please update the driver."
             install_button: "Install"
             downloading: "Downloading... {{percent}}%"
             restart_to_use_button: "Restart to use the GPU"
             remove_button: "Remove"
-            remove_pending: "They will be removed at the next start."
+            remove_pending: "It will be removed at the next start."
             restart_button: "Restart"
-            download_started_notification: "Started downloading the GPU parts. You can follow the progress under \"GPU parts\" in Settings > Translation."
-            installed_notification: "The GPU parts are installed. Restart to use them."
+            download_started_notification: "Started downloading the GPU acceleration pack. You can follow the progress under \"GPU acceleration pack\" in Settings > Translation."
+            installed_notification: "The GPU acceleration pack is installed. Restart to use it."
 
     side_menu_labels:
         device: "设备"

@@ -4,7 +4,7 @@ import { useStdoutToPython } from "@useStdoutToPython";
 import { useI18n } from "@useI18n";
 import { useNotificationStatus } from "./useNotificationStatus";
 
-// GPU 部品 (CUDA の cuBLAS / cuDNN)。状態はサイドカー (models/cuda_pack.py) が持ち、
+// GPU 高速化パック (CUDA の cuBLAS / cuDNN)。状態はサイドカー (models/cuda_pack.py) が持ち、
 // /get/data/cuda_pack_status と /run/cuda_pack_status で送ってくる。
 export const useCudaPack = () => {
     const { asyncStdoutToPython } = useStdoutToPython();

@@ -845,7 +845,7 @@ class Config:
     CONVERT_MESSAGE_TO_HIRAGANA = ManagedProperty('CONVERT_MESSAGE_TO_HIRAGANA', type_=bool)
     MAIN_WINDOW_SIDEBAR_COMPACT_MODE = ManagedProperty('MAIN_WINDOW_SIDEBAR_COMPACT_MODE', type_=bool)
 
-    # GPU 部品 (インストーラー サブプロジェクト 2)
+    # GPU 高速化パック (インストーラー サブプロジェクト 2)
     CUDA_PACK_PROMPTED = ManagedProperty('CUDA_PACK_PROMPTED', type_=bool)
     CUDA_PACK_SELECT_GPU_ON_NEXT_START = ManagedProperty('CUDA_PACK_SELECT_GPU_ON_NEXT_START', type_=bool)
 

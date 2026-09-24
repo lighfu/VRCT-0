@@ -151,7 +151,7 @@ controller.setRun(run)
 # 画面は /run/shutdown を送って 2 秒後に閉じるので、普通は Tauri (tauri-plugin-shell) が
 # そこでサイドカーを止め、この時計は鳴らない。親が止めなかったときの保険: watchdog は
 # controller.shutdown() が止めるので、ここで終わらないと誰にも止められず、RAM と (GPU を
-# 使っていれば) VRAM と GPU 部品の DLL を掴んだまま残る (2026-09-24 の実機確認で起きた)。
+# 使っていれば) VRAM と GPU 高速化パックの DLL を掴んだまま残る (2026-09-24 の実機確認で起きた)。
 # 止める処理 (設定の保存を含む) が終わってから数えるので、保存するものは失わない。
 _SHUTDOWN_SELF_EXIT_DELAY_SEC = 3
 

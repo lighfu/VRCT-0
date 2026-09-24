@@ -8,8 +8,8 @@ common:
     default_label: "デフォルト"
 
 cuda_pack_prompt:
-    title: "GPU で翻訳と文字起こしを速くする部品を導入しますか？"
-    desc: "NVIDIA の GPU が見つかりました。部品を導入すると、翻訳と文字起こしを GPU で速く動かせます（ダウンロード約 1.3 GB、展開後 1.8 GB）。あとからでも、設定の翻訳・文字起こしのデバイス欄で導入できます。"
+    title: "GPU 高速化パックを導入して、翻訳と文字起こしを GPU で動かしますか？"
+    desc: "NVIDIA の GPU が見つかりました。GPU 高速化パックを導入すると、翻訳と文字起こしを GPU で速く動かせます（ダウンロード約 1.3 GB、展開後 1.8 GB）。あとからでも、設定の翻訳・文字起こしのデバイス欄で導入できます。"
     install_button: "導入する"
     later_button: "今はしない"
 
@@ -35,9 +35,9 @@ common_error:
 
     invalid_hex_color: "有効なHEXカラーコード（例: {{brand_color_hex}}）形式で入力してください。"
 
-    failed_download_cuda_pack: "GPU 部品を導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。"
-    cuda_pack_in_use: "GPU 部品が使用中のため置き換えられません。再起動してからもう一度試してください。"
-    cuda_pack_not_loaded: "GPU 部品を読み込めませんでした。CPU で動きます。"
+    failed_download_cuda_pack: "GPU 高速化パックを導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。"
+    cuda_pack_in_use: "GPU 高速化パックが使用中のため置き換えられません。再起動してからもう一度試してください。"
+    cuda_pack_not_loaded: "GPU 高速化パックを読み込めませんでした。CPU で動きます。"
 
 common_warning:
     unable_to_use_osc_query: "OSC IP Address の設定によりOSCデータの受信ができないため、以下の機能が自動的に無効になっています。"
@@ -124,8 +124,8 @@ config_page:
         warning_labels:
             unable_to_use_osc_query: "OSC IP Address の設定によりOSCデータの受信ができないため、現在この機能は使用できません。"
         cuda_pack:
-            label: "GPU 部品"
-            desc: "NVIDIA の GPU で翻訳と文字起こしを速くする部品です（ダウンロード約 1.3 GB、展開後 1.8 GB）。導入したあと、再起動すると使えます。"
+            label: "GPU 高速化パック"
+            desc: "NVIDIA の GPU で翻訳と文字起こしを速くします（ダウンロード約 1.3 GB、展開後 1.8 GB）。導入したあと、再起動すると使えます。"
             driver_too_old: "NVIDIA のドライバーが古いため使えません。ドライバーを更新してください。"
             install_button: "導入する"
             downloading: "ダウンロード中… {{percent}}%"
@@ -133,8 +133,8 @@ config_page:
             remove_button: "削除"
             remove_pending: "次の起動で削除します。"
             restart_button: "再起動"
-            download_started_notification: "GPU 部品のダウンロードを始めました。進み具合は、設定の「翻訳」にある「GPU 部品」欄で見られます。"
-            installed_notification: "GPU 部品を導入しました。再起動すると使えます。"
+            download_started_notification: "GPU 高速化パックのダウンロードを始めました。進み具合は、設定の「翻訳」にある「GPU 高速化パック」欄で見られます。"
+            installed_notification: "GPU 高速化パックを導入しました。再起動すると使えます。"
 
     side_menu_labels:
         device: "デバイス"
