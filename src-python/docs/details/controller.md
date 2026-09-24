@@ -284,13 +284,6 @@ setWebSocketPort(data) -> dict
 ### システム管理
 
 ```python
-updateSoftware(data) -> dict
-updateCudaSoftware(data) -> dict
-```
-
-- ソフトウェアアップデート
-
-```python
 downloadCtranslate2Weight(data) -> dict
 downloadWhisperWeight(data) -> dict
 ```

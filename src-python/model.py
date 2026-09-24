@@ -3,7 +3,6 @@ import copy
 import asyncio
 import faulthandler
 import json
-from subprocess import Popen
 from os import makedirs as os_makedirs
 from os import path as os_path
 from os import remove as os_remove
