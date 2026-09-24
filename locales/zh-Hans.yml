@@ -36,6 +36,7 @@ common_error:
     invalid_hex_color: "请输入有效的 HEX 颜色代码（例：{{brand_color_hex}}）格式。"
 
     failed_download_cuda_pack: "Could not install the GPU parts. Check your connection and free disk space (about 3.1 GB needed), then try again."
+    cuda_pack_in_use: "The GPU parts are in use and can't be replaced. Restart the app and try again."
     cuda_pack_not_loaded: "Could not load the GPU parts. The app runs on the CPU."
 
 common_warning:

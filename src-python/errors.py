@@ -96,6 +96,7 @@ class ErrorCode(str, Enum):
     # GPU 部品 (CUDA_PACK_*)
     # ============================================================================
     CUDA_PACK_DOWNLOAD = "CUDA_PACK_DOWNLOAD"
+    CUDA_PACK_IN_USE = "CUDA_PACK_IN_USE"
     CUDA_PACK_NOT_LOADED = "CUDA_PACK_NOT_LOADED"
 
     # ============================================================================
@@ -413,6 +414,7 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
 
     # GPU 部品
     ErrorCode.CUDA_PACK_DOWNLOAD: {"category": ErrorCategory.DEVICE, "message": "GPU parts download error", "severity": "error", "user_action_required": True},
+    ErrorCode.CUDA_PACK_IN_USE: {"category": ErrorCategory.DEVICE, "message": "GPU parts are in use and cannot be replaced", "severity": "error", "user_action_required": True},
     ErrorCode.CUDA_PACK_NOT_LOADED: {"category": ErrorCategory.DEVICE, "message": "GPU parts could not be loaded", "severity": "warning", "user_action_required": False},
 
     # バリデーションエラー

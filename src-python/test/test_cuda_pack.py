@@ -3,10 +3,14 @@
 wheel は小さな偽物 (zip) を作り、cuda_pack.WHEELS と cuda_pack.requests_get を差し替える。
 """
 
+import glob
 import hashlib
 import io
 import json
 import os
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -72,9 +76,18 @@ class DownloadTests(unittest.TestCase):
             ok = cuda_pack.downloadCudaPack(progress.append, end, directory=self.directory)
         return ok, progress, end, mock_get
 
+    def _install_old_pack(self):
+        old_bin = os.path.join(self.directory, "bin")
+        os.makedirs(old_bin)
+        open(os.path.join(old_bin, "old.dll"), "w").close()
+        with open(os.path.join(self.directory, "pack.json"), "w", encoding="utf-8") as f:
+            json.dump({"pack_id": "cu11-old", "files": ["old.dll"]}, f)
+        return old_bin
+
     def test_download_installs_dlls_and_manifest(self) -> None:
         ok, progress, end, _ = self._download(_wheels())
         self.assertTrue(ok)
+        end.assert_called_once_with(cuda_pack.RESULT_INSTALLED)
         bin_dir = os.path.join(self.directory, "bin")
         self.assertEqual(sorted(os.listdir(bin_dir)), ["cublas64_12.dll", "cudnn64_9.dll", "cudnn_ops64_9.dll"])
         with open(os.path.join(self.directory, "pack.json"), encoding="utf-8") as f:
@@ -91,6 +104,7 @@ class DownloadTests(unittest.TestCase):
     def test_checksum_mismatch_leaves_nothing(self) -> None:
         ok, _, end, mock_get = self._download(_wheels(cudnn_sha="0" * 64))
         self.assertFalse(ok)
+        end.assert_called_once_with(cuda_pack.RESULT_FAILED)
         self.assertFalse(os.path.exists(os.path.join(self.directory, "bin")))
         self.assertFalse(os.path.exists(os.path.join(self.directory, "pack.json")))
         self.assertFalse(os.path.exists(os.path.join(self.directory, "download")))
@@ -115,6 +129,46 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(os.listdir(old_bin), ["old.dll"])
         self.assertEqual(utils.installedCudaPackId(self.directory), "cu11-old")
 
+    def test_bin_in_use_stops_before_downloading(self) -> None:
+        old_bin = self._install_old_pack()
+        with patch.object(cuda_pack, "_binInUse", return_value=True):
+            ok, _, end, mock_get = self._download(_wheels())
+        self.assertFalse(ok)
+        mock_get.assert_not_called()
+        end.assert_called_once_with(cuda_pack.RESULT_IN_USE)
+        self.assertEqual(os.listdir(old_bin), ["old.dll"])
+        self.assertEqual(utils.installedCudaPackId(self.directory), "cu11-old")
+        self.assertFalse(os.path.exists(os.path.join(self.directory, "download")))
+        self.assertFalse(os.path.exists(os.path.join(self.directory, "bin.tmp")))
+
+    def test_bin_taken_during_the_download_is_left_alone(self) -> None:
+        # 落としているあいだに、ほかのプロセスが古い bin の DLL を読み込んだ場合。
+        old_bin = self._install_old_pack()
+        with patch.object(cuda_pack, "_binInUse", side_effect=[False, True]):
+            ok, _, end, mock_get = self._download(_wheels())
+        self.assertFalse(ok)
+        self.assertEqual(mock_get.call_count, 2)
+        end.assert_called_once_with(cuda_pack.RESULT_IN_USE)
+        self.assertEqual(os.listdir(old_bin), ["old.dll"])
+        self.assertEqual(utils.installedCudaPackId(self.directory), "cu11-old")
+        self.assertFalse(os.path.exists(os.path.join(self.directory, "download")))
+        self.assertFalse(os.path.exists(os.path.join(self.directory, "bin.tmp")))
+
+    def test_bin_that_fails_to_delete_at_the_swap_is_reported_as_in_use(self) -> None:
+        self._install_old_pack()
+        real_rmtree = cuda_pack.shutil.rmtree
+        final_bin = os.path.join(self.directory, "bin")
+
+        def rmtree(path, *args, **kwargs):
+            if os.path.normcase(path) == os.path.normcase(final_bin) and not kwargs.get("ignore_errors"):
+                raise PermissionError(5, "Access is denied", path)
+            return real_rmtree(path, *args, **kwargs)
+
+        with patch.object(cuda_pack.shutil, "rmtree", side_effect=rmtree):
+            ok, _, end, _ = self._download(_wheels())
+        self.assertFalse(ok)
+        end.assert_called_once_with(cuda_pack.RESULT_IN_USE)
+
     def test_not_enough_disk_space_does_not_start(self) -> None:
         usage = MagicMock(free=10)
         with patch.object(cuda_pack, "REQUIRED_FREE_BYTES", 1000), \
@@ -137,6 +191,58 @@ class DownloadTests(unittest.TestCase):
         ok, _, _, _ = self._download(wheels, get=get)
         self.assertFalse(ok)
         self.assertFalse(os.path.exists(os.path.join(self.directory, "bin")))
+
+
+class BinInUseTests(unittest.TestCase):
+    """_binInUse: 古い bin の DLL を、ほかのプロセスが読み込んだままか。"""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.bin_dir = os.path.join(tmp.name, "cuda", "bin")
+        patcher = patch.object(cuda_pack, "sleep")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_missing_bin_is_not_in_use(self) -> None:
+        self.assertFalse(cuda_pack._binInUse(self.bin_dir))
+
+    def test_idle_bin_is_not_in_use_and_is_left_unchanged(self) -> None:
+        os.makedirs(self.bin_dir)
+        path = os.path.join(self.bin_dir, "cublas64_12.dll")
+        with open(path, "wb") as f:
+            f.write(b"dll")
+        before = os.stat(path)
+        self.assertFalse(cuda_pack._binInUse(self.bin_dir))
+        after = os.stat(path)
+        self.assertEqual((before.st_size, before.st_mtime_ns), (after.st_size, after.st_mtime_ns))
+        with open(path, "rb") as f:
+            self.assertEqual(f.read(), b"dll")
+
+    @unittest.skipUnless(os.name == "nt", "DLL loading is Windows-only")
+    def test_dll_loaded_by_another_process_is_in_use(self) -> None:
+        # 読み込まれた DLL は、フォルダごと名前を変えられるが消せない (2026-09-24 に確かめた)。
+        # 前のサイドカーが残っている状態を、DLL を読み込んだ別のプロセスで作る。
+        source = next(iter(glob.glob(os.path.join(sys.base_prefix, "DLLs", "*.dll"))), None)
+        if source is None:
+            self.skipTest("no DLL to copy in this Python")
+        os.makedirs(self.bin_dir)
+        dll = os.path.join(self.bin_dir, "cublas64_12.dll")
+        shutil.copyfile(source, dll)
+        holder = subprocess.Popen(
+            [sys.executable, "-c", f"import ctypes, sys; ctypes.WinDLL({dll!r}); print('loaded', flush=True); sys.stdin.read()"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            self.assertEqual(holder.stdout.readline().strip(), "loaded")
+            self.assertTrue(cuda_pack._binInUse(self.bin_dir))
+        finally:
+            holder.stdin.close()
+            holder.wait(timeout=10)
+            holder.stdout.close()
+        self.assertFalse(cuda_pack._binInUse(self.bin_dir))
 
 
 class DownloadWheelTests(unittest.TestCase):

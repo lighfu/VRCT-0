@@ -69,6 +69,15 @@ _DOWNLOAD_TIMEOUT = (10, 60)  # (connect, read) 秒
 _DOWNLOAD_MAX_ATTEMPTS = 3
 _DOWNLOAD_RETRY_BACKOFF = 2  # 秒。attempt 番号を掛けて待つ
 
+# 古い bin が使用中かを確かめる回数と間隔 (ウイルス対策ソフトなどが一瞬だけ開いている場合を除くため)。
+_IN_USE_CHECK_ATTEMPTS = 3
+_IN_USE_CHECK_RETRY_SEC = 0.5
+
+# downloadCudaPack が end_callback に渡す結果。
+RESULT_INSTALLED = "installed"
+RESULT_IN_USE = "in_use"  # 古い bin の DLL をほかのプロセスが使っていて置き換えられない
+RESULT_FAILED = "failed"  # 通信・SHA-256・空き容量・展開など、そのほかの失敗
+
 
 def _cudaDeviceCount() -> int:
     try:
@@ -150,6 +159,33 @@ def _downloadWheelWithRetry(wheel: Wheel, path: str, on_bytes: Callable[[int], N
             sleep(_DOWNLOAD_RETRY_BACKOFF * attempt)
 
 
+def _fileInUse(path: str) -> bool:
+    try:
+        # 何も書かずに閉じるので、中身も更新時刻も変わらない。
+        with open(path, "r+b"):
+            return False
+    except OSError:
+        return True
+
+
+def _binInUse(bin_dir: str) -> bool:
+    """古い bin の DLL を、ほかのプロセス (前のサイドカーなど) が読み込んだままか。
+
+    読み込まれた DLL は消せないが、名前は変えられ、フォルダごとの名前の変更もできる
+    (2026-09-24 に確かめた)。書き込みでは開けないので、それで見分ける。
+    状態が not_installed のときだけ取得するので、この bin をこのプロセスは読み込んでいない。
+    """
+    if not os_path.isdir(bin_dir):
+        return False
+    for attempt in range(_IN_USE_CHECK_ATTEMPTS):
+        if attempt > 0:
+            sleep(_IN_USE_CHECK_RETRY_SEC)
+        paths = [os_path.join(bin_dir, name) for name in os.listdir(bin_dir)]
+        if not any(_fileInUse(path) for path in paths if os_path.isfile(path)):
+            return False
+    return True
+
+
 def _extractDlls(wheel_path: str, target_dir: str) -> List[str]:
     """wheel の nvidia/<lib>/bin/*.dll だけを target_dir に取り出す (名前だけ使うのでフォルダの外へは出ない)。"""
     names: List[str] = []
@@ -168,20 +204,28 @@ def _extractDlls(wheel_path: str, target_dir: str) -> List[str]:
 
 def downloadCudaPack(
     callback: Optional[Callable[[float], None]] = None,
-    end_callback: Optional[Callable[[], None]] = None,
+    end_callback: Optional[Callable[[str], None]] = None,
     directory: Optional[str] = None,
 ) -> bool:
-    """GPU 部品を取得・検証・展開する。失敗しても前から入っていた部品は残す。"""
+    """GPU 部品を取得・検証・展開する。失敗しても前から入っていた部品は残す。
+
+    end_callback には結果 (RESULT_INSTALLED / RESULT_IN_USE / RESULT_FAILED) を渡す。
+    """
     directory = directory or cudaPackDirectory()
     download_dir = os_path.join(directory, "download")
     temporary_bin = os_path.join(directory, "bin.tmp")
     final_bin = os_path.join(directory, "bin")
     manifest_path = os_path.join(directory, CUDA_PACK_MANIFEST)
-    succeeded = False
+    result = RESULT_FAILED
     try:
         os.makedirs(directory, exist_ok=True)
         if shutil.disk_usage(directory).free < REQUIRED_FREE_BYTES:
             printLog("GPU parts: not enough free disk space")
+            return False
+        # 古い bin を置き換えられないなら、1.28 GB を落とす前に止める。
+        if _binInUse(final_bin):
+            printLog("GPU parts: the old DLLs are in use by another process")
+            result = RESULT_IN_USE
             return False
         shutil.rmtree(download_dir, ignore_errors=True)
         shutil.rmtree(temporary_bin, ignore_errors=True)
@@ -207,20 +251,29 @@ def downloadCudaPack(
         for path in wheel_paths:
             names.extend(_extractDlls(path, temporary_bin))
 
-        # 置き換えは全部そろってから。pack.json は最後に書く (これがあれば導入済み)。
+        # 置き換えは全部そろってから。落としているあいだに古い bin が使われ始めていたら、
+        # 何も消さずに止める。pack.json は最後に書く (これがあれば導入済み)。
+        if _binInUse(final_bin):
+            printLog("GPU parts: the old DLLs are in use by another process")
+            result = RESULT_IN_USE
+            return False
         if os_path.exists(manifest_path):
             os.remove(manifest_path)
         if os_path.exists(final_bin):
-            shutil.rmtree(final_bin)
+            try:
+                shutil.rmtree(final_bin)
+            except PermissionError:
+                result = RESULT_IN_USE
+                raise
         os.replace(temporary_bin, final_bin)
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump({"pack_id": CUDA_PACK_ID, "files": sorted(names)}, f)
-        succeeded = True
+        result = RESULT_INSTALLED
     except Exception:
         errorLogging()
     finally:
         shutil.rmtree(download_dir, ignore_errors=True)
         shutil.rmtree(temporary_bin, ignore_errors=True)
         if end_callback is not None:
-            end_callback()
-    return succeeded
+            end_callback(result)
+    return result == RESULT_INSTALLED

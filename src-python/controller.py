@@ -14,6 +14,7 @@ from errors import ErrorCode, VRCTError
 from models.transcription.transcription_openai_compatible import TRANSCRIPTION_MODEL_KEYWORDS, TRANSCRIPTION_API_ENGINES
 from models.translation.translation_providers import TRANSLATION_PROVIDER_REGISTRY, CONNECTION_PROVIDER_REGISTRY
 from models.message_pipeline import MessageDirectionSpec, MIC_MESSAGE_SPEC, SPEAKER_MESSAGE_SPEC, CHAT_MESSAGE_SPEC, OCR_MESSAGE_SPEC
+from models.cuda_pack import RESULT_IN_USE as CUDA_PACK_RESULT_IN_USE
 
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -987,8 +988,8 @@ class Controller:
                 return
             self.controller.run(200, self.controller.run_mapping["download_progress_cuda_pack"], {"progress": progress})
 
-        def downloaded(self) -> None:
-            self.controller.finishCudaPackDownload()
+        def downloaded(self, result=None) -> None:
+            self.controller.finishCudaPackDownload(result)
 
     def _processMessage(
         self,
@@ -3738,14 +3739,17 @@ class Controller:
         Thread(target=model.downloadCudaPack, args=(handler.progressBar, handler.downloaded), daemon=True).start()
         return {"status": 200, "result": self._cudaPackStatusPayload()}
 
-    def finishCudaPackDownload(self) -> None:
+    def finishCudaPackDownload(self, result=None) -> None:
+        """取得が終わったとき。result は cuda_pack.downloadCudaPack の結果 (RESULT_*)。"""
         with self._cuda_pack_lock:
             self._cuda_pack_downloading = False
         if model.isCudaPackInstalled() is True:
             config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
             self.run(200, self.run_mapping["downloaded_cuda_pack"], True)
         else:
-            error_response = VRCTError.create_error_response(ErrorCode.CUDA_PACK_DOWNLOAD, data=None)
+            # 古い部品を使っているプロセスが残っていて置き換えられないときは、原因に合った文言にする。
+            error_code = ErrorCode.CUDA_PACK_IN_USE if result == CUDA_PACK_RESULT_IN_USE else ErrorCode.CUDA_PACK_DOWNLOAD
+            error_response = VRCTError.create_error_response(error_code, data=None)
             self.run(error_response["status"], self.run_mapping["error_cuda_pack"], error_response["result"])
         self._pushCudaPackStatus()
 

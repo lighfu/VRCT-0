@@ -36,6 +36,7 @@ common_error:
     invalid_hex_color: "有効なHEXカラーコード（例: {{brand_color_hex}}）形式で入力してください。"
 
     failed_download_cuda_pack: "GPU 部品を導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。"
+    cuda_pack_in_use: "GPU 部品が使用中のため置き換えられません。再起動してからもう一度試してください。"
     cuda_pack_not_loaded: "GPU 部品を読み込めませんでした。CPU で動きます。"
 
 common_warning:

@@ -3,6 +3,7 @@
 import copy
 import inspect
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -95,6 +96,28 @@ class CudaPackControllerTests(unittest.TestCase):
         self.assertFalse(self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START)
         self.model.cudaPackStatus.assert_called_with(downloading=False)
         self.assertTrue(self._sent("/run/cuda_pack_status"))
+
+    def test_bin_in_use_reports_its_own_error(self) -> None:
+        self.model.isCudaPackInstalled.return_value = False
+        with patch.object(controller_module, "Thread"):
+            self.controller.downloadCudaPack()
+        self.run.reset_mock()
+        self.controller.finishCudaPackDownload("in_use")
+        errors = self._sent("/run/error_cuda_pack")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0][2]["error_code"], "CUDA_PACK_IN_USE")
+        self.assertFalse(self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START)
+        self.assertTrue(self._sent("/run/cuda_pack_status"))
+
+    def test_download_handler_passes_the_result_on(self) -> None:
+        handler = self.controller.DownloadCudaPack(self.controller)
+        with patch.object(self.controller, "finishCudaPackDownload") as mock_finish:
+            handler.downloaded("in_use")
+        mock_finish.assert_called_once_with("in_use")
+
+    def test_result_names_match_the_model(self) -> None:
+        from models import cuda_pack
+        self.assertEqual(cuda_pack.RESULT_IN_USE, "in_use")
 
     def test_remove_requests_removal_only_when_installed(self) -> None:
         self.model.cudaPackStatus.return_value = "installed"
@@ -212,8 +235,17 @@ class WiringTests(unittest.TestCase):
         self.assertIn("/get/data/cuda_pack_status", mainloop.init_mapping)
 
     def test_error_codes_exist(self) -> None:
-        for code in (ErrorCode.CUDA_PACK_DOWNLOAD, ErrorCode.CUDA_PACK_NOT_LOADED):
+        for code in (ErrorCode.CUDA_PACK_DOWNLOAD, ErrorCode.CUDA_PACK_IN_USE, ErrorCode.CUDA_PACK_NOT_LOADED):
             self.assertIn(code, ERROR_METADATA)
+
+    def test_ui_shows_every_cuda_pack_error(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        handling = (root / "src-ui" / "logics" / "_useBackendErrorHandling.js").read_text(encoding="utf-8")
+        for code in (ErrorCode.CUDA_PACK_DOWNLOAD, ErrorCode.CUDA_PACK_IN_USE, ErrorCode.CUDA_PACK_NOT_LOADED):
+            self.assertIn(f'case "{code.value}":', handling)
+        for locale in ("ja", "en", "ko", "zh-Hans", "zh-Hant"):
+            text = (root / "locales" / f"{locale}.yml").read_text(encoding="utf-8")
+            self.assertIn("cuda_pack_in_use:", text, locale)
 
     def test_init_switches_before_engines_and_reports_after_settings(self) -> None:
         source = inspect.getsource(Controller.init)
