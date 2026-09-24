@@ -76,3 +76,6 @@ src-python/telemetry_state.json
 .codegraph/
 
 release/
+
+# GPU 部品 (ソースから動かしたときの置き場所)
+src-python/cuda/

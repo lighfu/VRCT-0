@@ -6,6 +6,7 @@ import glob
 import json
 import os
 import queue
+import shutil
 import sys
 import traceback
 import logging
@@ -29,18 +30,61 @@ def dataDirectory(app_dir: str) -> str:
     return data_dir if data_dir else app_dir
 
 
-def externalCudaLibraryDir() -> Optional[str]:
-    """後から入れた CUDA ライブラリの置き場所 (存在すれば)。
+# GPU 部品 (インストーラー サブプロジェクト 2)。版の印は models/cuda_pack.py の
+# WHEELS と一緒に変える。印が違う部品は読み込まない (導入し直すときに bin を
+# 置き換えられるよう、古い DLL を使用中にしないため)。
+CUDA_PACK_ID = "cu12.8-cudnn9.7"
+CUDA_PACK_MANIFEST = "pack.json"
+CUDA_PACK_REMOVE_MARKER = "remove_pending"
 
-    Velopack で入れた版では <導入先>\\data\\cuda\\bin (VRCT_DATA_DIR\\cuda\\bin)。
-    取得処理はサブプロジェクト 2 (GPU 部品の後入れ) で作る。
-    元の VRCT のフォルダ (%LOCALAPPDATA%\\VRCT) は見ない (並べて入れるため)。
-    """
-    data_dir = os.environ.get(DATA_DIR_ENV, "").strip()
-    if not data_dir:
+_cuda_pack_loaded = False
+
+
+def _appDirectory() -> str:
+    """アプリのフォルダ。config.PATH_APP と同じ決め方 (utils.py は config.py と同じフォルダにある)。"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def cudaPackDirectory() -> str:
+    """GPU 部品の置き場所 (<データの置き場所>\\cuda)。元の VRCT のフォルダは見ない。"""
+    return os.path.join(dataDirectory(_appDirectory()), "cuda")
+
+
+def installedCudaPackId(directory: Optional[str] = None) -> Optional[str]:
+    """入っている GPU 部品の版の印。bin か pack.json が無ければ None。"""
+    directory = directory or cudaPackDirectory()
+    if not os.path.isdir(os.path.join(directory, "bin")):
         return None
-    path = os.path.join(data_dir, "cuda", "bin")
-    return path if os.path.isdir(path) else None
+    try:
+        with open(os.path.join(directory, CUDA_PACK_MANIFEST), encoding="utf-8") as f:
+            pack_id = json.load(f).get("pack_id")
+    except Exception:
+        return None
+    return pack_id if isinstance(pack_id, str) else None
+
+
+def externalCudaLibraryDir() -> Optional[str]:
+    """読み込む GPU 部品の bin (版の印が今のものと一致するときだけ)。"""
+    directory = cudaPackDirectory()
+    if installedCudaPackId(directory) != CUDA_PACK_ID:
+        return None
+    return os.path.join(directory, "bin")
+
+
+def processPendingCudaPackRemoval() -> bool:
+    """削除を頼まれていた GPU 部品を消す。DLL を読み込む前 (import 時) に呼ぶ。"""
+    directory = cudaPackDirectory()
+    if not os.path.isfile(os.path.join(directory, CUDA_PACK_REMOVE_MARKER)):
+        return False
+    shutil.rmtree(directory, ignore_errors=True)
+    return not os.path.exists(os.path.join(directory, "bin"))
+
+
+def cudaPackLoaded() -> bool:
+    """この起動で GPU 部品の DLL を検索パスに載せたか。"""
+    return _cuda_pack_loaded
 
 
 def _cudaLibraryDirs() -> List[str]:
@@ -78,14 +122,11 @@ def _registerCudaLibraries() -> None:
     LoadLibrary で開き、add_dll_directory の登録が効かないため
     (実測: PATH 無しだと "Could not locate cudnn_ops64_9.dll" で落ちる)。
 
-    凍結ビルドでも同じ処理で動く。PyInstaller は同じDLL群を
-    _internal/nvidia/<lib>/bin/ へ収集するので (spec/backend_cuda.spec の
-    hiddenimports 参照)、`nvidia.__path__` からそのまま辿れる。
-    CPU版ビルドには `nvidia` が無いので、その場合はここでは何も見つからない。
-
-    同梱 (CUDA版ビルド) に加えて externalCudaLibraryDir() も登録する。
-    どちらも無ければ何もしない。
+    手元の venv に `nvidia-*` が入っていればその bin も載せる。アプリの
+    GPU 部品は externalCudaLibraryDir()。
     """
+    global _cuda_pack_loaded
+    _cuda_pack_loaded = False
     if os.name != "nt":
         return
     library_dirs = _cudaLibraryDirs()
@@ -94,7 +135,13 @@ def _registerCudaLibraries() -> None:
     for library_dir in library_dirs:
         os.add_dll_directory(library_dir)
     os.environ["PATH"] = os.pathsep.join(library_dirs) + os.pathsep + os.environ.get("PATH", "")
+    external = externalCudaLibraryDir()
+    _cuda_pack_loaded = external is not None and external in library_dirs
 
+try:
+    processPendingCudaPackRemoval()
+except Exception:
+    pass
 _registerCudaLibraries()
 
 # ctranslate2 は import に時間がかかるので、使うときに読み込む (A-1, 2026-09-23)。
@@ -433,7 +480,7 @@ def isWildcardBindAddress(ip_address: str) -> bool:
 # ctranslate2.dll は GPU 実行時に cuBLAS を LoadLibrary で遅延ロードする
 # (ctranslate2.dll 内の文字列テーブルに "cublas64_12.dll" が入っている)。
 # cuDNN は ctranslate2 の wheel に同梱されているが cuBLAS は入っておらず、
-# CUDA版ビルドだけが nvidia-cublas-cu12 でこれを持つ。つまり
+# GPU 部品 (data\\cuda\\bin) を導入したときだけこれを持つ。つまり
 # 「cuBLASを引けるか」がそのままこのビルドでGPU実行できるかの判定になる。
 # torch を使っていた頃は torch.cuda.is_available() が偶然この役目を
 # 果たしていた (CPU版には CPU 版 torch が入るので常に False だった)。
