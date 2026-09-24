@@ -1,15 +1,13 @@
 export { useSoftwareVersion } from "./useSoftwareVersion";
-export { useAvailableReleases } from "./useAvailableReleases";
+export { useAppUpdate } from "./useAppUpdate";
 export { useComputeMode } from "./useComputeMode";
 export { useInitProgress } from "./useInitProgress";
 export { useIsBackendReady } from "./useIsBackendReady";
 export { useWindow } from "./useWindow";
 export { useIsOpenedConfigPage } from "./useIsOpenedConfigPage";
-export { useIsSoftwareUpdating } from "./useIsSoftwareUpdating";
 export { useNotificationStatus } from "./useNotificationStatus";
 export { useOpenFolder } from "./useOpenFolder";
 export { useMessage } from "./useMessage";
-export { useUpdateSoftware } from "./useUpdateSoftware";
 export { useVolume } from "./useVolume";
 export { useHandleNetworkConnection } from "./useHandleNetworkConnection";
 export { useHandleOscQuery } from "./useHandleOscQuery";

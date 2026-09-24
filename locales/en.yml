@@ -67,32 +67,29 @@ main_page:
         title_target_language: "Select Target Language"
 
     update_available: "New version is ready!"
-    updating: "Now updating..."
 
 update_modal:
     title: "Update"
     summary_up_to_date_desc: "You are on the latest version — no update needed."
     channel_stable: "Stable"
     channel_beta: "Beta"
-    compute_mode_cpu: "CPU"
-    compute_mode_cuda: "GPU (CUDA)"
-    latest_label: "Latest"
-    install_latest_button: "Update to Latest Version"
-    install_button: "Reinstall with These Settings"
-    section_pick_variant: "Pick a different version or build"
     refresh_button: "Check for Updates"
     channel_label: "Release channel"
     channel_desc: "Beta gives you early access but may be less stable."
-    compute_mode_label: "Device build"
-    compute_mode_desc: "GPU (CUDA) runs faster on NVIDIA GPUs but requires ~5 GB of additional disk space."
-    version_label: "Version to install"
-    version_desc: "Pick from releases published on the selected channel."
-    no_versions_available: "No releases are available on the selected channel yet."
-    change_col_current: "Current"
-    change_col_after: "After install"
-    warn_downgrade: "This is a downgrade from {{from}} to {{to}}. Config file compatibility is not guaranteed."
-    warn_cuda_extra_size: "The GPU build requires roughly 5 GB of additional download."
-    warn_switch_channel: "You are switching to the {{channel}} channel. Future update notifications will follow {{channel}} releases."
+    current_version: "Current version: {{version}}"
+    checking: "Checking for a new version..."
+    available: "Version {{version}} is available (about {{size}})"
+    available_downgrade: "You can switch to the latest stable version {{version}} (about {{size}})"
+    release_notes: "Release notes"
+    download_button: "Update"
+    downloading: "Downloading... {{percent}}%"
+    ready: "Version {{version}} is ready"
+    restart_now_button: "Restart now to update"
+    apply_on_exit_desc: "If you keep using the app, the update is applied the next time you close it."
+    check_failed: "Could not check for a new version: {{message}}"
+    download_failed: "The update failed: {{message}}"
+    retry_button: "Retry"
+    not_installed: "This is a development build, so it cannot be updated."
 
 config_page:
     common:
@@ -394,25 +391,6 @@ config_page:
         bubble_min_text_length:
             label: "Minimum text length"
             desc: "Bubbles with fewer characters than this are ignored. Default: 2."
-
-    updater:
-        install_panel:
-            section_label: "Choose Version and Build"
-            current_summary_label: "Current"
-            current_summary_value: "{{version}} / {{compute_mode}} / {{channel}}"
-            channel_label: "Release Channel"
-            channel_stable: "Stable"
-            channel_beta: "Beta"
-            compute_mode_label: "Device"
-            compute_mode_cpu: "CPU"
-            compute_mode_gpu: "GPU (CUDA)"
-            version_label: "Version to Install"
-            version_desc: "Pick a past release to downgrade. The list is filtered by the channel you selected above."
-            no_versions_available: "No releases are available on the selected channel yet."
-            beta_suffix: "Beta"
-            latest_suffix: "Latest"
-            install_button: "Install with This Setup"
-            reinstall_button: "Reinstall with This Setup"
 
     hotkeys:
         input_placeholder: "Press a key combination"

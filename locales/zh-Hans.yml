@@ -67,32 +67,29 @@ main_page:
         title_target_language: "目标语言"
 
     update_available: "有新版本可供使用！"
-    updating: "更新中..."
 
 update_modal:
     title: "更新"
     summary_up_to_date_desc: "您正在使用最新版本，无需更新。"
     channel_stable: "稳定版"
     channel_beta: "测试版"
-    compute_mode_cpu: "CPU 版"
-    compute_mode_cuda: "GPU 版 (CUDA)"
-    latest_label: "最新"
-    install_latest_button: "更新至最新版本"
-    install_button: "按此设置重新安装"
-    section_pick_variant: "选择其他版本或配置"
     refresh_button: "检查更新"
     channel_label: "发布渠道"
     channel_desc: "测试版可提前体验新功能，但可能不稳定。"
-    compute_mode_label: "设备构建"
-    compute_mode_desc: "GPU 版可在 NVIDIA GPU 上高速运行，但需要约 5GB 的额外磁盘空间。"
-    version_label: "要安装的版本"
-    version_desc: "可从所选渠道公开发布的版本中选择。"
-    no_versions_available: "所选渠道暂无可用版本。"
-    change_col_current: "当前"
-    change_col_after: "安装后"
-    warn_downgrade: "这是从 {{from}} 到 {{to}} 的降级。配置文件的兼容性无法保证。"
-    warn_cuda_extra_size: "GPU 版大约需要 5GB 的额外下载。"
-    warn_switch_channel: "将切换到{{channel}}渠道，今后的更新通知也将以{{channel}}为准。"
+    current_version: "Current version: {{version}}"
+    checking: "Checking for a new version..."
+    available: "Version {{version}} is available (about {{size}})"
+    available_downgrade: "You can switch to the latest stable version {{version}} (about {{size}})"
+    release_notes: "Release notes"
+    download_button: "Update"
+    downloading: "Downloading... {{percent}}%"
+    ready: "Version {{version}} is ready"
+    restart_now_button: "Restart now to update"
+    apply_on_exit_desc: "If you keep using the app, the update is applied the next time you close it."
+    check_failed: "Could not check for a new version: {{message}}"
+    download_failed: "The update failed: {{message}}"
+    retry_button: "Retry"
+    not_installed: "This is a development build, so it cannot be updated."
 
 config_page:
     common:
@@ -388,25 +385,6 @@ config_page:
         bubble_min_text_length:
             label: "最小文字长度"
             desc: "字符数低于此值的气泡将被忽略。默认值：2。"
-
-    updater:
-        install_panel:
-            section_label:
-            current_summary_label:
-            current_summary_value: "{{version}} / {{compute_mode}} / {{channel}}"
-            channel_label:
-            channel_stable:
-            channel_beta:
-            compute_mode_label:
-            compute_mode_cpu: "CPU"
-            compute_mode_gpu: "GPU (CUDA)"
-            version_label: "要安装的版本"
-            version_desc:
-            no_versions_available:
-            beta_suffix: "测试版"
-            latest_suffix:
-            install_button:
-            reinstall_button:
 
     hotkeys:
         input_placeholder: "请输入按键组合"

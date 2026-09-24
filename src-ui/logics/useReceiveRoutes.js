@@ -14,9 +14,6 @@ export const STATIC_ROUTE_META_LIST = [
     // OCR start-failure rollback push (backend flips the flag back off if the pipeline fails to start)
     { endpoint: "/run/enable_ocr_capture", ns: configs, hook_name: "useOcr", method_name: "updateFromBackendEnableOcrCapture" },
 
-    { endpoint: "/run/update_software", ns: null, hook_name: null, method_name: null },
-    { endpoint: "/run/update_cuda_software", ns: null, hook_name: null, method_name: null },
-
     { endpoint: "/get/data/main_window_geometry", ns: common, hook_name: "useWindow", method_name: "restoreWindowGeometry" },
     { endpoint: "/set/data/main_window_geometry", ns: null, hook_name: null, method_name: null },
 
@@ -34,9 +31,6 @@ export const STATIC_ROUTE_META_LIST = [
 
     // Software Version
     { endpoint: "/get/data/version", ns: common, hook_name: "useSoftwareVersion", method_name: "updateSoftwareVersion" },
-    { endpoint: "/get/data/available_releases", ns: common, hook_name: "useAvailableReleases", method_name: "updateAvailableReleasesFromBackend" },
-    // Latest Software Version Info
-    { endpoint: "/run/software_update_info", ns: common, hook_name: "useSoftwareVersion", method_name: "updateSoftwareVersionInfo" },
 
     { endpoint: "/run/connected_network", ns: common, hook_name: "useHandleNetworkConnection", method_name: "handleNetworkConnection" },
     { endpoint: "/run/enable_osc_query", ns: common, hook_name: "useHandleOscQuery", method_name: "handleOscQuery" },

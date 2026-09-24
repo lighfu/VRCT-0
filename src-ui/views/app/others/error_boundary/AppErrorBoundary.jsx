@@ -9,10 +9,8 @@ import { ContactsContainer } from "./contacts_container/ContactsContainer";
 
 import {
     useWindow,
-    useUpdateSoftware,
-    useIsSoftwareUpdating,
+    useAppUpdate,
     useSoftwareVersion,
-    useComputeMode,
     useCopyToClipboard,
 } from "@logics_common";
 import { CloseButton } from "@common_components";
@@ -98,46 +96,36 @@ const SafeActionButtons = () => {
 };
 
 const ActionButtons = () => {
-    const { updateSoftware, updateSoftware_CUDA } = useUpdateSoftware();
-    const { currentIsSoftwareUpdating, updateIsSoftwareUpdating } = useIsSoftwareUpdating();
-    const { currentLatestSoftwareVersionInfo } = useSoftwareVersion();
-    const { currentComputeMode } = useComputeMode();
+    const { currentAppUpdate, downloadAppUpdate, restartToApplyUpdate } = useAppUpdate();
+    const { asyncCloseApp } = useWindow();
+    const status = currentAppUpdate?.data?.status;
 
-    const is_update_available = currentLatestSoftwareVersionInfo?.data?.is_update_available === true;
-    const is_updating = currentIsSoftwareUpdating?.data === true;
-    const is_cpu = currentComputeMode?.data === "cpu";
-
-    const onClickUpdate = () => {
+    const onClickUpdate = async () => {
         try {
-            updateIsSoftwareUpdating(true);
-            if (is_cpu) {
-                updateSoftware();
-            } else {
-                updateSoftware_CUDA();
+            if (status === "available") {
+                await downloadAppUpdate();
+            } else if (status === "ready" && (await restartToApplyUpdate())) {
+                await asyncCloseApp();
             }
         } catch (e) {
             console.error("[AppErrorBoundary] Update failed:", e);
         }
     };
 
+    const labels = {
+        available: "Update Available — Update Now",
+        downloading: "Downloading update...",
+        ready: "Restart to Update",
+    };
 
     return (
         <div className={styles.action_buttons_container}>
-            {is_update_available && (
-                <button
-                    className={styles.update_button}
-                    onClick={onClickUpdate}
-                    disabled={is_updating}
-                >
-                    {is_updating ? "Updating..." : "Update Available — Update Now"}
+            {labels[status] && (
+                <button className={styles.update_button} onClick={onClickUpdate} disabled={status === "downloading"}>
+                    {labels[status]}
                 </button>
             )}
-            <a
-                className={styles.status_link_button}
-                href={VRCT_STATUS_URL}
-                target="_blank"
-                rel="noreferrer"
-            >
+            <a className={styles.status_link_button} href={VRCT_STATUS_URL} target="_blank" rel="noreferrer">
                 <span>Check VRCT Status</span>
                 <ExternalLinkSvg className={styles.external_link_svg} />
             </a>
