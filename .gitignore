@@ -19,8 +19,6 @@ common-voice-scripted-speech-*.tar.gz
 error.log
 *.exe
 *.ipynb
-VRCT.zip
-VRCT_cuda.zip
 
 .qoder/
 
