@@ -1,5 +1,6 @@
 pub mod app_paths;
 pub mod reinstall;
+pub mod restart;
 pub mod uninstall;
 pub mod updater;
 
@@ -98,7 +99,8 @@ pub fn run() {
             updater::updater_state,
             updater::updater_check,
             updater::updater_download,
-            updater::updater_restart_now
+            updater::updater_restart_now,
+            restart::app_restart
         ])
         .build(tauri::generate_context!());
     match result {
