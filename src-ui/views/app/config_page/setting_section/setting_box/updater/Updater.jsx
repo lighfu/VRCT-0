@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@useI18n";
 import styles from "./Updater.module.scss";
 
@@ -44,13 +44,29 @@ export const Updater = () => {
         checkAppUpdate(channel, true);
     };
 
+    const is_restarting_ref = useRef(false);
+    const [is_restarting, setIsRestarting] = useState(false);
     const onClickRestartNow = async () => {
-        if (await restartToApplyUpdate()) await asyncCloseApp();
+        if (is_restarting_ref.current) return;
+        is_restarting_ref.current = true;
+        setIsRestarting(true);
+        try {
+            if (await restartToApplyUpdate()) {
+                await asyncCloseApp();
+            } else {
+                is_restarting_ref.current = false;
+                setIsRestarting(false);
+            }
+        } catch (e) {
+            is_restarting_ref.current = false;
+            setIsRestarting(false);
+            throw e;
+        }
     };
 
     const channel_options = [
-        { id: "stable", label: t("update_modal.channel_stable") },
-        { id: "beta", label: t("update_modal.channel_beta") },
+        { id: "stable", label: t("update_modal.channel_stable"), disabled: is_channel_locked },
+        { id: "beta", label: t("update_modal.channel_beta"), disabled: is_channel_locked },
     ];
 
     return (
@@ -64,6 +80,7 @@ export const Updater = () => {
                     channel={channel}
                     onClickDownload={() => downloadAppUpdate()}
                     onClickRestartNow={onClickRestartNow}
+                    is_restarting={is_restarting}
                 />
             </div>
 
@@ -95,7 +112,7 @@ export const Updater = () => {
     );
 };
 
-const UpdateStatus = ({ update, current_version, channel, onClickDownload, onClickRestartNow }) => {
+const UpdateStatus = ({ update, current_version, channel, onClickDownload, onClickRestartNow, is_restarting }) => {
     const { t } = useI18n();
     const channel_label = channel === "beta" ? t("update_modal.channel_beta") : t("update_modal.channel_stable");
 
@@ -139,7 +156,7 @@ const UpdateStatus = ({ update, current_version, channel, onClickDownload, onCli
             return (
                 <div className={styles.status_block}>
                     <p className={styles.status_text}>{t("update_modal.ready", { version: update.version })}</p>
-                    <button className={styles.install_button} onClick={onClickRestartNow} disabled={update.restart_requested}>
+                    <button className={styles.install_button} onClick={onClickRestartNow} disabled={update.restart_requested || is_restarting}>
                         {t("update_modal.restart_now_button")}
                     </button>
                     <p className={styles.status_desc}>{t("update_modal.apply_on_exit_desc")}</p>

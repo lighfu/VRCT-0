@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import CopySvg from "@images/copy.svg?react";
@@ -99,16 +99,25 @@ const ActionButtons = () => {
     const { currentAppUpdate, downloadAppUpdate, restartToApplyUpdate } = useAppUpdate();
     const { asyncCloseApp } = useWindow();
     const status = currentAppUpdate?.data?.status;
+    const is_busy_ref = useRef(false);
+    const [is_busy, setIsBusy] = useState(false);
 
     const onClickUpdate = async () => {
+        if (is_busy_ref.current) return;
+        is_busy_ref.current = true;
+        setIsBusy(true);
         try {
             if (status === "available") {
                 await downloadAppUpdate();
             } else if (status === "ready" && (await restartToApplyUpdate())) {
                 await asyncCloseApp();
+                return;
             }
         } catch (e) {
             console.error("[AppErrorBoundary] Update failed:", e);
+        } finally {
+            is_busy_ref.current = false;
+            setIsBusy(false);
         }
     };
 
@@ -121,7 +130,7 @@ const ActionButtons = () => {
     return (
         <div className={styles.action_buttons_container}>
             {labels[status] && (
-                <button className={styles.update_button} onClick={onClickUpdate} disabled={status === "downloading"}>
+                <button className={styles.update_button} onClick={onClickUpdate} disabled={status === "downloading" || is_busy}>
                     {labels[status]}
                 </button>
             )}
