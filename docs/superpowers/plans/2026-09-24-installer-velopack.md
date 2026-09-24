@@ -2279,8 +2279,9 @@ jobs:
       - name: Download previous release (for delta packages)
         shell: pwsh
         run: |
-          $pre = if ("${{ steps.channel.outputs.is_beta }}" -eq "true") { "--pre" } else { "" }
-          vpk download github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack $pre
+          $extra = @()
+          if ("${{ steps.channel.outputs.is_beta }}" -eq "true") { $extra += "--pre" }
+          vpk download github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack @extra
         continue-on-error: true
 
       - name: Pack
@@ -2298,11 +2299,12 @@ jobs:
         env:
           VPK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $pre = if ("${{ steps.channel.outputs.is_beta }}" -eq "true") { "--pre" } else { "" }
-          vpk upload github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack --tag "v${{ env.VERSION }}" --releaseName "VRCT-0 ${{ env.VERSION }}" --publish $pre
+          $extra = @()
+          if ("${{ steps.channel.outputs.is_beta }}" -eq "true") { $extra += "--pre" }
+          vpk upload github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack --tag "v${{ env.VERSION }}" --releaseName "VRCT-0 ${{ env.VERSION }}" --publish @extra
 ```
 
-（`vpk download github` は最初のリリースでは取るものが無いので `continue-on-error: true`。今の release.yml の Node・Python・Rust の準備手順と違う点があれば、今のものに合わせる。）
+（空の文字列を native コマンドに渡すと空の引数になるので、`--pre` は配列で渡す。`vpk download github` / `vpk upload github` の `--pre` の綴りは `vpk download github --help` で確かめる。`vpk download github` は最初のリリースでは取るものが無いので `continue-on-error: true`。今の release.yml の Node・Python・Rust の準備手順と違う点があれば、今のものに合わせる。）
 
 消す: `src-tauri/nsis/`（丸ごと）、`utils/zip.py`。`docs/readme_build.md` のリリース手順を「タグ `v<版>` を push すると CI が `npm run build` → `vpk pack` → `vpk upload github` する。手元では `npm run release` で `release/velopack/` に作る。`vpk` は `dotnet tool install -g vpk --version 1.2.158`」に書き換える。`tools/measure_footprint.py` が NSIS の setup.exe のパスを使っていれば `release/velopack/VRCT-0-win-Setup.exe` に直す。
 
