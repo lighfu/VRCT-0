@@ -76,3 +76,5 @@ src-python/telemetry_state.json
 
 # CodeGraph index
 .codegraph/
+
+release/
