@@ -491,14 +491,14 @@ class Translator:
         if callback is not None:
             callback(bool(available))
 
-    def checkAiCliClient(self, tool: str, root_path: str = None, client_version: str = "") -> bool:
+    def checkAiCliClient(self, tool: str, root_path: str = None, client_version: str = "", workspace: str = None) -> bool:
         """選んだ AI CLI が入っていれば接続済みにする (セッションはまだ起動しない)。
 
         ログインしているかどうかは、この後の updateAiCliClient() が送る確認のターンで
         分かる。失敗したら AICliClient が状態の変化を知らせる (_onAiCliStatus)。
         """
         if self.ai_cli_client is None:
-            self.ai_cli_client = AICliClient(root_path=root_path, client_version=client_version)
+            self.ai_cli_client = AICliClient(root_path=root_path, workspace=workspace, client_version=client_version)
             self.ai_cli_client.setStatusCallback(self._onAiCliStatus)
         result = bool(self.ai_cli_client.setTool(tool) and self.ai_cli_client.authenticationCheck())
         if result is False:

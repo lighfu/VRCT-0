@@ -16,17 +16,30 @@ import requests
 import ipaddress
 import socket
 
-def externalCudaLibraryDir() -> Optional[str]:
-    """インストーラーが後から入れた CUDA ライブラリの置き場所 (存在すれば)。
+DATA_DIR_ENV = "VRCT_DATA_DIR"
 
-    CPU版とCUDA版を1つのビルドにするため、cuBLAS / cuDNN を同梱せず
-    %LOCALAPPDATA%\\VRCT\\cuda\\bin に置けるようにした (A-1, 2026-09-23)。
-    取得処理はインストーラー側のサブプロジェクトで作る。
+
+def dataDirectory(app_dir: str) -> str:
+    """設定・ログ・モデルなどを置くフォルダ。
+
+    Velopack で入れた版では、本体 (VRCT-0.exe) が導入先の data\\ を環境変数
+    VRCT_DATA_DIR で渡す。開発中など渡されないときは app_dir を使う。
     """
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if not local_app_data:
+    data_dir = os.environ.get(DATA_DIR_ENV, "").strip()
+    return data_dir if data_dir else app_dir
+
+
+def externalCudaLibraryDir() -> Optional[str]:
+    """後から入れた CUDA ライブラリの置き場所 (存在すれば)。
+
+    Velopack で入れた版では <導入先>\\data\\cuda\\bin (VRCT_DATA_DIR\\cuda\\bin)。
+    取得処理はサブプロジェクト 2 (GPU 部品の後入れ) で作る。
+    元の VRCT のフォルダ (%LOCALAPPDATA%\\VRCT) は見ない (並べて入れるため)。
+    """
+    data_dir = os.environ.get(DATA_DIR_ENV, "").strip()
+    if not data_dir:
         return None
-    path = os.path.join(local_app_data, "VRCT", "cuda", "bin")
+    path = os.path.join(data_dir, "cuda", "bin")
     return path if os.path.isdir(path) else None
 
 

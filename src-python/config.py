@@ -38,7 +38,7 @@ except Exception:  # pragma: no cover - optional runtime
 
 from models.transliteration.transliteration_dictionary import SUDACHI_DICT_TYPES
 
-from utils import errorLogging, printLog, validateDictStructure, getComputeDeviceList, isValidIpAddress, isWildcardBindAddress
+from utils import errorLogging, printLog, validateDictStructure, getComputeDeviceList, isValidIpAddress, isWildcardBindAddress, dataDirectory
 
 # NOTE: MIC_VAD_FILTER/SPEAKER_VAD_FILTER/MIC_VAD_PARAMETERS/SPEAKER_VAD_PARAMETERS と
 # 対応する migration ヘルパは ADR-0004 でストリーミング/VAD 独自実装を撤退した際に
@@ -782,7 +782,8 @@ class Config:
 
     # Read Only
     VERSION = ManagedProperty('VERSION', readonly=True, serialize=False)
-    PATH_LOCAL = ManagedProperty('PATH_LOCAL', readonly=True, serialize=False)
+    PATH_APP = ManagedProperty('PATH_APP', readonly=True, serialize=False)
+    PATH_DATA = ManagedProperty('PATH_DATA', readonly=True, serialize=False)
     PATH_CONFIG = ManagedProperty('PATH_CONFIG', readonly=True, serialize=False)
     PATH_LOGS = ManagedProperty('PATH_LOGS', readonly=True, serialize=False)
     SELECTABLE_RELEASE_CHANNEL_LIST = ManagedProperty('SELECTABLE_RELEASE_CHANNEL_LIST', readonly=True, serialize=False)
@@ -1061,11 +1062,14 @@ class Config:
         # Read Only
         self._VERSION = "3.5.1-beta.1"
         if getattr(sys, 'frozen', False):
-            self._PATH_LOCAL = os_path.dirname(sys.executable)
+            self._PATH_APP = os_path.dirname(sys.executable)
         else:
-            self._PATH_LOCAL = os_path.dirname(os_path.abspath(__file__))
-        self._PATH_CONFIG = os_path.join(self._PATH_LOCAL, "config.json")
-        self._PATH_LOGS = os_path.join(self._PATH_LOCAL, "logs")
+            self._PATH_APP = os_path.dirname(os_path.abspath(__file__))
+        # 設定・ログ・モデルは PATH_DATA、同梱ファイル (_internal) は PATH_APP から読む。
+        self._PATH_DATA = dataDirectory(self._PATH_APP)
+        os_makedirs(self._PATH_DATA, exist_ok=True)
+        self._PATH_CONFIG = os_path.join(self._PATH_DATA, "config.json")
+        self._PATH_LOGS = os_path.join(self._PATH_DATA, "logs")
         os_makedirs(self._PATH_LOGS, exist_ok=True)
         self._SELECTABLE_RELEASE_CHANNEL_LIST = ["stable", "beta"]
         # 初回 (config.json に値が無いとき) は、この版のチャンネルを既定にする。
@@ -1081,7 +1085,7 @@ class Config:
         # these external mappings may be empty dicts if the optional modules failed to import
         self._SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_LIST = getattr(ctranslate2_weights, 'keys', lambda: [])()
         self._SELECTABLE_WHISPER_WEIGHT_TYPE_LIST = getattr(whisper_models, 'keys', lambda: [])()
-        translation_lang = loadTranslationLanguages(self.PATH_LOCAL)
+        translation_lang = loadTranslationLanguages(self.PATH_APP)
         self._SELECTABLE_TRANSLATION_ENGINE_LIST = getattr(translation_lang, 'keys', lambda: [])()
         try:
             # transcription_lang is nested dict; attempt to extract keys defensively

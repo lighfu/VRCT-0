@@ -758,7 +758,7 @@ class MicSession(_AudioDeviceSession):
             phrase_timeout=phrase_timeout,
             max_phrases=config.MIC_MAX_PHRASES,
             transcription_engine=config.SELECTED_TRANSCRIPTION_ENGINE,
-            root=config.PATH_LOCAL,
+            root=config.PATH_DATA,
             whisper_weight_type=config.WHISPER_WEIGHT_TYPE,
             device=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device"],
             device_index=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device_index"],
@@ -820,7 +820,7 @@ class SpeakerSession(_AudioDeviceSession):
             phrase_timeout=phrase_timeout,
             max_phrases=config.SPEAKER_MAX_PHRASES,
             transcription_engine=config.SELECTED_TRANSCRIPTION_ENGINE,
-            root=config.PATH_LOCAL,
+            root=config.PATH_DATA,
             whisper_weight_type=config.WHISPER_WEIGHT_TYPE,
             device=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device"],
             device_index=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device_index"],
@@ -921,7 +921,7 @@ class Model:
             "large": overlay_large_log_settings,
         }
         self.overlay = Overlay(overlay_settings)
-        self.overlay_image = OverlayImage(config.PATH_LOCAL)
+        self.overlay_image = OverlayImage(config.PATH_APP)
         self.mic_mute_status = None
         # OSC ミュート同期 (changeHandlerMute) が実行する pause()/resume() を
         # Controller.mic_lifecycle_lock 配下で行うためのフック。
@@ -967,15 +967,15 @@ class Model:
                 errorLogging()
 
     def backwardCompatibleTranslatorCTranslate2ModelRenameWeightsDir(self):
-        return backwardCompatibleRenameWeightsDir(config.PATH_LOCAL)
+        return backwardCompatibleRenameWeightsDir(config.PATH_DATA)
         
     def checkTranslatorCTranslate2ModelWeight(self, weight_type:str):
-        return checkCTranslate2Weight(config.PATH_LOCAL, weight_type)
+        return checkCTranslate2Weight(config.PATH_DATA, weight_type)
 
     def changeTranslatorCTranslate2Model(self):
         self.ensure_initialized()
         self.translator.changeCTranslate2Model(
-            path=config.PATH_LOCAL,
+            path=config.PATH_DATA,
             model_type=config.CTRANSLATE2_WEIGHT_TYPE,
             device=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device"],
             device_index=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device_index"],
@@ -983,10 +983,10 @@ class Model:
             )
 
     def downloadCTranslate2ModelWeight(self, weight_type, callback=None, end_callback=None):
-        return downloadCTranslate2Weight(config.PATH_LOCAL, weight_type, callback, end_callback)
+        return downloadCTranslate2Weight(config.PATH_DATA, weight_type, callback, end_callback)
 
     def downloadCTranslate2ModelTokenizer(self, weight_type):
-        return downloadCTranslate2Tokenizer(config.PATH_LOCAL, weight_type)
+        return downloadCTranslate2Tokenizer(config.PATH_DATA, weight_type)
 
     def isLoadedCTranslate2Model(self):
         self.ensure_initialized()
@@ -1001,10 +1001,10 @@ class Model:
         self.translator.setChangedTranslatorParameters(is_changed)
 
     def checkTranscriptionWhisperModelWeight(self, weight_type:str):
-        return checkWhisperWeight(config.PATH_LOCAL, weight_type)
+        return checkWhisperWeight(config.PATH_DATA, weight_type)
 
     def downloadWhisperModelWeight(self, weight_type, callback=None, end_callback=None):
-        return downloadWhisperWeight(config.PATH_LOCAL, weight_type, callback, end_callback)
+        return downloadWhisperWeight(config.PATH_DATA, weight_type, callback, end_callback)
 
     def authenticationTranscriptionApiKey(self, api_key: str, base_url: str) -> bool:
         return checkTranscriptionApiKey(api_key, base_url)
@@ -1033,7 +1033,7 @@ class Model:
         return result
 
     def authenticationTranslatorPlamoAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationPlamoAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationPlamoAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorPlamoModelList(self) -> list[str]:
@@ -1050,7 +1050,7 @@ class Model:
         self.translator.updatePlamoClient()
 
     def authenticationTranslatorGeminiAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationGeminiAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationGeminiAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorGeminiModelList(self) -> list[str]:
@@ -1067,7 +1067,7 @@ class Model:
         self.translator.updateGeminiClient()
 
     def authenticationTranslatorOpenAIAuthKey(self, auth_key: str, base_url: Optional[str] = None) -> bool:
-        result = self.translator.authenticationOpenAIAuthKey(auth_key, base_url=base_url, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationOpenAIAuthKey(auth_key, base_url=base_url, root_path=config.PATH_APP)
         return result
 
     def getTranslatorOpenAIModelList(self) -> list[str]:
@@ -1085,7 +1085,7 @@ class Model:
 
     def authenticationTranslatorOpenAICompatibleAuthKey(self, auth_key: str, base_url: Optional[str] = None) -> bool:
         result = self.translator.authenticationOpenAICompatibleAuthKey(
-            auth_key, base_url=base_url, root_path=config.PATH_LOCAL
+            auth_key, base_url=base_url, root_path=config.PATH_APP
         )
         return result
 
@@ -1102,7 +1102,7 @@ class Model:
         self.translator.updateOpenAICompatibleClient()
 
     def authenticationTranslatorGroqAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationGroqAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationGroqAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorGroqModelList(self) -> list[str]:
@@ -1119,7 +1119,7 @@ class Model:
         self.translator.updateGroqClient()
 
     def authenticationTranslatorOpenRouterAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationOpenRouterAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationOpenRouterAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorOpenRouterModelList(self) -> list[str]:
@@ -1140,7 +1140,7 @@ class Model:
         return self.translator.getLMStudioConnected()
 
     def authenticationTranslatorLMStudio(self, base_url: str) -> bool:
-        result = self.translator.setLMStudioClientURL(base_url=base_url, root_path=config.PATH_LOCAL)
+        result = self.translator.setLMStudioClientURL(base_url=base_url, root_path=config.PATH_APP)
         return result
 
     def getTranslatorLMStudioModelList(self) -> list[str]:
@@ -1160,7 +1160,7 @@ class Model:
         return self.translator.getOllamaConnected()
 
     def authenticationTranslatorOllama(self) -> bool:
-        result = self.translator.checkOllamaClient(root_path=config.PATH_LOCAL)
+        result = self.translator.checkOllamaClient(root_path=config.PATH_APP)
         return result
 
     def getTranslatorOllamaModelList(self) -> list[str]:
@@ -1185,12 +1185,21 @@ class Model:
 
     def authenticationTranslatorAiCli(self) -> bool:
         self.ensure_initialized()
-        return self.translator.checkAiCliClient(tool=config.SELECTED_AI_CLI_TOOL, root_path=config.PATH_LOCAL,
-                                                client_version=config.VERSION)
+        return self.translator.checkAiCliClient(
+            tool=config.SELECTED_AI_CLI_TOOL,
+            root_path=config.PATH_APP,
+            client_version=config.VERSION,
+            workspace=os_path.join(config.PATH_DATA, "ai_cli_workspace"),
+        )
 
     def setTranslatorAiCliTool(self, tool: str) -> bool:
         self.ensure_initialized()
-        return self.translator.checkAiCliClient(tool=tool, root_path=config.PATH_LOCAL, client_version=config.VERSION)
+        return self.translator.checkAiCliClient(
+            tool=tool,
+            root_path=config.PATH_APP,
+            client_version=config.VERSION,
+            workspace=os_path.join(config.PATH_DATA, "ai_cli_workspace"),
+        )
 
     def setTranslatorAiCliStatusCallback(self, callback) -> None:
         """AI CLI が使えなくなった/立ち直ったときに呼ぶ関数 (引数は bool) を登録する。"""
@@ -1548,8 +1557,8 @@ class Model:
 
     def _transliterationDictPath(self):
         if config.SUDACHI_DICT_TYPE == "full":
-            if checkSudachiFullDict(config.PATH_LOCAL):
-                return sudachiFullDictPath(config.PATH_LOCAL)
+            if checkSudachiFullDict(config.PATH_DATA):
+                return sudachiFullDictPath(config.PATH_DATA)
             errorLog(
                 "SUDACHI_DICT_TYPE is 'full' but the full dictionary is not downloaded; "
                 "falling back to the standard (core) Sudachi dictionary."
@@ -1573,10 +1582,10 @@ class Model:
             self.transliterator = Transliterator(dict_path=self._transliterationDictPath())
 
     def checkSudachiFullDict(self):
-        return checkSudachiFullDict(config.PATH_LOCAL)
+        return checkSudachiFullDict(config.PATH_DATA)
 
     def downloadSudachiFullDict(self, callback=None, end_callback=None):
-        return downloadSudachiFullDict(config.PATH_LOCAL, callback, end_callback)
+        return downloadSudachiFullDict(config.PATH_DATA, callback, end_callback)
 
     def convertMessageToTransliteration(self, message: str, hiragana: bool=True, romaji: bool=True) -> list:
         self.ensure_initialized()
@@ -2027,7 +2036,7 @@ class Model:
             "zh-Hant":"Chinese Traditional",
         }
         language = convert_languages.get(ui_language, "Default")
-        overlay_image = OverlayImage(config.PATH_LOCAL)
+        overlay_image = OverlayImage(config.PATH_APP)
 
         for _ in range(2):
             overlay_image.createOverlayImageLargeLog("send", message, language)
@@ -2327,7 +2336,7 @@ class Model:
         """Model 内で Telemetry を初期化"""
         if storage_path is None:
             try:
-                storage_path = os_path.join(config.PATH_LOCAL, "telemetry_state.json")
+                storage_path = os_path.join(config.PATH_DATA, "telemetry_state.json")
             except Exception:
                 storage_path = None
         self.telemetry.init(enabled=enabled, app_version=app_version, storage_path=storage_path)

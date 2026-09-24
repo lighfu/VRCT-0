@@ -42,7 +42,8 @@ from config import config
 
 # 設定値の取得（読み取り専用）
 version = config.VERSION
-app_path = config.PATH_LOCAL
+app_path = config.PATH_APP
+data_path = config.PATH_DATA
 
 # 設定値の取得（読み書き可能）
 current_tab = config.SELECTED_TAB_NO
@@ -113,14 +114,15 @@ _debounce_time: int = 2  # デバウンス時間（秒）
 
 ### 設定プロパティ一覧
 
-#### 読み取り専用設定（20項目）
+#### 読み取り専用設定（21項目）
 
 | プロパティ名 | 型 | 説明 | デフォルト値 |
 |------------|----|----|------------|
 | `VERSION` | str | アプリケーションバージョン | "3.3.0" |
-| `PATH_LOCAL` | str | アプリケーションローカルパス | 実行時決定 |
-| `PATH_CONFIG` | str | 設定ファイルパス | `{PATH_LOCAL}/config.json` |
-| `PATH_LOGS` | str | ログディレクトリパス | `{PATH_LOCAL}/logs` |
+| `PATH_APP` | str | 同梱ファイルの場所（実行ファイルのフォルダ） | 実行時決定 |
+| `PATH_DATA` | str | 設定・ログ・モデルなどデータの置き場所（`VRCT_DATA_DIR` があればそこ、無ければ `PATH_APP`） | 実行時決定 |
+| `PATH_CONFIG` | str | 設定ファイルパス | `{PATH_DATA}/config.json` |
+| `PATH_LOGS` | str | ログディレクトリパス | `{PATH_DATA}/logs` |
 | `BOOTH_URL` | str | Booth 販売ページURL | Booth URL |
 | `DOCUMENTS_URL` | str | ドキュメントURL | Notion URL |
 | `DEEPL_AUTH_KEY_PAGE_URL` | str | DeepL認証キー取得ページ | DeepL URL |

@@ -214,7 +214,7 @@ except Exception:
 **処理:**
 ```python
 self.translator.changeCTranslate2Model(
-    path=config.PATH_LOCAL,
+    path=config.PATH_DATA,
     model_type=config.CTRANSLATE2_WEIGHT_TYPE,
     device=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device"],
     device_index=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device_index"],
@@ -251,7 +251,7 @@ CTranslate2 モデルがロード済みかチェック。
 
 **責務:** Groq API キーの検証
 
-**処理:** `translator.authenticationGroqAuthKey()` に委譲し、`root_path=config.PATH_LOCAL` を渡す
+**処理:** `translator.authenticationGroqAuthKey()` に委譲し、`root_path=config.PATH_APP` を渡す
 
 **戻り値:** 認証成功時 True
 
@@ -285,7 +285,7 @@ CTranslate2 モデルがロード済みかチェック。
 
 **責務:** OpenRouter API キーの検証
 
-**処理:** `translator.authenticationOpenRouterAuthKey()` に委譲し、`root_path=config.PATH_LOCAL` を渡す
+**処理:** `translator.authenticationOpenRouterAuthKey()` に委譲し、`root_path=config.PATH_APP` を渡す
 
 **戻り値:** 認証成功時 True
 
@@ -413,7 +413,7 @@ Whisper モデルウェイトのダウンロード。
        phrase_timeout=config.MIC_PHRASE_TIMEOUT,
        max_phrases=config.MIC_MAX_PHRASES,
        transcription_engine=config.SELECTED_TRANSCRIPTION_ENGINE,
-       root=config.PATH_LOCAL,
+       root=config.PATH_DATA,
        whisper_weight_type=config.WHISPER_WEIGHT_TYPE,
        device=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device"],
        device_index=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device_index"],
@@ -602,7 +602,7 @@ return self.overlay_image.createOverlayImageSmallLog(message, language)
 
 **特殊処理:**
 ```python
-overlay_image = OverlayImage(config.PATH_LOCAL)
+overlay_image = OverlayImage(config.PATH_APP)
 for _ in range(2):
     # 2回繰り返して画像を生成（理由は不明、バグ修正のため？）
     overlay_image.createOverlayImageLargeLog("send", message, language)

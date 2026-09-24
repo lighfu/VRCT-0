@@ -59,7 +59,7 @@ CLI への入力には他人の発言が入るので信用しない。
 |---|---|---|
 | claude | `--tools ""`・`--strict-mcp-config`・`--setting-sources project`・`--no-session-persistence` | `system/init` にツールか MCP があれば起動失敗、`tool_use` でターン失敗 |
 | codex | `-c` で notify・Web 検索・シェル・プラグインなどの機能を切る、MCP サーバーはスレッドの設定で止める、`ephemeral` スレッド | 会話以外の item・サーバーからの要求でターン失敗 |
-| agy | 専用ホーム（`<PATH_LOCAL>/ai_cli_agy_home`）、ツールの無いエージェント（`--agent vrct-translator`）、strict と deny ルール | tool の `step_update`・`denied_actions` の増加でターン失敗 |
+| agy | 専用ホーム（`<PATH_DATA>/ai_cli_agy_home`）、ツールの無いエージェント（`--agent vrct-translator`）、strict と deny ルール | tool の `step_update`・`denied_actions` の増加でターン失敗 |
 
 ターンが失敗するとプロセスを殺し、会話ごと捨てる（`AiCliToolUseError`。ブレーカーは開かない）。残る注意点（codex の `~/.codex/AGENTS.md`、`ANTHROPIC_API_KEY`、履歴の囲みは最善を尽くすだけ）は設計書の「安全性」を参照。
 
