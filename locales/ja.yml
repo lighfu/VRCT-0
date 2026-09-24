@@ -133,6 +133,8 @@ config_page:
             remove_button: "削除"
             remove_pending: "次の起動で削除します。"
             restart_button: "再起動"
+            download_started_notification: "GPU 部品のダウンロードを始めました。進み具合は、設定の「翻訳」にある「GPU 部品」欄で見られます。"
+            installed_notification: "GPU 部品を導入しました。再起動すると使えます。"
 
     side_menu_labels:
         device: "デバイス"

@@ -133,6 +133,8 @@ config_page:
             remove_button: "Remove"
             remove_pending: "They will be removed at the next start."
             restart_button: "Restart"
+            download_started_notification: "Started downloading the GPU parts. You can follow the progress under \"GPU parts\" in Settings > Translation."
+            installed_notification: "The GPU parts are installed. Restart to use them."
 
     side_menu_labels:
         device: "Device"

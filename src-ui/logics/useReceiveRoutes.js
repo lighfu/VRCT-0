@@ -33,7 +33,7 @@ export const STATIC_ROUTE_META_LIST = [
     { endpoint: "/get/data/cuda_pack_status", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackStatus" },
     { endpoint: "/run/cuda_pack_status", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackStatus" },
     { endpoint: "/run/download_progress_cuda_pack", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackProgress" },
-    { endpoint: "/run/downloaded_cuda_pack", ns: null, hook_name: null, method_name: null },
+    { endpoint: "/run/downloaded_cuda_pack", ns: common, hook_name: "useCudaPack", method_name: "notifyCudaPackInstalled" },
     { endpoint: "/run/download_cuda_pack", ns: null, hook_name: null, method_name: null },
     { endpoint: "/run/remove_cuda_pack", ns: null, hook_name: null, method_name: null },
     { endpoint: "/run/mark_cuda_pack_prompted", ns: null, hook_name: null, method_name: null },

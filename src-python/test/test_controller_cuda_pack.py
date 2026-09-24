@@ -247,6 +247,17 @@ class WiringTests(unittest.TestCase):
             text = (root / "locales" / f"{locale}.yml").read_text(encoding="utf-8")
             self.assertIn("cuda_pack_in_use:", text, locale)
 
+    def test_ui_announces_a_finished_download(self) -> None:
+        # 取得は数分かかり、問いかけから始めると画面には何も出ないので、終わったら知らせる。
+        root = Path(__file__).resolve().parents[2]
+        routes = (root / "src-ui" / "logics" / "useReceiveRoutes.js").read_text(encoding="utf-8")
+        route = next(line for line in routes.splitlines() if '"/run/downloaded_cuda_pack"' in line)
+        self.assertIn('method_name: "notifyCudaPackInstalled"', route)
+        for locale in ("ja", "en", "ko", "zh-Hans", "zh-Hant"):
+            text = (root / "locales" / f"{locale}.yml").read_text(encoding="utf-8")
+            self.assertIn("download_started_notification:", text, locale)
+            self.assertIn("installed_notification:", text, locale)
+
     def test_init_switches_before_engines_and_reports_after_settings(self) -> None:
         source = inspect.getsource(Controller.init)
         self.assertLess(source.index("applyCudaPackGpuSelection"), source.index("Set Translation Engine"))
