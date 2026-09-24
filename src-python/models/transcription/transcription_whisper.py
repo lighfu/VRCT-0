@@ -184,19 +184,24 @@ def downloadWhisperWeight(
     if callable(end_callback):
         end_callback()
 
-def _whisperCpuThreads() -> int:
-    """CPU 推論に使うスレッド数。
+def transcriptionCpuThreads() -> int:
+    """ローカル文字起こしモデル1つが CPU 推論に使うスレッド数。
 
-    以前は 4 固定で、8 コア以上の PC でも半分以上のコアが遊んでいた。
-    VRChat 等のゲームと同時に動かすため全コアは使わず、物理コアから 2 つ
-    残した数を 4〜8 の範囲で使う (8 を超えると CTranslate2 の伸びが鈍る)。
+    VRChat 等のゲームと同時に動かすため、物理コアから 2 つ残した数を上限の
+    目安にする。マイクとスピーカーはそれぞれモデルを持って同時に推論する
+    ことがあるので、その半分を1モデル分とする (2〜8)。
+    例: 4〜6 コアで 2、8 コアで 3、10 コアで 4、16 コアで 7。
+    物理コア数が分からなければ従来通り 4。
     """
     try:
         import psutil
         physical = psutil.cpu_count(logical=False) or 0
     except Exception:
         physical = 0
-    return max(4, min(physical - 2, 8))
+    if physical <= 0:
+        return 4
+    budget = max(2, physical - 2)
+    return max(2, min(budget // 2, 8))
 
 def getWhisperModel(
     root: str,
@@ -223,7 +228,7 @@ def getWhisperModel(
             device=device,
             device_index=device_index,
             compute_type=compute_type,
-            cpu_threads=_whisperCpuThreads(),
+            cpu_threads=transcriptionCpuThreads(),
             num_workers=1,
             local_files_only=True,
         )

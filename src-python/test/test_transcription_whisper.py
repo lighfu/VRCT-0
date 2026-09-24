@@ -108,22 +108,32 @@ class TestDownloadWhisperWeight(unittest.TestCase):
         end_callback.assert_called_once()
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TestWhisperCpuThreads(unittest.TestCase):
-    """CPU 推論のスレッド数は物理コアから 2 つ残し、4〜8 に収める。"""
+    """1モデル分のスレッド数。物理コアから 2 つ残した数を、マイクとスピーカー
+    の2モデルで分け合う (2〜8)。"""
 
     def _threads_for(self, physical):
         with patch("psutil.cpu_count", return_value=physical):
-            return transcription_whisper._whisperCpuThreads()
+            return transcription_whisper.transcriptionCpuThreads()
 
     def test_scales_with_physical_cores(self) -> None:
-        self.assertEqual(self._threads_for(4), 4)
-        self.assertEqual(self._threads_for(6), 4)
-        self.assertEqual(self._threads_for(8), 6)
-        self.assertEqual(self._threads_for(16), 8)
+        self.assertEqual(self._threads_for(2), 2)
+        self.assertEqual(self._threads_for(4), 2)
+        self.assertEqual(self._threads_for(6), 2)
+        self.assertEqual(self._threads_for(8), 3)
+        self.assertEqual(self._threads_for(10), 4)
+        self.assertEqual(self._threads_for(16), 7)
+        self.assertEqual(self._threads_for(32), 8)
+
+    def test_two_models_never_exceed_the_budget(self) -> None:
+        for physical in range(6, 33):
+            with self.subTest(physical=physical):
+                self.assertLessEqual(2 * self._threads_for(physical), physical - 2)
 
     def test_falls_back_to_four_when_unknown(self) -> None:
         self.assertEqual(self._threads_for(None), 4)
+
+
+if __name__ == "__main__":
+    unittest.main()

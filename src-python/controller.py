@@ -868,45 +868,18 @@ class Controller:
                 energy,
             )
 
-    class DownloadCTranslate2:
-        def __init__(self, run_mapping:dict,  weight_type:str, run:Callable[[int, str, Any], None]) -> None:
-            self.run_mapping = run_mapping
-            self.weight_type = weight_type
-            self.run = run
-            self._last_progress = -1.0
-            self._last_time = 0.0
+    class _WeightDownload:
+        """モデルの重みの取得の進み具合・完了・失敗を UI に知らせる。
 
-        def progressBar(self, progress) -> None:
-            if not _shouldEmitDownloadProgress(self, progress):
-                return
-            printLog("CTranslate2 Weight Download Progress", progress)
-            self.run(
-                200,
-                self.run_mapping["download_progress_ctranslate2_weight"],
-                {"weight_type": self.weight_type, "progress": progress},
-            )
+        `/run/download_progress_<endpoint>`、`/run/downloaded_<endpoint>`、
+        `/run/error_<endpoint>` を送る。エンジンごとの違い (確認の関数、完了時に
+        更新する設定、エラーコード) はサブクラスで与える。
+        """
 
-        def downloaded(self) -> None:
-            if model.checkTranslatorCTranslate2ModelWeight(self.weight_type) is True:
-                config.SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_DICT[self.weight_type] = True
+        _label = ""
+        _endpoint = ""
+        _error_code: ErrorCode
 
-                self.run(
-                    200,
-                    self.run_mapping["downloaded_ctranslate2_weight"],
-                    self.weight_type,
-                )
-            else:
-                error_response = VRCTError.create_error_response(
-                    ErrorCode.WEIGHT_CTRANSLATE2_DOWNLOAD,
-                    data=None
-                )
-                self.run(
-                    error_response["status"],
-                    self.run_mapping["error_ctranslate2_weight"],
-                    error_response["result"],
-                )
-
-    class DownloadWhisper:
         def __init__(self, run_mapping:dict, weight_type:str, run:Callable[[int, str, Any], None]) -> None:
             self.run_mapping = run_mapping
             self.weight_type = weight_type
@@ -914,74 +887,77 @@ class Controller:
             self._last_progress = -1.0
             self._last_time = 0.0
 
+        def _isDownloaded(self) -> bool:
+            raise NotImplementedError
+
+        def _markDownloaded(self) -> None:
+            raise NotImplementedError
+
         def progressBar(self, progress) -> None:
             if not _shouldEmitDownloadProgress(self, progress):
                 return
-            printLog("Whisper Weight Download Progress", progress)
+            printLog(f"{self._label} Weight Download Progress", progress)
             self.run(
                 200,
-                self.run_mapping["download_progress_whisper_weight"],
+                self.run_mapping[f"download_progress_{self._endpoint}"],
                 {"weight_type": self.weight_type, "progress": progress},
             )
 
-        def downloaded(self) -> None:
-            if model.checkTranscriptionWhisperModelWeight(self.weight_type) is True:
-                config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT[self.weight_type] = True
+        def _sendError(self, error_code: ErrorCode) -> None:
+            error_response = VRCTError.create_error_response(error_code, data=None)
+            self.run(
+                error_response["status"],
+                self.run_mapping[f"error_{self._endpoint}"],
+                error_response["result"],
+            )
 
-                self.run(
-                    200,
-                    self.run_mapping["downloaded_whisper_weight"],
-                    self.weight_type,
-                )
+        def downloaded(self) -> None:
+            if self._isDownloaded() is True:
+                self._markDownloaded()
+                self.run(200, self.run_mapping[f"downloaded_{self._endpoint}"], self.weight_type)
             else:
-                error_response = VRCTError.create_error_response(
-                    ErrorCode.WEIGHT_WHISPER_DOWNLOAD,
-                    data=None
-                )
-                self.run(
-                    error_response["status"],
-                    self.run_mapping["error_whisper_weight"],
-                    error_response["result"],
-                )
+                self._sendError(self._error_code)
 
-    class DownloadSenseVoice:
-        def __init__(self, run_mapping:dict, weight_type:str, run:Callable[[int, str, Any], None]) -> None:
-            self.run_mapping = run_mapping
-            self.weight_type = weight_type
-            self.run = run
-            self._last_progress = -1.0
-            self._last_time = 0.0
+    class DownloadCTranslate2(_WeightDownload):
+        _label = "CTranslate2"
+        _endpoint = "ctranslate2_weight"
+        _error_code = ErrorCode.WEIGHT_CTRANSLATE2_DOWNLOAD
 
-        def progressBar(self, progress) -> None:
-            if not _shouldEmitDownloadProgress(self, progress):
-                return
-            printLog("SenseVoice Weight Download Progress", progress)
-            self.run(
-                200,
-                self.run_mapping["download_progress_sensevoice_weight"],
-                {"weight_type": self.weight_type, "progress": progress},
-            )
+        def _isDownloaded(self) -> bool:
+            return model.checkTranslatorCTranslate2ModelWeight(self.weight_type)
 
-        def downloaded(self) -> None:
-            if model.checkSenseVoiceModelWeight() is True:
-                # Whisper と違い重みは1種類だけなので、ダウンロードできた
-                # 時点でエンジンとして使える状態にする (再起動を待たない)。
+        def _markDownloaded(self) -> None:
+            config.SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_DICT[self.weight_type] = True
+
+    class DownloadWhisper(_WeightDownload):
+        _label = "Whisper"
+        _endpoint = "whisper_weight"
+        _error_code = ErrorCode.WEIGHT_WHISPER_DOWNLOAD
+
+        def _isDownloaded(self) -> bool:
+            return model.checkTranscriptionWhisperModelWeight(self.weight_type)
+
+        def _markDownloaded(self) -> None:
+            config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT[self.weight_type] = True
+
+    class DownloadSenseVoice(_WeightDownload):
+        _label = "SenseVoice"
+        _endpoint = "sensevoice_weight"
+        _error_code = ErrorCode.WEIGHT_SENSEVOICE_DOWNLOAD
+
+        def _isDownloaded(self) -> bool:
+            return model.checkSenseVoiceModelWeight()
+
+        def _markDownloaded(self) -> None:
+            # 重みは揃っても、sherpa_onnx が読み込めなければ (VC++ ランタイムが
+            # 無い、DLL が読めない等) エンジンとしては使えない。取得の失敗とは
+            # 別のエラーとして知らせ、取り直しをさせない。
+            if model.loadSenseVoiceRuntime() is True:
+                # Whisper と違い重みは1種類だけなので、この時点でエンジンとして
+                # 使える状態にする (再起動を待たない)。
                 config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS["SenseVoice"] = True
-                self.run(
-                    200,
-                    self.run_mapping["downloaded_sensevoice_weight"],
-                    self.weight_type,
-                )
             else:
-                error_response = VRCTError.create_error_response(
-                    ErrorCode.WEIGHT_SENSEVOICE_DOWNLOAD,
-                    data=None
-                )
-                self.run(
-                    error_response["status"],
-                    self.run_mapping["error_sensevoice_weight"],
-                    error_response["result"],
-                )
+                self._sendError(ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE)
 
     class DownloadSudachiDict:
         def __init__(self, run_mapping: dict, run: Callable[[int, str, Any], None]) -> None:
@@ -1481,10 +1457,9 @@ class Controller:
 
     @staticmethod
     def getSelectableSenseVoiceWeightTypeDict(*args, **kwargs) -> dict:
-        # SenseVoice の重みは1種類だけ。エンジンが使える (= 重みが揃って
-        # いる) かどうかをそのままダウンロード済みかどうかとして返す。
-        downloaded = config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS.get("SenseVoice", False) is True
-        return {"status":200, "result":{SENSEVOICE_WEIGHT_TYPE: downloaded}}
+        # SenseVoice の重みは1種類だけ。エンジンとして使えるか (sherpa_onnx が
+        # 読み込めるか) とは別に、重みが揃っているかだけを返す。
+        return {"status":200, "result":{SENSEVOICE_WEIGHT_TYPE: model.checkSenseVoiceModelWeight() is True}}
 
     @staticmethod
     def getSelectableSudachiDictTypeDict(*args, **kwargs) -> dict:
@@ -5247,9 +5222,14 @@ class Controller:
                         # キャッシュされた結果を使用（重複チェックを回避）
                         status = self._whisper_available_cache
                     case "SenseVoice":
-                        # ネットワーク不要。重みがダウンロード済みなら使える
-                        # (起動時に自動ダウンロードはせず、設定画面から取得する)。
-                        status = model.checkSenseVoiceModelWeight() is True
+                        # ネットワーク不要。重みがダウンロード済みで sherpa_onnx が
+                        # 入っていれば使える (起動時に自動ダウンロードはせず、設定画面
+                        # から取得する)。使わない人の起動で DLL を読み込まないよう、
+                        # ここでは import せず有無だけを見る。
+                        status = (
+                            model.checkSenseVoiceModelWeight() is True
+                            and model.isSenseVoiceRuntimeInstalled() is True
+                        )
                     case "Groq_Whisper":
                         api_key = config.TRANSCRIPTION_AUTH_KEYS.get(engine)
                         if not api_key:

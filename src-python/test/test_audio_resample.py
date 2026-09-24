@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from models.transcription.audio_resample import resample_float32, resample_pcm16_to_float32
+from models.transcription.audio_resample import StreamingResampler, resample_float32, resample_pcm16_to_float32
 
 
 def _tone(freq: float, sample_rate: int, seconds: float = 1.0) -> np.ndarray:
@@ -50,6 +50,35 @@ class TestResample(unittest.TestCase):
 
     def test_very_short_input_does_not_crash(self) -> None:
         self.assertEqual(resample_pcm16_to_float32(b"\x01\x00", 48000).dtype, np.float32)
+
+
+class TestStreamingResampler(unittest.TestCase):
+    def _run(self, x: np.ndarray, rate: int, chunk: int) -> np.ndarray:
+        resampler = StreamingResampler(rate)
+        return np.concatenate([resampler.process(x[i:i + chunk]) for i in range(0, x.size, chunk)])
+
+    def test_output_does_not_depend_on_chunk_size(self) -> None:
+        x = _tone(700, 44100, seconds=0.5) * 20000
+        small = self._run(x, 44100, 441)
+        large = self._run(x, 44100, 1000)
+        n = min(small.size, large.size)
+        np.testing.assert_allclose(small[:n], large[:n], atol=1e-6)
+
+    def test_speech_band_tone_matches_the_one_shot_resampler(self) -> None:
+        x = _tone(1000, 48000)
+        streamed = self._run(x, 48000, 960)
+        expected = resample_float32(x, 48000)[:streamed.size]
+        np.testing.assert_allclose(streamed[800:], expected[800:], atol=2e-3)
+
+    def test_content_above_8khz_is_removed(self) -> None:
+        streamed = self._run(_tone(12000, 48000), 48000, 960)
+        self.assertLess(_rms(streamed[100:]), 0.005)
+
+    def test_reset_forgets_the_previous_stream(self) -> None:
+        resampler = StreamingResampler(48000)
+        resampler.process(np.full(4800, 20000.0))
+        resampler.reset()
+        self.assertLess(np.abs(resampler.process(np.zeros(4800))).max(), 1e-9)
 
 
 if __name__ == "__main__":

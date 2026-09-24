@@ -1226,6 +1226,21 @@ class TestWhisperDetectsLanguageOnceAmongCandidates(unittest.TestCase):
         self.assertEqual(transcriber.getTranscript()["language"], "Korean")
 
     @patch("models.transcription.transcription_transcriber.checkWhisperWeight", return_value=False)
+    def test_no_candidate_runs_no_inference(self, _) -> None:
+        """スピーカーの翻訳先の言語をすべて無効にすると候補は0件。発言の
+        たびに重い言語判定を走らせない。"""
+        transcriber = AudioTranscriber(False, FakeAudioSource(), 3, 10, "Whisper")
+        transcriber.transcription_engine = "Whisper"
+        transcriber.whisper_model = MagicMock()
+        audio_queue = Queue()
+        audio_queue.put((b"\x01\x00", _already_old_timestamp()))
+
+        transcriber.transcribeAudioQueue(audio_queue, [], [])
+
+        transcriber.whisper_model.detect_language.assert_not_called()
+        transcriber.whisper_model.transcribe.assert_not_called()
+
+    @patch("models.transcription.transcription_transcriber.checkWhisperWeight", return_value=False)
     def test_single_candidate_skips_detection(self, _) -> None:
         transcriber = AudioTranscriber(False, FakeAudioSource(), 3, 10, "Whisper")
         transcriber.transcription_engine = "Whisper"

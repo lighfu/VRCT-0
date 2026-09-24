@@ -43,7 +43,19 @@ class TestPcm16MonoNormalizer(unittest.TestCase):
 
         result = normalizer.process(source[:4800]) + normalizer.process(source[4800:])
 
-        self.assertAlmostEqual(len(result) // 2, 1600, delta=1)
+        # 帯域制限のフィルタの右半分 (16 出力サンプル = 1ms) は次の塊を待つ。
+        self.assertAlmostEqual(len(result) // 2, 1600, delta=16)
+
+    def test_removes_content_above_8khz_instead_of_aliasing(self) -> None:
+        """audioop.ratecv では 12kHz が 4kHz に折り返して残っていた。"""
+        normalizer = Pcm16MonoNormalizer(48000, 2, 1)
+        t = np.arange(48000) / 48000
+        tone = (10000 * np.sin(2 * np.pi * 12000 * t)).astype("<i2").tobytes()
+
+        result = b"".join(normalizer.process(tone[i:i + 2048]) for i in range(0, len(tone), 2048))
+        samples = np.frombuffer(result, dtype=np.int16).astype(np.float64)
+
+        self.assertLess(np.sqrt(np.mean(samples[200:] ** 2)), 30)
 
 
 class TestSileroFrameProbability(unittest.TestCase):

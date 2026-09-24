@@ -187,6 +187,10 @@ export const useReceiveRoutes = () => {
                 break;
 
             case 400:
+                // 重みの取得の失敗は、画面の「取得中」を戻してから知らせる。
+                if (endpoint?.startsWith("/run/error_") && endpoint in routes) {
+                    routes[endpoint](result);
+                }
                 errorHandling_Backend({
                     error_code: parsed_data.result.error_code,
                     message: parsed_data.result.message,
@@ -312,6 +316,13 @@ const buildRouteMetaList = () => {
                 ns: namespace_module,
                 hook_name: hookName,
                 method_name: `downloaded${base}`,
+            });
+            // 失敗は status 400 で届く (下の errorHandling_Backend と併せて呼ぶ)。
+            generated.push({
+                endpoint: `/run/error_${ep}`,
+                ns: namespace_module,
+                hook_name: hookName,
+                method_name: `failedDownload${base}`,
             });
             generated.push({
                 endpoint: `/run/pending_${ep}`,

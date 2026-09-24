@@ -21,6 +21,7 @@ common_error:
     failed_download_weight_ctranslate2: "CTranslate2 模型下載失敗。"
     failed_download_weight_whisper: "Whisper 模型下載失敗。"
     failed_download_weight_sensevoice: "SenseVoice 模型下載失敗。"
+    sensevoice_runtime_unavailable: "無法載入 SenseVoice 引擎 (sherpa-onnx)。請嘗試重新安裝 VRCT，或安裝 Microsoft Visual C++ 可轉散發套件。"
     failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "已達到翻譯引擎使用限制或臨時受到使用限制。"
     deepl_auth_key_invalid_length: "API 金鑰字元數錯誤。"
@@ -291,7 +292,7 @@ config_page:
             desc: "容量越大的模型精度越高，但會占用更多 CPU/GPU 資源。\n※特別是比 medium 更大的模型，根據 CPU/GPU 效能可能難以使用。"
         sensevoice_weight_type:
             label: "SenseVoice 模型"
-            desc: "支援日語、英語、中文、粵語、韓語的輕量快速本地模型。在 CPU 上也能快速執行，精度接近 Whisper large-v3-turbo。下載後即可選擇 SenseVoice。"
+            desc: "輕量快速的本地模型。在 CPU 上也能快速執行，精度接近 Whisper large-v3-turbo。僅能辨識日語、英語、中文、粵語、韓語，其他語言不會被轉寫。下載後即可選擇 SenseVoice。"
         transcription_compute_device:
             label: "AI 語音辨識使用的處理裝置"
 

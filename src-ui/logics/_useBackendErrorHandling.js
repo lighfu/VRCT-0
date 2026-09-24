@@ -149,6 +149,9 @@ export const _useBackendErrorHandling = () => {
             case "WEIGHT_SENSEVOICE_DOWNLOAD":
                 showNotification_Error(t("common_error.failed_download_weight_sensevoice"), { category_id: error_code });
                 return;
+            case "SENSEVOICE_RUNTIME_UNAVAILABLE":
+                showNotification_Error(t("common_error.sensevoice_runtime_unavailable"), { category_id: error_code });
+                return;
             case "WEIGHT_SUDACHI_DICT_DOWNLOAD":
                 showNotification_Error(t("common_error.failed_download_sudachi_dict"), { category_id: error_code });
                 return;

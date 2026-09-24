@@ -21,6 +21,7 @@ common_error:
     failed_download_weight_ctranslate2: "CTranslate2 モデルのダウンロードに失敗しました。"
     failed_download_weight_whisper: "Whisper モデルのダウンロードに失敗しました。"
     failed_download_weight_sensevoice: "SenseVoice モデルのダウンロードに失敗しました。"
+    sensevoice_runtime_unavailable: "SenseVoice のエンジン (sherpa-onnx) を読み込めませんでした。VRCT の再インストールか、Microsoft Visual C++ 再頒布可能パッケージのインストールを試してください。"
     failed_download_sudachi_dict: "読みがな用の辞書のダウンロードに失敗しました。"
     translation_limit: "翻訳エンジンの使用制限に達したか、一時的に利用制限がかけられています。"
     deepl_auth_key_invalid_length: "APIキーの文字数が間違っています。"
@@ -297,7 +298,7 @@ config_page:
             desc: "容量が大きいモデルほど精度は高いですが、その分CPUやGPUを占有します。\n※特にmediumより容量の大きいモデルは、CPU/GPUの性能によっては使用すらも困難です。"
         sensevoice_weight_type:
             label: "SenseVoiceモデル"
-            desc: "日本語・英語・中国語・広東語・韓国語に対応した、軽くて速いローカルモデルです。CPUでも高速に動き、精度は Whisper large-v3-turbo に近いです。ダウンロードすると SenseVoice を選べるようになります。"
+            desc: "軽くて速いローカルモデルです。CPUでも高速に動き、精度は Whisper large-v3-turbo に近いです。認識できるのは日本語・英語・中国語・広東語・韓国語だけで、ほかの言語は文字起こしされません。ダウンロードすると SenseVoice を選べるようになります。"
         transcription_compute_device:
             label: "AI音声認識で使用する処理デバイス"
 

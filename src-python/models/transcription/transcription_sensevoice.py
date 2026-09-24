@@ -9,31 +9,50 @@ SenseVoice-Small は非自己回帰型のため、Whisper のように1トーク
 
 モデルは Hugging Face から weights/sensevoice/ に取得する (int8 量子化版、
 約 230MB)。2025-09-09 版は同じ評価で CER 79% と大きく劣化したため、
-2024-07-17 版を使う。
+2024-07-17 版をコミットで固定して使う。
 """
 
-from os import path as os_path, makedirs as os_makedirs
-from typing import Callable, Optional
+import hashlib
+import importlib.util
+from os import path as os_path, makedirs as os_makedirs, remove as os_remove, replace as os_replace
+from threading import Lock
+from typing import Callable, Dict, Optional, Tuple
 
-from models.transcription.transcription_whisper import downloadFile
-from utils import errorLogging
+import numpy as np
+
+from models.transcription.transcription_whisper import downloadFile, transcriptionCpuThreads
+from utils import errorLogging, isWeightVerifiedCache, writeWeightVerifiedCache
 
 # UI のダウンロード欄 (weight_download_status) で使う重みの ID。重みは1種類だけ。
 SENSEVOICE_WEIGHT_TYPE = "sensevoice-small"
 SENSEVOICE_REPO_ID = "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
+# main は差し替わりうるため、中身を確かめたコミットに固定する。
+SENSEVOICE_REVISION = "2365baeacb507f821a0c8120fcee3d484dba7a07"
 _MODEL_FILE = "model.int8.onnx"
 _TOKENS_FILE = "tokens.txt"
-_FILENAMES = (_MODEL_FILE, _TOKENS_FILE)
+# ファイル名 -> (大きさ, SHA-256)。取得後にこれと照合できたものだけを置く。
+_FILES: Dict[str, Tuple[int, str]] = {
+    _MODEL_FILE: (239233841, "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"),
+    _TOKENS_FILE: (315894, "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"),
+}
 
-sherpa_onnx = None  # 使うときに _sherpaOnnx() が読み込む (起動時間の短縮)
+sherpa_onnx = None  # 使うときに loadSenseVoiceRuntime() が読み込む (起動時間の短縮)
 
 
-def _sherpaOnnx():
+def isSenseVoiceRuntimeInstalled() -> bool:
+    """sherpa_onnx が入っているか。import はしない (起動時に DLL を読み込まない)。"""
+    return importlib.util.find_spec("sherpa_onnx") is not None
+
+
+def loadSenseVoiceRuntime():
+    """sherpa_onnx を読み込んで返す。読み込めなければ None
+    (VC++ ランタイムが無い、DLL が読めない等)。"""
     global sherpa_onnx
     if sherpa_onnx is None:
         try:
             import sherpa_onnx as _module
         except Exception:
+            errorLogging()
             return None
         sherpa_onnx = _module
     return sherpa_onnx
@@ -43,14 +62,51 @@ def _weightDir(root: str) -> str:
     return os_path.join(root, "weights", "sensevoice")
 
 
+def _removeQuietly(file_path: str) -> None:
+    try:
+        if os_path.exists(file_path):
+            os_remove(file_path)
+    except Exception:
+        pass
+
+
+def _sha256(file_path: str) -> str:
+    digest = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def checkSenseVoiceWeight(root: str) -> bool:
-    """モデルファイルが揃っていて、sherpa-onnx が読み込める状態なら True。"""
+    """モデルファイルが揃い、取得時に大きさとハッシュを確かめてから変わって
+    いなければ True。sherpa_onnx が使えるかは見ない
+    (isSenseVoiceRuntimeInstalled / loadSenseVoiceRuntime で別に確かめる)。"""
     directory = _weightDir(root)
-    for filename in _FILENAMES:
+    for filename, (size, _) in _FILES.items():
         file_path = os_path.join(directory, filename)
-        if not os_path.isfile(file_path) or os_path.getsize(file_path) == 0:
+        if not os_path.isfile(file_path) or os_path.getsize(file_path) != size:
             return False
-    return _sherpaOnnx() is not None
+    return isWeightVerifiedCache(directory)
+
+
+def _downloadVerified(directory: str, filename: str, callback: Optional[Callable[[float], None]]) -> bool:
+    """一時ファイルに取得し、大きさと SHA-256 が合ったときだけ置き換える。
+    途中で終わっても (アプリを閉じた等) 本来のファイル名には何も残らない。"""
+    import huggingface_hub
+    size, sha256 = _FILES[filename]
+    file_path = os_path.join(directory, filename)
+    tmp_path = file_path + ".tmp"
+    url = huggingface_hub.hf_hub_url(SENSEVOICE_REPO_ID, filename, revision=SENSEVOICE_REVISION)
+    try:
+        if not downloadFile(url, tmp_path, func=callback):
+            return False
+        if os_path.getsize(tmp_path) != size or _sha256(tmp_path) != sha256:
+            return False
+        os_replace(tmp_path, file_path)
+        return True
+    finally:
+        _removeQuietly(tmp_path)
 
 
 def downloadSenseVoiceWeight(
@@ -58,41 +114,80 @@ def downloadSenseVoiceWeight(
     callback: Optional[Callable[[float], None]] = None,
     end_callback: Optional[Callable[[], None]] = None,
 ) -> bool:
-    """モデルが無ければ Hugging Face から取得する。成功したら True。"""
-    directory = _weightDir(root)
-    os_makedirs(directory, exist_ok=True)
-    ok = True
-    if not checkSenseVoiceWeight(root):
-        import huggingface_hub
-        for filename in _FILENAMES:
-            url = huggingface_hub.hf_hub_url(SENSEVOICE_REPO_ID, filename)
-            func = callback if filename == _MODEL_FILE else None
-            ok = downloadFile(url, os_path.join(directory, filename), func=func) and ok
-    if callable(end_callback):
-        end_callback()
-    return ok and checkSenseVoiceWeight(root)
-
-
-def getSenseVoiceRecognizer(root: str, num_threads: int = 4):
-    """sherpa-onnx の OfflineRecognizer を返す。
-
-    言語は "auto" (自動判定) で作る。sherpa-onnx は言語をモデル読み込み時に
-    固定するため、言語ごとに読み込むとメモリを言語数ぶん使う。自動判定の
-    結果 (`stream.result.lang`) は呼び出し側 (SenseVoiceProvider) が候補言語と
-    突き合わせる。
-    """
-    module = _sherpaOnnx()
-    if module is None:
-        raise RuntimeError("sherpa_onnx is not installed")
-    directory = _weightDir(root)
+    """モデルが無ければ Hugging Face から取得する。成功したら True。
+    どこで失敗しても end_callback は必ず呼ぶ (画面の「取得中」を解くため)。"""
     try:
-        return module.OfflineRecognizer.from_sense_voice(
-            model=os_path.join(directory, _MODEL_FILE),
-            tokens=os_path.join(directory, _TOKENS_FILE),
-            num_threads=num_threads,
-            language="auto",
-            use_itn=True,
-        )
+        if checkSenseVoiceWeight(root):
+            return True
+        directory = _weightDir(root)
+        os_makedirs(directory, exist_ok=True)
+        for filename in _FILES:
+            func = callback if filename == _MODEL_FILE else None
+            if not _downloadVerified(directory, filename, func):
+                return False
+        writeWeightVerifiedCache(directory)
+        return checkSenseVoiceWeight(root)
     except Exception:
         errorLogging()
-        raise
+        return False
+    finally:
+        if callable(end_callback):
+            end_callback()
+
+
+class SenseVoiceRecognizer:
+    """sherpa-onnx の OfflineRecognizer を包む。マイクとスピーカーで同じ
+    インスタンスを共有するため、推論は1つずつ順に行う (SenseVoice は音声長の
+    数%で終わるので、順番待ちの遅れは小さい)。"""
+
+    def __init__(self, recognizer) -> None:
+        self._recognizer = recognizer
+        self._lock = Lock()
+
+    def decode(self, audio: np.ndarray, sample_rate: int) -> Tuple[str, str]:
+        """(text, lang) を返す。lang は "ja" などで、"<|ja|>" の囲みは外す。"""
+        with self._lock:
+            stream = self._recognizer.create_stream()
+            stream.accept_waveform(sample_rate, audio)
+            self._recognizer.decode_stream(stream)
+            result = stream.result
+        return result.text or "", (result.lang or "").strip("<|>")
+
+
+# (重みのディレクトリ, 言語) -> SenseVoiceRecognizer
+_recognizers: Dict[Tuple[str, str], SenseVoiceRecognizer] = {}
+_recognizers_lock = Lock()
+
+
+def getSenseVoiceRecognizer(root: str, language: str = "auto") -> SenseVoiceRecognizer:
+    """言語ごとに1つだけ読み込み、以後は同じものを返す。
+
+    language="auto" は言語を自動判定する。sherpa-onnx は言語をモデルの
+    読み込み時に固定する (発話ごとには変えられない) ため、候補が1言語の
+    ときに判定が外れた場合だけ、その言語に固定したものを別に読み込む
+    (SenseVoiceProvider 参照)。
+    """
+    directory = _weightDir(root)
+    key = (directory, language)
+    with _recognizers_lock:
+        cached = _recognizers.get(key)
+        if cached is not None:
+            return cached
+        module = loadSenseVoiceRuntime()
+        if module is None:
+            raise RuntimeError("sherpa_onnx could not be loaded")
+        try:
+            recognizer = module.OfflineRecognizer.from_sense_voice(
+                model=os_path.join(directory, _MODEL_FILE),
+                tokens=os_path.join(directory, _TOKENS_FILE),
+                # マイクとスピーカーで共有するので、1モデル分の2倍を上限に使う。
+                num_threads=min(transcriptionCpuThreads() * 2, 8),
+                language=language,
+                use_itn=True,
+            )
+        except Exception:
+            errorLogging()
+            raise
+        wrapped = SenseVoiceRecognizer(recognizer)
+        _recognizers[key] = wrapped
+        return wrapped

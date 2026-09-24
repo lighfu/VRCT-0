@@ -91,6 +91,7 @@ class ErrorCode(str, Enum):
     WEIGHT_CTRANSLATE2_DOWNLOAD = "WEIGHT_CTRANSLATE2_DOWNLOAD"
     WEIGHT_WHISPER_DOWNLOAD = "WEIGHT_WHISPER_DOWNLOAD"
     WEIGHT_SENSEVOICE_DOWNLOAD = "WEIGHT_SENSEVOICE_DOWNLOAD"
+    SENSEVOICE_RUNTIME_UNAVAILABLE = "SENSEVOICE_RUNTIME_UNAVAILABLE"
     WEIGHT_SUDACHI_DICT_DOWNLOAD = "WEIGHT_SUDACHI_DICT_DOWNLOAD"
 
     # ============================================================================
@@ -414,6 +415,12 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
     ErrorCode.WEIGHT_SENSEVOICE_DOWNLOAD: {
         "category": ErrorCategory.WEIGHT,
         "message": "SenseVoice weight download error",
+        "severity": "error",
+        "user_action_required": True,
+    },
+    ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE: {
+        "category": ErrorCategory.WEIGHT,
+        "message": "SenseVoice runtime (sherpa-onnx) could not be loaded",
         "severity": "error",
         "user_action_required": True,
     },

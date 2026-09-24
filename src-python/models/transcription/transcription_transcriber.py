@@ -152,7 +152,7 @@ class AudioTranscriber:
         self.transcription_engine = "Google"
         self.whisper_model = None
         self.whisper_weight_type = whisper_weight_type
-        self.sensevoice_recognizer = None
+        self.sensevoice_root: Optional[str] = None
         self._api_provider: Optional[OpenAICompatibleTranscriptionProvider] = None
         self.audio_sources: Dict[str, Any] = {
             "sample_rate": source.SAMPLE_RATE,
@@ -170,7 +170,10 @@ class AudioTranscriber:
             )
             self.transcription_engine = "Whisper"
         elif transcription_engine == "SenseVoice" and checkSenseVoiceWeight(root) is True:
-            self.sensevoice_recognizer = getSenseVoiceRecognizer(root)
+            # 自動判定の認識器を先に読み込んでおく (マイクとスピーカーで共有、
+            # 最初の発話で読み込み待ちにならないように)。
+            getSenseVoiceRecognizer(root)
+            self.sensevoice_root = root
             self.transcription_engine = "SenseVoice"
         elif transcription_engine in _API_TRANSCRIPTION_ENGINES:
             self.transcription_engine = transcription_engine
@@ -208,9 +211,9 @@ class AudioTranscriber:
                 return None
             return LocalWhisperProvider(self.whisper_model)
         if self.transcription_engine == "SenseVoice":
-            if self.sensevoice_recognizer is None:
+            if self.sensevoice_root is None:
                 return None
-            return SenseVoiceProvider(self.sensevoice_recognizer)
+            return SenseVoiceProvider(self.sensevoice_root)
         if self.transcription_engine in _CLOUD_TRANSCRIPTION_ENGINES:
             return self._api_provider
         return GoogleProvider(self.audio_recognizer)
@@ -544,12 +547,15 @@ class AudioTranscriber:
                 provider_error = RuntimeError("transcription provider is unavailable")
             else:
                 force_language = len(languages) == 1
-                # ローカル Whisper は候補が複数でも言語判定を1回で済ませ、
-                # 選んだ候補だけを言語指定で文字起こしする (候補の数だけ
-                # 推論を繰り返さない)。
+                # 自分で言語を判定できるプロバイダ (ローカル Whisper/SenseVoice)
+                # は、候補が複数でも判定を1回で済ませ、選んだ候補だけを言語
+                # 指定で文字起こしする (候補の数だけ推論を繰り返さない)。
+                # 候補が0か1なら判定は要らない。
                 candidates = list(zip(languages, countries))
-                if not force_language and isinstance(provider, LocalWhisperProvider):
-                    chosen = provider.choose_language(audio_data, languages, countries)
+                if len(candidates) > 1 and getattr(provider, "chooses_language", False) is True:
+                    chosen = provider.choose_language(
+                        audio_data, languages, countries, no_speech_prob=no_speech_prob,
+                    )
                     if chosen is not None:
                         candidates = [candidates[chosen]]
                         force_language = True

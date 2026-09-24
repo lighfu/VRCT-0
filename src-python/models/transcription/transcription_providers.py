@@ -17,6 +17,7 @@ VRCT の既存パイプラインは「フレーズ確定後にまとめて1回�
 """
 
 import math
+import numbers
 import re
 from typing import List, Optional, Protocol, Tuple
 
@@ -26,6 +27,7 @@ from speech_recognition import AudioData, Recognizer, UnknownValueError
 
 from errors import ErrorCode
 from models.transcription.audio_resample import WHISPER_SAMPLE_RATE, resample_pcm16_to_float32
+from models.transcription.transcription_sensevoice import getSenseVoiceRecognizer
 from models.transcription.transcription_deepgram import resolveDeepgramLanguageCode
 from models.transcription.transcription_languages import transcription_lang
 from utils import errorLogging
@@ -66,6 +68,14 @@ class TranscriptionProvider(Protocol):
               示す (呼び出し元はこの合図でループを早期終了できる)。
         """
         ...
+
+    # 任意: 自分で言語を判定できるプロバイダは `chooses_language = True` とし、
+    #
+    #   choose_language(audio_data, languages, countries, *, no_speech_prob) -> Optional[int]
+    #
+    # を持つ。候補が複数のとき、呼び出し元はまずこれを1回呼び、返った添字の
+    # 候補だけを force_language=True で文字起こしする (候補ごとに推論を
+    # 繰り返さない)。None なら従来通り候補を順に試す。
 
 
 class GoogleProvider:
@@ -117,35 +127,51 @@ class GoogleProvider:
         return text, confidence, False
 
 
+class _PreparedAudio:
+    """AudioData を Whisper/SenseVoice が受け取る 16kHz float32 に直し、同じ
+    クリップを候補言語ごとに呼び直すときは直した結果を使い回す。
+
+    get_raw_data(convert_rate=16000) は audioop.ratecv (ローパス無しの線形補間)
+    で 48kHz → 16kHz を行い、8kHz 以上が折り返して認識精度を落とす。元の
+    レートのまま取り出し、帯域制限付きでリサンプルする。
+    """
+
+    def __init__(self) -> None:
+        self._source: Optional[AudioData] = None
+        self._audio: Optional[np.ndarray] = None
+
+    def get(self, audio_data: AudioData) -> np.ndarray:
+        if self._source is audio_data and self._audio is not None:
+            return self._audio
+        sample_rate = getattr(audio_data, "sample_rate", WHISPER_SAMPLE_RATE)
+        if not isinstance(sample_rate, numbers.Integral) or sample_rate <= 0:
+            sample_rate = WHISPER_SAMPLE_RATE
+        raw = audio_data.get_raw_data(convert_width=2)
+        self._audio = resample_pcm16_to_float32(raw, int(sample_rate))
+        self._source = audio_data
+        return self._audio
+
+
+def _languageCode(language: str, country: str, engine: str) -> Optional[str]:
+    return transcription_lang.get(language, {}).get(country, {}).get(engine)
+
+
 class LocalWhisperProvider:
     """既存のローカル (faster-whisper/CTranslate2) 呼び出しをそのまま包む。"""
 
+    chooses_language = True
+
     def __init__(self, whisper_model) -> None:
         self._whisper_model = whisper_model
-        # 同じクリップを候補言語ごとに呼び直す際に、リサンプルをやり直さない。
-        self._prepared_for: Optional[AudioData] = None
-        self._prepared_audio: Optional[np.ndarray] = None
-
-    def _prepare_audio(self, audio_data: AudioData) -> np.ndarray:
-        if self._prepared_for is audio_data and self._prepared_audio is not None:
-            return self._prepared_audio
-        # get_raw_data(convert_rate=16000) は audioop.ratecv (ローパス無しの
-        # 線形補間) で 48kHz → 16kHz を行い、8kHz 以上が折り返して認識精度を
-        # 落とす。元のレートのまま取り出し、帯域制限付きでリサンプルする。
-        sample_rate = getattr(audio_data, "sample_rate", WHISPER_SAMPLE_RATE)
-        if not isinstance(sample_rate, int) or sample_rate <= 0:
-            sample_rate = WHISPER_SAMPLE_RATE
-        raw = audio_data.get_raw_data(convert_width=2)
-        audio = resample_pcm16_to_float32(raw, sample_rate)
-        self._prepared_for = audio_data
-        self._prepared_audio = audio
-        return audio
+        self._audio = _PreparedAudio()
 
     def choose_language(
         self,
         audio_data: AudioData,
         languages: List[str],
         countries: List[str],
+        *,
+        no_speech_prob: float = 0.6,
     ) -> Optional[int]:
         """候補言語が複数あるとき、言語判定を1回だけ行い最も確からしい候補の
         添字を返す。
@@ -158,7 +184,7 @@ class LocalWhisperProvider:
         判定できない場合は None を返し、呼び出し元は従来通り候補を順に試す。
         """
         try:
-            _, _, all_probs = self._whisper_model.detect_language(self._prepare_audio(audio_data))
+            _, _, all_probs = self._whisper_model.detect_language(self._audio.get(audio_data))
             probs = {code: float(prob) for code, prob in all_probs}
         except Exception:
             errorLogging()
@@ -167,9 +193,8 @@ class LocalWhisperProvider:
         best_index = None
         best_prob = -1.0
         for index, (language, country) in enumerate(zip(languages, countries)):
-            try:
-                code = transcription_lang[language][country]["Whisper"]
-            except KeyError:
+            code = _languageCode(language, country, "Whisper")
+            if code is None:
                 continue
             prob = probs.get(code, 0.0)
             if prob > best_prob:
@@ -187,7 +212,7 @@ class LocalWhisperProvider:
         no_repeat_ngram_size: int,
         force_language: bool,
     ) -> Tuple[str, float, bool]:
-        raw = self._prepare_audio(audio_data)
+        raw = self._audio.get(audio_data)
 
         source_language = transcription_lang[language][country]["Whisper"] if force_language else None
         segments, info = self._whisper_model.transcribe(
@@ -212,45 +237,82 @@ class LocalWhisperProvider:
         return text, info.language_probability, is_definitive
 
 
-# SenseVoice は日本語・中国語でも単語の間に空白を入れて返すことがある
-# (例: "天然 記念物級 の 規模")。かな・漢字・全角記号どうしの間の空白だけを
-# 詰め、英単語の間の空白は残す。
-_CJK = r"\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef"
-_SPACE_BETWEEN_CJK = re.compile(rf"(?<=[{_CJK}])\s+(?=[{_CJK}])")
+# SenseVoice は日本語・中国語でも単語や数字・英単語の前後に空白を入れて返す
+# ことがある (例: "今日 は 3 時 に VRChat で 遊ぶ")。かな・漢字・全角記号の
+# 隣にある空白を詰め、英単語どうしの間の空白は残す。
+_CJK = "\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef"
+_SPACE_NEXT_TO_CJK = re.compile(rf"(?<=[{_CJK}])\s+(?=\S)|(?<=\S)\s+(?=[{_CJK}])")
+# 空白を詰める言語 (韓国語は語の間に空白を入れる言語なので含めない)。
+_NO_SPACE_LANGUAGES = ("ja", "zh", "yue")
 
 
 class SenseVoiceProvider:
     """ローカル SenseVoice (sherpa-onnx) 向けプロバイダ。
 
-    認識器は言語を自動判定する設定で読み込む (`getSenseVoiceRecognizer`
-    参照)。1クリップにつき推論は1回だけ行い、候補言語ごとの呼び出しでは
-    その結果を使い回す。判定された言語が候補と一致すれば is_definitive を
-    返して呼び出し元のループを打ち切る。SenseVoice は信頼度を返さないため、
-    一致した候補を 1.0、一致しない候補を 0.5 とする (どの候補とも一致
-    しなければ最初の候補の結果が残る)。
+    - 言語を自動判定する認識器 (マイクとスピーカーで共有) で1回だけ推論し、
+      候補言語ごとの呼び出しではその結果を使い回す。
+    - 判定された言語が候補に無ければ採用しない。候補が1言語 (force_language)
+      なら、その言語に固定した認識器で読み直す (sherpa-onnx は発話ごとに言語を
+      変えられないため、固定したものを別に読み込む。初回だけ読み込みが走る)。
+      候補が複数なら、どれを読み直すべきか分からないので捨てる。
+    - SenseVoice は無音や雑音にも "그." のような短い文と普通の言語タグを返し、
+      信頼度も返さない。そこで推論の前に Silero VAD で発話があるかを確かめ、
+      無ければ推論しない。VAD のしきい値は no_speech_prob の設定から決める
+      (1 - no_speech_prob。既定の 0.6 なら 0.4)。なお BGM などのイベントの
+      タグは使わない (BGM に重ねた発話の2割が BGM と判定されたため)。
+    - 対応していない言語 (フランス語等) の候補は何も返さない。
     """
 
-    def __init__(self, recognizer) -> None:
-        self._recognizer = recognizer
+    chooses_language = True
+
+    def __init__(self, root: str) -> None:
+        self._root = root
+        self._audio = _PreparedAudio()
         self._decoded_for: Optional[AudioData] = None
         self._decoded: Tuple[str, str] = ("", "")
 
-    def _decode(self, audio_data: AudioData) -> Tuple[str, str]:
+    def _hasSpeech(self, audio: np.ndarray, no_speech_prob: float) -> bool:
+        from faster_whisper.vad import VadOptions, get_speech_timestamps
+        threshold = min(max(1.0 - no_speech_prob, 0.1), 0.9)
+        return len(get_speech_timestamps(audio, VadOptions(threshold=threshold))) > 0
+
+    @staticmethod
+    def _cleanText(text: str, detected: str) -> str:
+        if detected in _NO_SPACE_LANGUAGES:
+            text = _SPACE_NEXT_TO_CJK.sub("", text)
+        return text.strip()
+
+    def _decode(self, audio_data: AudioData, no_speech_prob: float) -> Tuple[str, str]:
+        """自動判定の認識器で推論し (text, 判定された言語) を返す。発話が
+        無ければ ("", "")。"""
         if self._decoded_for is audio_data:
             return self._decoded
-        sample_rate = getattr(audio_data, "sample_rate", WHISPER_SAMPLE_RATE)
-        if not isinstance(sample_rate, int) or sample_rate <= 0:
-            sample_rate = WHISPER_SAMPLE_RATE
-        audio = resample_pcm16_to_float32(audio_data.get_raw_data(convert_width=2), sample_rate)
-        stream = self._recognizer.create_stream()
-        stream.accept_waveform(WHISPER_SAMPLE_RATE, audio)
-        self._recognizer.decode_stream(stream)
-        # lang は "<|ja|>" の形で返る。
-        detected = (stream.result.lang or "").strip("<|>")
-        text = _SPACE_BETWEEN_CJK.sub("", stream.result.text or "")
+        audio = self._audio.get(audio_data)
+        text, detected = "", ""
+        if audio.size > 0 and self._hasSpeech(audio, no_speech_prob):
+            recognizer = getSenseVoiceRecognizer(self._root)
+            text, detected = recognizer.decode(audio, WHISPER_SAMPLE_RATE)
+            if detected == "nospeech":
+                text, detected = "", ""
+            text = self._cleanText(text, detected)
         self._decoded_for = audio_data
         self._decoded = (text, detected)
         return self._decoded
+
+    def choose_language(
+        self,
+        audio_data: AudioData,
+        languages: List[str],
+        countries: List[str],
+        *,
+        no_speech_prob: float = 0.6,
+    ) -> Optional[int]:
+        """判定された言語に一致する候補の添字。一致しなければ None。"""
+        _, detected = self._decode(audio_data, no_speech_prob)
+        for index, (language, country) in enumerate(zip(languages, countries)):
+            if detected and _languageCode(language, country, "SenseVoice") == detected:
+                return index
+        return None
 
     def transcribe(
         self,
@@ -263,11 +325,22 @@ class SenseVoiceProvider:
         no_repeat_ngram_size: int,
         force_language: bool,
     ) -> Tuple[str, float, bool]:
-        text, detected = self._decode(audio_data)
+        code = _languageCode(language, country, "SenseVoice")
+        if code is None:
+            return "", 0.0, False
+        text, detected = self._decode(audio_data, no_speech_prob)
         if not text:
             return "", 0.0, False
-        matches = detected == transcription_lang[language][country].get("SenseVoice")
-        return text, 1.0 if matches else 0.5, matches or force_language
+        if detected == code:
+            return text, 1.0, True
+        if not force_language:
+            return "", 0.0, False
+        recognizer = getSenseVoiceRecognizer(self._root, code)
+        text, _ = recognizer.decode(self._audio.get(audio_data), WHISPER_SAMPLE_RATE)
+        text = self._cleanText(text, code)
+        if not text:
+            return "", 0.0, False
+        return text, 1.0, True
 
 
 OpenAI = None  # 使うときに _openai() が読み込む (起動時間の短縮, A-1)
