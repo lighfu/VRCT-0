@@ -145,47 +145,28 @@ npm run dev-cuda-fast
 
 ## リリースビルド
 
-配布用のインストーラーを作成するビルドです。
+配布用のインストーラー（Velopack）を作成するビルドです。
 
-### CPU版のリリースビルド
+タグ `v<版>` を push すると CI（`.github/workflows/release.yml`）が
+`npm run build` → `vpk pack`（`utils/pack_release.py`）→ `vpk upload github` を実行し、
+GitHub Releases に `VRCT-0-win-Setup.exe` と差分パッケージ（nupkg）を公開します。
 
-```bash
-npm run build
-```
-
-または、ZIP形式でパッケージング:
+手元で作る場合:
 
 ```bash
 npm run release
 ```
 
-生成されるファイル:
-- インストーラー: `src-tauri/target/release/bundle/nsis/`
-- ZIPファイル: `VRCT.zip` (releaseコマンド使用時)
-
-### CUDA版のリリースビルド
+`vpk` が入っていない場合は先に入れてください:
 
 ```bash
-npm run build-cuda
+dotnet tool install -g vpk --version 1.2.158
 ```
 
-または、ZIP形式でパッケージング:
-
-```bash
-npm run release-cuda
-```
-
-生成されるファイル:
-- インストーラー: `src-tauri/target/release/bundle/nsis/`
-- ZIPファイル: `VRCT_cuda.zip` (release-cudaコマンド使用時)
-
-### 両バージョンの同時ビルド
-
-CPU版とCUDA版の両方をビルドする場合:
-
-```bash
-npm run release-all
-```
+生成されるファイル（`release/velopack/`）:
+- `VRCT-0-win-Setup.exe`
+- `VRCT-0-<版>-full.nupkg`（前の版の full.nupkg が同じ場所にあれば `-delta.nupkg` も）
+- `releases.win.json`
 
 ## ビルドプロセスの詳細
 
@@ -204,12 +185,11 @@ npm run update-version
 ### どこにバージョンを設定すればReleaseに反映されるか
 
 - **設定箇所**: `package.json` の `version` が唯一のソース・オブ・トゥルース。
-- **反映方法**: `npm run update-version`（`build`/`build-cuda`/`release`コマンド内でも自動実行）により、
-	- `src-tauri/tauri.conf.json` の `version` に同期（Tauri/NSISインストーラーの表示・メタデータに使用）
+- **反映方法**: `npm run update-version`（`build`/`release`コマンド内でも自動実行）により、
+	- `src-tauri/tauri.conf.json` の `version` に同期（Tauri アプリの表示・メタデータに使用）
 	- `src-python/config.py` の `self._VERSION` に同期（ランタイム表示等に使用）
 - **成果物への影響**:
-	- インストーラー（NSIS）は `tauri.conf.json` の `version` を取り込み、プロダクトバージョンとして反映。
-	- ZIPパッケージ名はスクリプト既定では固定（`VRCT.zip`/`VRCT_cuda.zip`）。ファイル名にバージョンを含めたい場合は、`package.json` の `release` スクリプトを調整してください。
+	- `utils/pack_release.py` は `package.json` の `version` を読んで Velopack の packVersion に使うため、`VRCT-0-win-Setup.exe` とファイル名がそのバージョンになります。
 
 ### Pythonバックエンドのビルド
 
@@ -255,97 +235,10 @@ Tauriを使用して最終的なデスクトップアプリケーションをビ
 
 ## GitHub ActionsでのRelease自動化
 
-Windows用のReleaseをGitHub Actionsで自動生成・公開する例です。`package.json` のバージョンをタグ・リリース名に使い、TauriのNSISインストーラーとZIPを添付します。
-
-### 推奨トリガー
-
-- タグプッシュ（例: `v*`）または手動実行（`workflow_dispatch`）
-
-### サンプルワークフロー（Windows）
-
-```yaml
-name: Release (Windows)
-
-on:
-	workflow_dispatch: {}
-	push:
-		tags:
-			- 'v*'
-
-jobs:
-	build-release-windows:
-		runs-on: windows-latest
-
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
-
-			- name: Setup Node
-				uses: actions/setup-node@v4
-				with:
-					node-version: '20'
-
-			- name: Setup Python
-				uses: actions/setup-python@v5
-				with:
-					python-version: '3.11'
-
-			- name: Setup Rust
-				uses: dtolnay/rust-toolchain@stable
-
-			- name: Install dependencies
-				run: |
-					npm ci
-
-			- name: Setup Python envs (.venv/.venv_cuda)
-				run: |
-					npm run setup-python
-
-			- name: Sync versions from package.json
-				run: |
-					npm run update-version
-
-			- name: Build (CPU)
-				run: |
-					npm run build
-
-			- name: Package ZIP (CPU)
-				run: |
-					python utils/zip.py --zip_name VRCT.zip
-
-			- name: Read version from package.json
-				id: pkg
-				shell: pwsh
-				run: |
-					$version = (Get-Content package.json | ConvertFrom-Json).version
-					echo "version=$version" >> $env:GITHUB_OUTPUT
-
-			- name: Upload artifacts
-				uses: actions/upload-artifact@v4
-				with:
-					name: VRCT-windows-${{ steps.pkg.outputs.version }}
-					path: |
-						src-tauri/target/release/bundle/nsis/**/*
-						VRCT.zip
-
-			- name: Create GitHub Release
-				uses: softprops/action-gh-release@v2
-				with:
-					tag_name: v${{ steps.pkg.outputs.version }}
-					name: VRCT v${{ steps.pkg.outputs.version }}
-					files: |
-						src-tauri/target/release/bundle/nsis/**/*
-						VRCT.zip
-				env:
-					GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-### ポイント
-- ビルド前に必ず `npm run update-version` を実行して、`tauri.conf.json` と `config.py` にバージョンを同期します。
-- アーティファクトのパスは既定構成に合わせています：
-	- インストーラー: `src-tauri/target/release/bundle/nsis/`
-	- ZIP: ルート直下の `VRCT.zip`
-- CUDA版も同様にビルドする場合は、`npm run build-cuda` と `python utils/zip.py --zip_name VRCT_cuda.zip` を追加して、別アーティファクト名でアップロード・添付してください。
+`.github/workflows/release.yml` がタグ `v*` の push をトリガーに、版と `BUILD_CHANNEL` の確認、
+`npm run build`、`vpk pack`（`utils/pack_release.py`）、`vpk upload github` までを実行し、
+GitHub Releases に Velopack のパッケージを公開します。ベータ版（タグに `-beta`/`-rc` を含む）は
+プレリリースとして扱われます。手順の詳細は同ファイルを参照してください。
 
 ## ユーティリティコマンド
 
@@ -412,7 +305,7 @@ VRCT/
 │   ├── dev_sidecar/     # dev-fast用のvenv直起動ラッパー(Rust)
 │   ├── task_kill.py     # プロセス終了スクリプト
 │   ├── update_version.py # バージョン更新スクリプト
-│   └── zip.py           # ZIPパッケージング
+│   └── pack_release.py  # Velopack パッケージング
 ├── package.json          # Node.js設定とバージョン管理
 ├── requirements.txt      # Python依存関係（CPU版）
 └── requirements_cuda.txt # Python依存関係（CUDA版。requirements.txt + CUDAライブラリ）

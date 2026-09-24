@@ -2,7 +2,7 @@
 
 使い方 (リポジトリ直下):
     python tools/measure_footprint.py --label baseline-cpu --bin-dir src-tauri/bin \
-        --installer src-tauri/target/release/bundle/nsis/VRCT_x.y.z_x64-setup.exe \
+        --installer release/velopack/VRCT-0-win-Setup.exe \
         --python .venv/Scripts/python.exe
 
 - 配布サイズ: --bin-dir の合計と内訳。初回起動でサイドカーが作る
