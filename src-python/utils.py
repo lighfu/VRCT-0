@@ -109,6 +109,17 @@ def processPendingCudaPackRemoval() -> bool:
     return True
 
 
+def cleanupInterruptedCudaPackDownload() -> None:
+    """取得の途中で終わった (閉じた・落ちた・電源が切れた) ときに残る download と bin.tmp を消す。
+
+    import 時 (サイドカーが動き出す前) に呼ぶので、取得が動いていることはない。
+    合わせて最大 3 GB ほど残り、次に「導入する」を押すまで誰も消さないため。
+    """
+    directory = cudaPackDirectory()
+    for name in ("download", "bin.tmp"):
+        shutil.rmtree(os.path.join(directory, name), ignore_errors=True)
+
+
 def cudaPackLoaded() -> bool:
     """この起動で GPU 部品の DLL を検索パスに載せたか。"""
     return _cuda_pack_loaded
@@ -167,6 +178,10 @@ def _registerCudaLibraries() -> None:
 
 try:
     processPendingCudaPackRemoval()
+except Exception:
+    pass
+try:
+    cleanupInterruptedCudaPackDownload()
 except Exception:
     pass
 _registerCudaLibraries()

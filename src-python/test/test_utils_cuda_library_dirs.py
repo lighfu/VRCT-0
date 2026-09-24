@@ -1,5 +1,6 @@
 """GPU 部品 (<データの置き場所>\\cuda) の置き場所・版の印・削除の予約・DLL の登録のテスト。"""
 
+import inspect
 import json
 import os
 import sys
@@ -176,6 +177,41 @@ class PendingRemovalTests(unittest.TestCase):
                     patch.dict(sys.modules, {"nvidia": None}):
                 self.assertIsNone(utils.externalCudaLibraryDir())
                 self.assertEqual(utils._cudaLibraryDirs(), [])
+
+
+class InterruptedDownloadCleanupTests(unittest.TestCase):
+    def test_leftovers_of_an_interrupted_download_are_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as data_dir:
+            bin_dir = _install_pack(data_dir)
+            directory = os.path.join(data_dir, "cuda")
+            download_dir = os.path.join(directory, "download")
+            temporary_bin = os.path.join(directory, "bin.tmp")
+            os.makedirs(download_dir)
+            os.makedirs(temporary_bin)
+            with open(os.path.join(download_dir, "nvidia_cublas_cu12.whl"), "wb") as f:
+                f.write(b"partial")
+            with open(os.path.join(temporary_bin, "cublas64_12.dll"), "wb") as f:
+                f.write(b"half")
+            with patch.dict(os.environ, _env_with_data_dir(data_dir), clear=True):
+                utils.cleanupInterruptedCudaPackDownload()
+                self.assertEqual(utils.externalCudaLibraryDir(), bin_dir)
+            self.assertFalse(os.path.exists(download_dir))
+            self.assertFalse(os.path.exists(temporary_bin))
+            self.assertTrue(os.path.isfile(os.path.join(directory, utils.CUDA_PACK_MANIFEST)))
+
+    def test_nothing_to_clean_is_fine(self) -> None:
+        with tempfile.TemporaryDirectory() as data_dir:
+            with patch.dict(os.environ, _env_with_data_dir(data_dir), clear=True):
+                utils.cleanupInterruptedCudaPackDownload()
+            self.assertEqual(os.listdir(data_dir), [])
+
+    def test_runs_at_import_before_registration(self) -> None:
+        source = inspect.getsource(utils)
+        module_level = source[source.index("\ntry:\n    processPendingCudaPackRemoval()"):]
+        self.assertLess(
+            module_level.index("cleanupInterruptedCudaPackDownload()"),
+            module_level.index("\n_registerCudaLibraries()"),
+        )
 
 
 class RegisterTests(unittest.TestCase):
