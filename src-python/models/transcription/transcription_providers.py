@@ -24,6 +24,7 @@ import requests
 from speech_recognition import AudioData, Recognizer, UnknownValueError
 
 from errors import ErrorCode
+from models.transcription.audio_resample import WHISPER_SAMPLE_RATE, resample_pcm16_to_float32
 from models.transcription.transcription_deepgram import resolveDeepgramLanguageCode
 from models.transcription.transcription_languages import transcription_lang
 from utils import errorLogging
@@ -120,6 +121,59 @@ class LocalWhisperProvider:
 
     def __init__(self, whisper_model) -> None:
         self._whisper_model = whisper_model
+        # 同じクリップを候補言語ごとに呼び直す際に、リサンプルをやり直さない。
+        self._prepared_for: Optional[AudioData] = None
+        self._prepared_audio: Optional[np.ndarray] = None
+
+    def _prepare_audio(self, audio_data: AudioData) -> np.ndarray:
+        if self._prepared_for is audio_data and self._prepared_audio is not None:
+            return self._prepared_audio
+        # get_raw_data(convert_rate=16000) は audioop.ratecv (ローパス無しの
+        # 線形補間) で 48kHz → 16kHz を行い、8kHz 以上が折り返して認識精度を
+        # 落とす。元のレートのまま取り出し、帯域制限付きでリサンプルする。
+        sample_rate = getattr(audio_data, "sample_rate", WHISPER_SAMPLE_RATE)
+        if not isinstance(sample_rate, int) or sample_rate <= 0:
+            sample_rate = WHISPER_SAMPLE_RATE
+        raw = audio_data.get_raw_data(convert_width=2)
+        audio = resample_pcm16_to_float32(raw, sample_rate)
+        self._prepared_for = audio_data
+        self._prepared_audio = audio
+        return audio
+
+    def choose_language(
+        self,
+        audio_data: AudioData,
+        languages: List[str],
+        countries: List[str],
+    ) -> Optional[int]:
+        """候補言語が複数あるとき、言語判定を1回だけ行い最も確からしい候補の
+        添字を返す。
+
+        以前は候補ごとに `language=None` で丸ごと文字起こしを繰り返していた。
+        言語を指定しない呼び出しは毎回同じ結果になるため、判定結果が候補と
+        一致しないと候補の数だけ同じ推論が走り、その上で候補外の言語
+        (日本語の発話を中国語と判定する等) の結果が採用されていた。
+        判定を候補の中に絞り、その言語を指定して1回だけ文字起こしする。
+        判定できない場合は None を返し、呼び出し元は従来通り候補を順に試す。
+        """
+        try:
+            _, _, all_probs = self._whisper_model.detect_language(self._prepare_audio(audio_data))
+            probs = {code: float(prob) for code, prob in all_probs}
+        except Exception:
+            errorLogging()
+            return None
+
+        best_index = None
+        best_prob = -1.0
+        for index, (language, country) in enumerate(zip(languages, countries)):
+            try:
+                code = transcription_lang[language][country]["Whisper"]
+            except KeyError:
+                continue
+            prob = probs.get(code, 0.0)
+            if prob > best_prob:
+                best_index, best_prob = index, prob
+        return best_index
 
     def transcribe(
         self,
@@ -132,9 +186,7 @@ class LocalWhisperProvider:
         no_repeat_ngram_size: int,
         force_language: bool,
     ) -> Tuple[str, float, bool]:
-        raw = np.frombuffer(
-            audio_data.get_raw_data(convert_rate=16000, convert_width=2), np.int16
-        ).flatten().astype(np.float32) / 32768.0
+        raw = self._prepare_audio(audio_data)
 
         source_language = transcription_lang[language][country]["Whisper"] if force_language else None
         segments, info = self._whisper_model.transcribe(

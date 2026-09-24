@@ -110,3 +110,20 @@ class TestDownloadWhisperWeight(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestWhisperCpuThreads(unittest.TestCase):
+    """CPU 推論のスレッド数は物理コアから 2 つ残し、4〜8 に収める。"""
+
+    def _threads_for(self, physical):
+        with patch("psutil.cpu_count", return_value=physical):
+            return transcription_whisper._whisperCpuThreads()
+
+    def test_scales_with_physical_cores(self) -> None:
+        self.assertEqual(self._threads_for(4), 4)
+        self.assertEqual(self._threads_for(6), 4)
+        self.assertEqual(self._threads_for(8), 6)
+        self.assertEqual(self._threads_for(16), 8)
+
+    def test_falls_back_to_four_when_unknown(self) -> None:
+        self.assertEqual(self._threads_for(None), 4)

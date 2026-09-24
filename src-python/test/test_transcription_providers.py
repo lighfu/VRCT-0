@@ -101,8 +101,63 @@ class TestGoogleProvider(unittest.TestCase):
 class TestLocalWhisperProvider(unittest.TestCase):
     def _make_audio_data(self) -> MagicMock:
         audio_data = MagicMock()
+        audio_data.sample_rate = 16000
         audio_data.get_raw_data.return_value = b"\x00\x00" * 8
         return audio_data
+
+    def test_resamples_native_rate_audio_to_16khz(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.transcribe.return_value = ([], SimpleNamespace(language="ja", language_probability=1.0))
+        provider = LocalWhisperProvider(whisper_model)
+
+        provider.transcribe(
+            _audio_data(1.0, sample_rate=48000), "Japanese", "Japan",
+            avg_logprob=-0.8, no_speech_prob=0.6, no_repeat_ngram_size=0, force_language=True,
+        )
+
+        args, _ = whisper_model.transcribe.call_args
+        self.assertEqual(args[0].size, 16000)
+
+    def test_choose_language_picks_the_most_likely_candidate(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.detect_language.return_value = (
+            "zh", 0.6, [("zh", 0.6), ("ja", 0.3), ("en", 0.1)],
+        )
+        provider = LocalWhisperProvider(whisper_model)
+
+        chosen = provider.choose_language(
+            self._make_audio_data(), ["English", "Japanese"], ["United States", "Japan"],
+        )
+
+        # 候補外の zh ではなく、候補の中で最も確からしい ja を選ぶ。
+        self.assertEqual(chosen, 1)
+
+    def test_choose_language_returns_none_when_detection_fails(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.detect_language.side_effect = RuntimeError("boom")
+        provider = LocalWhisperProvider(whisper_model)
+
+        with patch("models.transcription.transcription_providers.errorLogging"):
+            chosen = provider.choose_language(
+                self._make_audio_data(), ["English", "Japanese"], ["United States", "Japan"],
+            )
+
+        self.assertIsNone(chosen)
+
+    def test_reuses_prepared_audio_for_the_same_clip(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.detect_language.return_value = ("ja", 0.9, [("ja", 0.9)])
+        whisper_model.transcribe.return_value = ([], SimpleNamespace(language="ja", language_probability=1.0))
+        provider = LocalWhisperProvider(whisper_model)
+        audio_data = self._make_audio_data()
+
+        provider.choose_language(audio_data, ["Japanese", "English"], ["Japan", "United States"])
+        provider.transcribe(
+            audio_data, "Japanese", "Japan",
+            avg_logprob=-0.8, no_speech_prob=0.6, no_repeat_ngram_size=0, force_language=True,
+        )
+
+        audio_data.get_raw_data.assert_called_once()
 
     def test_filters_low_confidence_segments(self) -> None:
         whisper_model = MagicMock()

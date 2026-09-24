@@ -534,7 +534,16 @@ class AudioTranscriber:
                 provider_error = RuntimeError("transcription provider is unavailable")
             else:
                 force_language = len(languages) == 1
-                for language, country in zip(languages, countries):
+                # ローカル Whisper は候補が複数でも言語判定を1回で済ませ、
+                # 選んだ候補だけを言語指定で文字起こしする (候補の数だけ
+                # 推論を繰り返さない)。
+                candidates = list(zip(languages, countries))
+                if not force_language and isinstance(provider, LocalWhisperProvider):
+                    chosen = provider.choose_language(audio_data, languages, countries)
+                    if chosen is not None:
+                        candidates = [candidates[chosen]]
+                        force_language = True
+                for language, country in candidates:
                     call_started_at = time.perf_counter()
                     try:
                         text, confidence, is_definitive = provider.transcribe(

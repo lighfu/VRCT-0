@@ -1191,6 +1191,54 @@ class TestWhisperResilienceAcrossCandidates(unittest.TestCase):
         self.assertTrue(transcriber.last_recognition_error)
 
 
+class TestWhisperDetectsLanguageOnceAmongCandidates(unittest.TestCase):
+    """候補言語が複数あるとき、ローカル Whisper は言語判定を1回だけ行い、
+    候補の中で最も確からしい言語を指定して1回だけ文字起こしする。
+
+    以前は候補ごとに language=None で同じ推論を繰り返していた (判定結果が
+    候補と一致しないと候補の数だけ走る) うえ、候補外の言語の結果が
+    採用されることがあった。
+    """
+
+    @patch("models.transcription.transcription_transcriber.checkWhisperWeight", return_value=False)
+    def test_transcribes_once_with_the_detected_candidate(self, _) -> None:
+        transcriber = AudioTranscriber(False, FakeAudioSource(), 3, 10, "Whisper")
+        transcriber.transcription_engine = "Whisper"
+        transcriber.whisper_model = MagicMock()
+        transcriber.whisper_model.detect_language.return_value = (
+            "zh", 0.5, [("zh", 0.5), ("ko", 0.3), ("ja", 0.2)],
+        )
+        transcriber.whisper_model.transcribe.return_value = (
+            [MagicMock(text="안녕하세요", avg_logprob=-0.1, no_speech_prob=0.1)],
+            MagicMock(language="ko", language_probability=1.0),
+        )
+        audio_queue = Queue()
+        audio_queue.put((b"\x01\x00", _already_old_timestamp()))
+
+        transcriber.transcribeAudioQueue(
+            audio_queue, ["Japanese", "English", "Korean"], ["Japan", "United States", "South Korea"]
+        )
+
+        transcriber.whisper_model.detect_language.assert_called_once()
+        self.assertEqual(transcriber.whisper_model.transcribe.call_count, 1)
+        _, kwargs = transcriber.whisper_model.transcribe.call_args
+        self.assertEqual(kwargs["language"], "ko")
+        self.assertEqual(transcriber.getTranscript()["language"], "Korean")
+
+    @patch("models.transcription.transcription_transcriber.checkWhisperWeight", return_value=False)
+    def test_single_candidate_skips_detection(self, _) -> None:
+        transcriber = AudioTranscriber(False, FakeAudioSource(), 3, 10, "Whisper")
+        transcriber.transcription_engine = "Whisper"
+        transcriber.whisper_model = MagicMock()
+        transcriber.whisper_model.transcribe.return_value = ([], MagicMock(language="ja", language_probability=1.0))
+        audio_queue = Queue()
+        audio_queue.put((b"\x01\x00", _already_old_timestamp()))
+
+        transcriber.transcribeAudioQueue(audio_queue, ["Japanese"], ["Japan"])
+
+        transcriber.whisper_model.detect_language.assert_not_called()
+
+
 class TestMutedMicMessage(unittest.TestCase):
     @patch("controller.model")
     @patch("controller.config")

@@ -184,6 +184,20 @@ def downloadWhisperWeight(
     if callable(end_callback):
         end_callback()
 
+def _whisperCpuThreads() -> int:
+    """CPU 推論に使うスレッド数。
+
+    以前は 4 固定で、8 コア以上の PC でも半分以上のコアが遊んでいた。
+    VRChat 等のゲームと同時に動かすため全コアは使わず、物理コアから 2 つ
+    残した数を 4〜8 の範囲で使う (8 を超えると CTranslate2 の伸びが鈍る)。
+    """
+    try:
+        import psutil
+        physical = psutil.cpu_count(logical=False) or 0
+    except Exception:
+        physical = 0
+    return max(4, min(physical - 2, 8))
+
 def getWhisperModel(
     root: str,
     weight_type: str,
@@ -209,7 +223,7 @@ def getWhisperModel(
             device=device,
             device_index=device_index,
             compute_type=compute_type,
-            cpu_threads=4,
+            cpu_threads=_whisperCpuThreads(),
             num_workers=1,
             local_files_only=True,
         )
