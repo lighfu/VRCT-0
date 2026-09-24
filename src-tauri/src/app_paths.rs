@@ -11,9 +11,16 @@ use std::path::{Path, PathBuf};
 pub const DATA_DIR_ENV: &str = "VRCT_DATA_DIR";
 
 /// huggingface_hub と hf_xet のキャッシュの置き場所。既定は `%USERPROFILE%\.cache\huggingface` で、
-/// `hf_hub_download(cache_dir=...)` を渡しても hf_xet のチャンクキャッシュ (`xet\`) はそこに書かれる。
-/// 入れた版では `data\huggingface` に向けて、導入先の外に書かないようにする。
+/// hf_xet が使われると `hf_hub_download(cache_dir=...)` を渡してもチャンクキャッシュ (`xet\`) はそこに書かれる
+/// (開発版で確認。配る版のサイドカーは hf_xet の配布情報 (dist-info) を含まず、huggingface_hub が hf_xet を
+/// 使えないと判断して普通の HTTP で取るので、2026-09-24 の時点では書かれない)。同梱のしかたが変わっても
+/// 導入先の外に書かないよう、入れた版では `data\huggingface` に向ける。
 pub const HF_HOME_ENV: &str = "HF_HOME";
+
+/// NVIDIA のドライバーが CUDA の JIT のキャッシュを置く場所。既定は `%APPDATA%\NVIDIA\ComputeCache` で、
+/// サイドカーが CUDA の装置を数えるだけでもドライバーがこのフォルダを作る (2026-09-24 に空のプロフィールで確認)。
+/// 入れた版では `data\nvidia\ComputeCache` に向ける。
+pub const CUDA_CACHE_ENV: &str = "CUDA_CACHE_PATH";
 
 /// Velopack で入れた版なら導入先 (`current\` の親) を返す。
 pub fn install_root(exe: &Path) -> Option<PathBuf> {
@@ -46,6 +53,7 @@ pub fn prepare_data_dir(exe: &Path) -> Option<PathBuf> {
     let created = std::fs::create_dir_all(&data_dir).is_ok();
     std::env::set_var(DATA_DIR_ENV, &data_dir);
     std::env::set_var(HF_HOME_ENV, data_dir.join("huggingface"));
+    std::env::set_var(CUDA_CACHE_ENV, data_dir.join("nvidia").join("ComputeCache"));
     if created {
         // 作業フォルダを変えられなくても、環境変数だけで設定とモデルは data\ に入る。
         let _ = std::env::set_current_dir(&data_dir);
@@ -135,16 +143,17 @@ mod tests {
     /// 環境変数と作業フォルダを変えたテストのあとで元に戻す。
     struct ProcessStateGuard {
         dir: PathBuf,
-        data_env: Option<std::ffi::OsString>,
-        hf_env: Option<std::ffi::OsString>,
+        env: Vec<(&'static str, Option<std::ffi::OsString>)>,
     }
 
     impl ProcessStateGuard {
         fn save() -> Self {
             ProcessStateGuard {
                 dir: std::env::current_dir().unwrap(),
-                data_env: std::env::var_os(DATA_DIR_ENV),
-                hf_env: std::env::var_os(HF_HOME_ENV),
+                env: [DATA_DIR_ENV, HF_HOME_ENV, CUDA_CACHE_ENV]
+                    .into_iter()
+                    .map(|name| (name, std::env::var_os(name)))
+                    .collect(),
             }
         }
     }
@@ -152,7 +161,7 @@ mod tests {
     impl Drop for ProcessStateGuard {
         fn drop(&mut self) {
             let _ = std::env::set_current_dir(&self.dir);
-            for (name, value) in [(DATA_DIR_ENV, &self.data_env), (HF_HOME_ENV, &self.hf_env)] {
+            for (name, value) in &self.env {
                 match value {
                     Some(value) => std::env::set_var(name, value),
                     None => std::env::remove_var(name),
@@ -188,6 +197,19 @@ mod tests {
         assert_eq!(
             std::env::var_os(HF_HOME_ENV),
             Some(root.join("data").join("huggingface").into_os_string())
+        );
+    }
+
+    #[test]
+    fn prepare_points_the_nvidia_compute_cache_into_data() {
+        let _lock = crate::test_support::lock_process_state();
+        let (_tmp, root, exe) = installed_layout("VRCT-0", "current");
+        let _restore = ProcessStateGuard::save();
+        prepare_data_dir(&exe).expect("installed layout");
+
+        assert_eq!(
+            std::env::var_os(CUDA_CACHE_ENV),
+            Some(root.join("data").join("nvidia").join("ComputeCache").into_os_string())
         );
     }
 
