@@ -2,7 +2,6 @@ from typing import Callable, Any, List, Optional
 from subprocess import Popen
 from threading import Thread, Lock, RLock
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict
 import copy
 import functools
 import re
@@ -1401,18 +1400,6 @@ class Controller:
         return {"status": 200, "result": result}
 
 
-    def checkSoftwareUpdated(self) -> dict:
-        software_update_info = model.checkSoftwareUpdated()
-        self.run(
-            200,
-            self.run_mapping["software_update_info"],
-            software_update_info,
-        )
-        return {"status":200, "result": software_update_info}
-
-
-
-
     def setSelectedTranslationComputeDevice(self, device:str, *args, **kwargs) -> dict:
         printLog("setSelectedTranslationComputeDevice", device)
         config.SELECTED_TRANSLATION_COMPUTE_DEVICE = device
@@ -2032,12 +2019,6 @@ class Controller:
     def setSelectedReleaseChannel(data, *args, **kwargs) -> dict:
         config.SELECTED_RELEASE_CHANNEL = str(data)
         return {"status":200, "result":config.SELECTED_RELEASE_CHANNEL}
-
-    @staticmethod
-    def listAvailableReleases(*args, **kwargs) -> dict:
-        releases = model.listAvailableReleases()
-        return {"status":200, "result":[asdict(r) for r in releases]}
-
 
     @staticmethod
     def setEnableConvertMessageToRomaji(*args, **kwargs) -> dict:
@@ -3669,20 +3650,6 @@ class Controller:
                 }
             }
 
-    def updateSoftware(self, data:Optional[str]=None, *args, **kwargs) -> dict:
-        target_version = str(data) if data else None
-        th_start_update_software = Thread(target=model.updateSoftware, args=(target_version,))
-        th_start_update_software.daemon = True
-        th_start_update_software.start()
-        return {"status":200, "result":True}
-
-    def updateCudaSoftware(self, data:Optional[str]=None, *args, **kwargs) -> dict:
-        target_version = str(data) if data else None
-        th_start_update_cuda_software = Thread(target=model.updateCudaSoftware, args=(target_version,))
-        th_start_update_cuda_software.daemon = True
-        th_start_update_cuda_software.start()
-        return {"status":200, "result":True}
-
     def downloadCtranslate2Weight(self, data:str, asynchronous:bool=True, *args, **kwargs) -> dict:
         weight_type = str(data)
         download_ctranslate2 = self.DownloadCTranslate2(
@@ -5255,22 +5222,6 @@ class Controller:
         # Set Word Filter
         printLog("Set Word Filter")
         model.addKeywords()
-
-        # Check Software Updated (Background)
-        printLog("Check Software Updated (Background)")
-
-        def check_software_updated_background():
-            """ソフトウェア更新チェックをバックグラウンドで実行"""
-            try:
-                self.checkSoftwareUpdated()
-                printLog("[Background] Software update check completed")
-            except Exception:
-                errorLogging()
-                printLog("[Background] Software update check failed")
-
-        bg_thread = Thread(target=check_software_updated_background)
-        bg_thread.daemon = True
-        bg_thread.start()
 
         # Init Logger
         printLog("Init Logger")

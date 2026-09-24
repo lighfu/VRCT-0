@@ -5,15 +5,11 @@
 `Controller.init()` の最終行が `updateConfigSettings()` を呼び、`init_mapping`
 (= `/get/data/` 前方一致の全エンドポイント) を全て舐めてから
 `/run/initialization_complete` を送る。UIのローディング画面はこの応答で解除
-されるため、ここには 2 つの構造的な弱点があった:
+されるため、getter 呼び出しに try/except が無く、1 つでも例外を投げると
+`init()` がそこで死に、`/run/initialization_complete` が永久に送られず UI が
+ローディング画面のまま固まる、という弱点があった。
 
-1. `/get/data/available_releases` が含まれており、その実体は GitHub API への
-   同期HTTPリクエスト (timeout (10, 60))。起動を最大70秒遅らせうる。
-2. getter 呼び出しに try/except が無く、1 つでも例外を投げると `init()` が
-   そこで死に、`/run/initialization_complete` が永久に送られず UI が
-   ローディング画面のまま固まる。
-
-本テストは両方の回帰を防ぐ。
+本テストはこの回帰を防ぐ。
 """
 
 import unittest
@@ -22,21 +18,18 @@ from controller import Controller
 from mainloop import init_mapping, mapping
 
 
-class TestInitMappingExcludesNetworkEndpoints(unittest.TestCase):
-    def test_available_releases_is_not_collected_at_startup(self) -> None:
-        """GitHub API を叩くエンドポイントが起動時の一括取得に含まれないこと。
-
-        UI 側は Updater.jsx のマウント時に自分で
-        `/get/data/available_releases` を要求するため、ここから外しても
-        取得経路は失われない。
-        """
-        self.assertIn("/get/data/available_releases", mapping)
-        self.assertNotIn("/get/data/available_releases", init_mapping)
-
-    def test_other_get_data_endpoints_are_still_collected(self) -> None:
-        """除外は available_releases だけで、他は従来どおり集められること。"""
+class TestInitMappingCollectsAllGetData(unittest.TestCase):
+    def test_every_get_data_endpoint_is_collected_at_startup(self) -> None:
         get_data_keys = {k for k in mapping if k.startswith("/get/data/")}
-        self.assertEqual(get_data_keys - set(init_mapping), {"/get/data/available_releases"})
+        self.assertEqual(get_data_keys - set(init_mapping), set())
+
+    def test_update_endpoints_are_gone(self) -> None:
+        for endpoint in (
+            "/get/data/available_releases",
+            "/run/update_software",
+            "/run/update_cuda_software",
+        ):
+            self.assertNotIn(endpoint, mapping)
 
 
 class TestUpdateConfigSettingsIsolatesFailures(unittest.TestCase):

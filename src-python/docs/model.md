@@ -940,41 +940,6 @@ self.logger.disabled = False
 
 ---
 
-### 14. ソフトウェアアップデート
-
-##### `checkSoftwareUpdated() -> dict`
-
-**責務:** 最新バージョンの確認
-
-**処理:**
-```python
-update_flag = False
-version = ""
-try:
-    # GitHub API 等から最新バージョン情報を取得
-    # packaging.version.parse でバージョン比較
-except Exception:
-    errorLogging()
-return {
-    "is_update_available": update_flag,
-    "new_version": version,
-}
-```
-
-##### `updateSoftware() -> None`
-
-**責務:** CPU版へのアップデート/切替実行
-
-**処理:**
-1. Hugging Faceから `VRCT_setup.exe`（NSISインストーラー）をダウンロード（最大5回リトライ）
-2. `Popen(["VRCT_setup.exe", "/EDITION=cpu"])` でセットアップウィザードを起動（CPU版が初期選択された状態で表示される）
-3. 実行中のVRCT本体の終了確認・再起動は起動されたセットアップウィザード側が行う
-
-##### `updateCudaSoftware() -> None`
-GPU版へのアップデート/切替実行。`updateSoftware()`と同様だが `/EDITION=gpu` 付きでセットアップウィザードを起動し、GPU版が初期選択された状態で表示される。
-
----
-
 ### 15. Watchdog 機能
 
 ##### `startWatchdog() -> None`

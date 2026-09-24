@@ -130,8 +130,6 @@ run_mapping = {
     "selectable_mic_device_list":"/run/selectable_mic_device_list",
     "selectable_speaker_device_list":"/run/selectable_speaker_device_list",
 
-    "software_update_info":"/run/software_update_info",
-
     "initialization_progress":"/run/initialization_progress",
     "initialization_complete":"/run/initialization_complete",
 
@@ -215,7 +213,6 @@ mapping = {
     "/get/data/selectable_release_channels": {"status": True, "variable":controller.getSelectableReleaseChannels},
     "/get/data/release_channel": {"status": True, "variable":controller.getSelectedReleaseChannel},
     "/set/data/release_channel": {"status": True, "variable":controller.setSelectedReleaseChannel},
-    "/get/data/available_releases": {"status": True, "variable":controller.listAvailableReleases},
 
     "/run/send_message_box": {"status": False, "variable":controller.sendMessageBox},
     "/run/typing_message_box": {"status": False, "variable":controller.typingMessageBox},
@@ -229,9 +226,6 @@ mapping = {
     "/run/shutdown": {"status": True, "variable":controller.shutdown},
 
     "/run/swap_your_language_and_target_language": {"status": True, "variable":controller.swapYourLanguageAndTargetLanguage},
-
-    "/run/update_software": {"status": True, "variable":controller.updateSoftware},
-    "/run/update_cuda_software": {"status": True, "variable":controller.updateCudaSoftware},
 
     # Config Window
     # Appearance
@@ -586,20 +580,9 @@ mapping = {
     # "/run/stop_watchdog": {"status": True, "variable":controller.stopWatchdog},
 }
 
-# 起動時の一括取得 (updateConfigSettings) から除外するエンドポイント。
-# init_mapping を舐め終えてから /run/initialization_complete を送る = UIの
-# ローディング解除がここの合計時間で決まるため、ネットワークI/Oを伴うものを
-# 入れてはいけない。available_releases は GitHub API への同期リクエスト
-# (timeout (10, 60)) で、起動を最大70秒遅らせうる。UI側は Updater.jsx の
-# マウント時に自分で /get/data/available_releases を叩くので、ここから
-# 外しても取得経路は失われない。
-_INIT_MAPPING_EXCLUDED_ENDPOINTS = frozenset({
-    "/get/data/available_releases",
-})
-
 init_mapping = {
     key: value for key, value in mapping.items()
-    if key.startswith("/get/data/") and key not in _INIT_MAPPING_EXCLUDED_ENDPOINTS
+    if key.startswith("/get/data/")
 }
 controller.setInitMapping(init_mapping)
 

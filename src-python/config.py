@@ -1,6 +1,6 @@
 import sys
 import copy
-from os import path as os_path, makedirs as os_makedirs, replace as os_replace, fsync as os_fsync, remove as os_remove
+from os import path as os_path, makedirs as os_makedirs, replace as os_replace, fsync as os_fsync
 from json import load as json_load
 from json import dump as json_dump
 from secrets import token_urlsafe as secrets_token_urlsafe
@@ -667,6 +667,31 @@ def _allowed_in_populated(list_attr_name: str):
 AI_CLI_TOOLS = ("codex", "claude", "agy")
 
 
+def uiLanguageForLocale(name: str) -> str:
+    """ロケール名 (例: "ja_JP"、"zh_TW") を VRCT の UI 言語コードにする。当てはまらなければ英語。"""
+    lowered = (name or "").lower().replace("-", "_")
+    if lowered.startswith("ja"):
+        return "ja"
+    if lowered.startswith("ko"):
+        return "ko"
+    if lowered.startswith(("zh_tw", "zh_hk", "zh_mo")) or "hant" in lowered:
+        return "zh-Hant"
+    if lowered.startswith("zh"):
+        return "zh-Hans"
+    return "en"
+
+
+def osUiLanguage() -> str:
+    """Windows の表示言語から UI 言語を決める。config.json が無い初回起動の既定値に使う。"""
+    try:
+        import ctypes
+        import locale
+        lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        return uiLanguageForLocale(locale.windows_locale.get(lang_id, ""))
+    except Exception:
+        return "en"
+
+
 class Config:
     """Application configuration singleton.
 
@@ -684,22 +709,14 @@ class Config:
     _debounce_time: int = 2
     _file_lock: threading.Lock = threading.Lock()
 
-    # このフォークの GitHub リポジトリ (owner/repo)。GitHub Releases の
-    # API/ダウンロード URL は全てここから組み立てる。
-    # docs/readme_build.md "β版リリース" と .github/workflows/release.yml を参照。
-    SOFTWARE_RELEASE_GITHUB_REPO = "lighfu/VRCT-0"
-
-    # VERSION に含まれていれば beta チャンネル扱いとする接尾辞。NSIS
-    # インストーラの .onInit (template.nsi) が ${VERSION} に対して行って
-    # いる "-beta"/"-rc" 判定と同じルール。load_config() が起動のたびに
-    # SELECTED_RELEASE_CHANNEL をこの基準へ再同期する際に使う。
+    # VERSION に含まれていれば beta チャンネルとする接尾辞。config.json が
+    # 無いときのチャンネルの既定値に使う。
     _RELEASE_CHANNEL_BETA_MARKERS = ("-beta", "-rc")
 
     @staticmethod
     def _channelForVersion(version: str) -> str:
         """バージョン文字列(例: "3.5.1-beta.1")からリリースチャンネルを
-        機械的に判定する。NSISインストーラの.onInit(template.nsi)が
-        ${VERSION}に対して行う判定と同じルール。"""
+        機械的に判定する。config.json が無いときのチャンネルの既定値に使う。"""
         return (
             "beta" if any(marker in version for marker in Config._RELEASE_CHANNEL_BETA_MARKERS)
             else "stable"
@@ -710,22 +727,6 @@ class Config:
     # ユーザーが指定する (issue #100 のローカル/LANサーバー向け)。
     GROQ_WHISPER_BASE_URL = "https://api.groq.com/openai/v1"
     OPENAI_WHISPER_BASE_URL = "https://api.openai.com/v1"
-
-    def setupDownloadUrlForTag(self, tag: str) -> str:
-        # 更新対象として解決済みの release の tag_name (GitHub API の
-        # release["tag_name"]、例: "v3.5.1-beta.1") に対応する setup.exe の
-        # URL。"v" + version を機械的に合成するのではなく、release オブジェ
-        # クトが実際に持っている tag_name をそのまま渡すこと(将来 "v" 接頭
-        # 辞以外の tag 命名になっても壊れないようにするため)。ハッシュ検証
-        # と実際にダウンロードするファイルを同じ release に揃えるため、
-        # 呼び出し側は必ず Model._resolveReleaseForVersion() 等で解決した
-        # release の tag を渡すこと。
-        return f"https://github.com/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases/download/{tag}/VRCT_setup.exe"
-
-    def setupDownloadUrlForVersion(self, version: str) -> str:
-        # 後方互換のための薄いラッパー: tag_name が取得できない場合の
-        # フォールバック ("v" + version という従来通りの想定) 用。
-        return self.setupDownloadUrlForTag(f"v{version}")
 
     def __new__(cls):
         if cls._instance is None:
@@ -784,9 +785,6 @@ class Config:
     PATH_LOCAL = ManagedProperty('PATH_LOCAL', readonly=True, serialize=False)
     PATH_CONFIG = ManagedProperty('PATH_CONFIG', readonly=True, serialize=False)
     PATH_LOGS = ManagedProperty('PATH_LOGS', readonly=True, serialize=False)
-    GITHUB_URL = ManagedProperty('GITHUB_URL', readonly=True, serialize=False)
-    GITHUB_RELEASES_LIST_URL = ManagedProperty('GITHUB_RELEASES_LIST_URL', readonly=True, serialize=False)
-    MIN_SUPPORTED_VERSION = ManagedProperty('MIN_SUPPORTED_VERSION', readonly=True, serialize=False)
     SELECTABLE_RELEASE_CHANNEL_LIST = ManagedProperty('SELECTABLE_RELEASE_CHANNEL_LIST', readonly=True, serialize=False)
     MAX_MIC_THRESHOLD = ManagedProperty('MAX_MIC_THRESHOLD', readonly=True, serialize=False)
     MAX_SPEAKER_THRESHOLD = ManagedProperty('MAX_SPEAKER_THRESHOLD', readonly=True, serialize=False)
@@ -1069,13 +1067,10 @@ class Config:
         self._PATH_CONFIG = os_path.join(self._PATH_LOCAL, "config.json")
         self._PATH_LOGS = os_path.join(self._PATH_LOCAL, "logs")
         os_makedirs(self._PATH_LOGS, exist_ok=True)
-        self._GITHUB_URL = f"https://api.github.com/repos/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases/latest"
-        self._GITHUB_RELEASES_LIST_URL = f"https://api.github.com/repos/{self.SOFTWARE_RELEASE_GITHUB_REPO}/releases"
-        # VRCT 3.4.2 fails to start (fixed in 3.4.3); exclude it from version
-        # selection/update detection instead of letting users install it.
-        self._MIN_SUPPORTED_VERSION = "3.4.3"
         self._SELECTABLE_RELEASE_CHANNEL_LIST = ["stable", "beta"]
-        self._SELECTED_RELEASE_CHANNEL = "stable"
+        # 初回 (config.json に値が無いとき) は、この版のチャンネルを既定にする。
+        # ベータ版の Setup で入れた人に、起動直後から安定版へ戻す更新を勧めないため。
+        self._SELECTED_RELEASE_CHANNEL = self._channelForVersion(self._VERSION)
 
         self._MAX_MIC_THRESHOLD = 2000
         self._MAX_SPEAKER_THRESHOLD = 2000
@@ -1178,7 +1173,7 @@ class Config:
         self._SEND_MESSAGE_BUTTON_TYPE = "show"
         self._SHOW_RESEND_BUTTON = False
         self._FONT_FAMILY = "Yu Gothic UI"
-        self._UI_LANGUAGE = "en"
+        self._UI_LANGUAGE = osUiLanguage()
         self._MAIN_WINDOW_GEOMETRY = {
             "x_pos": 0,
             "y_pos": 0,
@@ -1401,43 +1396,6 @@ class Config:
                                 continue
                         except Exception:
                             errorLogging()
-
-        # config.json から読み込んだ SELECTED_RELEASE_CHANNEL は、前回起動時に
-        # UI でチャンネルを切り替えた「つもり」の値をそのまま引き継いでいる
-        # 可能性がある。model.updateSoftware()/updateCudaSoftware() は
-        # インストーラ (NSIS) を起動した直後に VRCT を即終了する設計のため、
-        # ユーザーがインストーラをキャンセルしても config.json には新
-        # チャンネルが書き込まれたまま残ってしまう(実際にインストール
-        # されているのは元のバージョンのまま)。起動のたびに、実際に
-        # 動いている VERSION から機械的に再判定して上書きすることで、この
-        # 不整合を自己修復する(NSIS 側の .onInit が ${VERSION} の
-        # "-beta"/"-rc" サフィックスから同じ判定をしているのと同じ
-        # ルール)。UI 経由の明示的な変更 (setSelectedReleaseChannel) 自体は
-        # 今まで通り可能で、これは「起動時だけは実態を優先する」上書きに
-        # すぎない。
-        self.SELECTED_RELEASE_CHANNEL = self._channelForVersion(self.VERSION)
-
-        # インストーラ (NSIS) が選択した UI 言語の反映。NSIS 側は config.json
-        # を直接 JSON パースせず (UTF-8/非ASCII文字を含む既存ファイルで
-        # nsJSON プラグインのパースが実機で確実に失敗することを確認済み、
-        # 2026-08-21)、常に ASCII な言語コードだけを書いたこのマーカー
-        # ファイルを置く。存在すれば検証の上 UI_LANGUAGE に反映し、
-        # 一度使ったら削除する (以後のアプリ内言語変更をこのファイルが
-        # 上書きし続けないようにするため)。
-        installer_language_marker = os_path.join(self._PATH_LOCAL, "installer_language.txt")
-        if os_path.isfile(installer_language_marker):
-            try:
-                with open(installer_language_marker, 'r', encoding="utf-8") as fp:
-                    selected_language = fp.read().strip()
-                if selected_language in self._SELECTABLE_UI_LANGUAGE_LIST:
-                    self.UI_LANGUAGE = selected_language
-            except Exception:
-                errorLogging()
-            finally:
-                try:
-                    os_remove(installer_language_marker)
-                except Exception:
-                    errorLogging()
 
         self.saveConfigToFile()
 
