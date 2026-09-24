@@ -3752,6 +3752,9 @@ class Controller:
     def removeCudaPack(self, *args, **kwargs) -> dict:
         if model.cudaPackStatus() in ("installed", "installed_restart_required"):
             model.requestCudaPackRemoval()
+            # 導入して再起動する前に削除したとき、次の起動で GPU へ切り替えようとして
+            # 「GPU 部品を読み込めませんでした」を出さないように。
+            config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = False
         self._pushCudaPackStatus()
         return {"status": 200, "result": self._cudaPackStatusPayload()}
 

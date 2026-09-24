@@ -105,6 +105,21 @@ class CudaPackControllerTests(unittest.TestCase):
         self.controller.removeCudaPack()
         self.model.requestCudaPackRemoval.assert_not_called()
 
+    def test_remove_before_the_restart_cancels_the_gpu_switch(self) -> None:
+        # 導入 → 再起動の前に「削除」→ 再起動、で「GPU 部品を読み込めませんでした」を出さない。
+        self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
+        self.model.cudaPackStatus.return_value = "installed_restart_required"
+        self.controller.removeCudaPack()
+        self.model.requestCudaPackRemoval.assert_called_once()
+        self.assertFalse(self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START)
+
+    def test_refused_remove_keeps_the_gpu_switch(self) -> None:
+        self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
+        self.model.cudaPackStatus.return_value = "downloading"
+        self.controller.removeCudaPack()
+        self.model.requestCudaPackRemoval.assert_not_called()
+        self.assertTrue(self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START)
+
     def test_mark_prompted(self) -> None:
         self.controller.markCudaPackPrompted()
         self.assertTrue(self.config.CUDA_PACK_PROMPTED)
