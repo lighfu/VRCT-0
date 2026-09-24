@@ -70,8 +70,7 @@ mod tests {
             .lines()
             .filter(|line| !line.trim_start().starts_with("//"))
             .collect();
-        let code = code.join("
-");
+        let code = code.join("\n");
         assert!(code.contains("app.request_restart()"));
         assert!(!code.contains("app.restart()"));
     }
