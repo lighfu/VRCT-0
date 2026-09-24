@@ -14,6 +14,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Do not leave GITHUB_TOKEN (contents: write) in .git/config, where every
+          # later npm/pip install script could read it. vpk gets it explicitly.
+          persist-credentials: false
 
       - name: Get version from tag
         shell: pwsh
@@ -103,13 +107,19 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Fails the job on a network error or a rate limit instead of silently
+      # publishing a release without delta packages. When the repository has no
+      # release yet (the first one), vpk only warns "No releases found" and
+      # exits with 0 (checked with vpk 1.2.158), so that case still passes.
       - name: Download previous release (for delta packages)
         shell: pwsh
+        env:
+          VPK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $extra = @()
           if ("${{ steps.channel.outputs.is_beta }}" -eq "true") { $extra += "--pre" }
-          vpk download github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack @extra
-        continue-on-error: true
+          vpk download github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack --token $env:VPK_TOKEN @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Pack
         run: python utils/pack_release.py
