@@ -136,6 +136,57 @@ class CudaPackControllerTests(unittest.TestCase):
         self.controller.applyCudaPackGpuSelection()
         self.assertEqual(self.config.SELECTED_TRANSLATION_COMPUTE_DEVICE, CPU)
 
+    def test_gpu_without_auto_compute_type_uses_its_first_type(self) -> None:
+        gpu_float32_only = {
+            "device": "cuda",
+            "device_index": 0,
+            "device_name": "NVIDIA Unknown GPU",
+            "compute_types": ["float32"],
+        }
+        self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
+        self.config.SELECTABLE_COMPUTE_DEVICE_LIST = [CPU, gpu_float32_only]
+        self.controller.applyCudaPackGpuSelection()
+        self.assertEqual(self.config.SELECTED_TRANSLATION_COMPUTE_DEVICE, gpu_float32_only)
+        self.assertEqual(self.config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE, gpu_float32_only)
+        self.assertEqual(self.config.SELECTED_TRANSLATION_COMPUTE_TYPE, "float32")
+        self.assertEqual(self.config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE, "float32")
+        self.assertFalse(self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START)
+
+    def test_assignment_failure_falls_back_to_cpu_without_raising(self) -> None:
+        class RaisingConfig:
+            def __init__(self, base) -> None:
+                self.CUDA_PACK_SELECT_GPU_ON_NEXT_START = base.CUDA_PACK_SELECT_GPU_ON_NEXT_START
+                self.SELECTABLE_COMPUTE_DEVICE_LIST = base.SELECTABLE_COMPUTE_DEVICE_LIST
+                self._translation_device = base.SELECTED_TRANSLATION_COMPUTE_DEVICE
+                self.SELECTED_TRANSLATION_COMPUTE_TYPE = base.SELECTED_TRANSLATION_COMPUTE_TYPE
+                self.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE = base.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE
+                self.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = base.SELECTED_TRANSCRIPTION_COMPUTE_TYPE
+
+            @property
+            def SELECTED_TRANSLATION_COMPUTE_DEVICE(self):
+                return self._translation_device
+
+            @SELECTED_TRANSLATION_COMPUTE_DEVICE.setter
+            def SELECTED_TRANSLATION_COMPUTE_DEVICE(self, value):
+                if value == GPU:
+                    raise ValueError("simulated ConfigValidationError")
+                self._translation_device = value
+
+        self.config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
+        raising_config = RaisingConfig(self.config)
+        with patch.object(controller_module, "config", raising_config):
+            self.controller.applyCudaPackGpuSelection()
+            self.assertEqual(raising_config.SELECTED_TRANSLATION_COMPUTE_DEVICE, CPU)
+            self.assertEqual(raising_config.SELECTED_TRANSLATION_COMPUTE_TYPE, "int8")
+            self.assertEqual(raising_config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE, CPU)
+            self.assertEqual(raising_config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE, "int8")
+            self.assertFalse(raising_config.CUDA_PACK_SELECT_GPU_ON_NEXT_START)
+            self.controller.reportCudaPackNotLoaded()
+            self.controller.reportCudaPackNotLoaded()
+        errors = self._sent("/run/error_cuda_pack")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0][2]["error_code"], "CUDA_PACK_NOT_LOADED")
+
 
 class WiringTests(unittest.TestCase):
     def test_endpoints_are_registered(self) -> None:

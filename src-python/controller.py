@@ -3769,10 +3769,29 @@ class Controller:
             errorLog("GPU parts were installed but no GPU device is available; staying on the CPU.")
             self._cuda_pack_gpu_missing = True
             return
-        config.SELECTED_TRANSLATION_COMPUTE_DEVICE = copy.deepcopy(gpu)
-        config.SELECTED_TRANSLATION_COMPUTE_TYPE = "auto"
-        config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE = copy.deepcopy(gpu)
-        config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = "auto"
+        compute_types = gpu.get("compute_types") or []
+        compute_type = "auto" if "auto" in compute_types else (compute_types[0] if compute_types else "auto")
+        original_translation_device = copy.deepcopy(config.SELECTED_TRANSLATION_COMPUTE_DEVICE)
+        original_translation_type = config.SELECTED_TRANSLATION_COMPUTE_TYPE
+        original_transcription_device = copy.deepcopy(config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE)
+        original_transcription_type = config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE
+        try:
+            config.SELECTED_TRANSLATION_COMPUTE_DEVICE = copy.deepcopy(gpu)
+            config.SELECTED_TRANSLATION_COMPUTE_TYPE = compute_type
+            config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE = copy.deepcopy(gpu)
+            config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = compute_type
+        except Exception:
+            # 未知のGPUの compute_types 組み合わせなどで ValidatedProperty が
+            # 例外を投げても、init() を止めずにCPUのままの状態に戻して動かし続ける。
+            errorLogging()
+            try:
+                config.SELECTED_TRANSLATION_COMPUTE_DEVICE = original_translation_device
+                config.SELECTED_TRANSLATION_COMPUTE_TYPE = original_translation_type
+                config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE = original_transcription_device
+                config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = original_transcription_type
+            except Exception:
+                errorLogging()
+            self._cuda_pack_gpu_missing = True
 
     def reportCudaPackNotLoaded(self) -> None:
         """applyCudaPackGpuSelection が GPU を見つけられなかったら、画面が出たあとに 1 回だけ知らせる。"""
