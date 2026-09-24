@@ -17,6 +17,9 @@ a = Analysis(
         ('./../.venv_cuda/Lib/site-packages/zeroconf', 'zeroconf/'),
         ('./../.venv_cuda/Lib/site-packages/openvr', 'openvr/'),
         ('./../.venv_cuda/Lib/site-packages/faster_whisper', 'faster_whisper/'),
+        # SenseVoice: keep sherpa_onnx/lib together so _sherpa_onnx.pyd finds
+        # its onnxruntime.dll / sherpa-onnx-c-api.dll next to it.
+        ('./../.venv_cuda/Lib/site-packages/sherpa_onnx', 'sherpa_onnx/'),
         ('./../.venv/Lib/site-packages/hf_xet', 'hf_xet/'),
         ('./../.venv_cuda/Lib/site-packages/rapidocr', 'rapidocr/'),
         ],
@@ -27,7 +30,7 @@ a = Analysis(
     # へ収集させる (2026-09-18 に torch を落とすまでは、torch が同梱していた
     # 同じDLL群が torch 経由で収集されていた)。実行時のDLL検索パス登録は
     # src-python/utils.py の _registerBundledCudaLibraries が行う。
-    hiddenimports=['faster_whisper.vad', 'rapidocr', 'cv2', 'OpenGL', 'glfw', 'models.ocr',
+    hiddenimports=['faster_whisper.vad', 'sherpa_onnx', 'rapidocr', 'cv2', 'OpenGL', 'glfw', 'models.ocr',
                    'nvidia.cublas', 'nvidia.cudnn'],
     hookspath=[],
     hooksconfig={},

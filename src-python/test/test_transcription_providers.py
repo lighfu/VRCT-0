@@ -29,6 +29,7 @@ from models.transcription.transcription_providers import (
     GoogleProvider,
     LocalWhisperProvider,
     OpenAICompatibleTranscriptionProvider,
+    SenseVoiceProvider,
     TranscriptionApiError,
 )
 
@@ -221,6 +222,59 @@ class TestLocalWhisperProvider(unittest.TestCase):
         )
 
         self.assertFalse(is_definitive)
+
+
+class TestSenseVoiceProvider(unittest.TestCase):
+    def _make_recognizer(self, text: str, lang: str) -> MagicMock:
+        recognizer = MagicMock()
+        stream = MagicMock()
+        stream.result = SimpleNamespace(text=text, lang=lang)
+        recognizer.create_stream.return_value = stream
+        return recognizer
+
+    def _transcribe(self, provider, audio_data, language, country, force_language=False):
+        return provider.transcribe(
+            audio_data, language, country,
+            avg_logprob=-0.8, no_speech_prob=0.6, no_repeat_ngram_size=0, force_language=force_language,
+        )
+
+    def test_returns_text_and_is_definitive_when_detected_language_matches(self) -> None:
+        recognizer = self._make_recognizer("こんにちは", "<|ja|>")
+        provider = SenseVoiceProvider(recognizer)
+
+        text, confidence, is_definitive = self._transcribe(provider, _audio_data(1.0, 48000), "Japanese", "Japan")
+
+        self.assertEqual(text, "こんにちは")
+        self.assertEqual(confidence, 1.0)
+        self.assertTrue(is_definitive)
+        stream = recognizer.create_stream.return_value
+        sample_rate, samples = stream.accept_waveform.call_args[0]
+        self.assertEqual(sample_rate, 16000)
+        self.assertEqual(samples.size, 16000)  # 48kHz 1秒 → 16kHz 1秒
+
+    def test_decodes_once_across_candidate_languages(self) -> None:
+        recognizer = self._make_recognizer("hello", "<|en|>")
+        provider = SenseVoiceProvider(recognizer)
+        audio_data = _audio_data(0.5)
+
+        first = self._transcribe(provider, audio_data, "Japanese", "Japan")
+        second = self._transcribe(provider, audio_data, "English", "United States")
+
+        self.assertEqual(first, ("hello", 0.5, False))
+        self.assertEqual(second, ("hello", 1.0, True))
+        recognizer.decode_stream.assert_called_once()
+
+    def test_removes_spaces_between_japanese_words_but_not_english_ones(self) -> None:
+        provider = SenseVoiceProvider(self._make_recognizer("天然 記念物級 の 規模。 VRChat is fun", "<|ja|>"))
+
+        text, _, _ = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan")
+
+        self.assertEqual(text, "天然記念物級の規模。 VRChat is fun")
+
+    def test_empty_result(self) -> None:
+        provider = SenseVoiceProvider(self._make_recognizer("", "<|ja|>"))
+
+        self.assertEqual(self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan", True), ("", 0.0, False))
 
 
 class TestOpenAICompatibleTranscriptionProvider(unittest.TestCase):

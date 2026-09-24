@@ -33,10 +33,12 @@ from speech_recognition.exceptions import UnknownValueError
 from datetime import datetime, timedelta
 from pyaudiowpatch import get_sample_size, paInt16
 from .transcription_whisper import getWhisperModel, checkWhisperWeight
+from .transcription_sensevoice import checkSenseVoiceWeight, getSenseVoiceRecognizer
 from .transcription_providers import (
     GoogleProvider,
     LocalWhisperProvider,
     OpenAICompatibleTranscriptionProvider,
+    SenseVoiceProvider,
     DeepgramProvider,
     TranscriptionApiError,
 )
@@ -150,6 +152,7 @@ class AudioTranscriber:
         self.transcription_engine = "Google"
         self.whisper_model = None
         self.whisper_weight_type = whisper_weight_type
+        self.sensevoice_recognizer = None
         self._api_provider: Optional[OpenAICompatibleTranscriptionProvider] = None
         self.audio_sources: Dict[str, Any] = {
             "sample_rate": source.SAMPLE_RATE,
@@ -166,6 +169,9 @@ class AudioTranscriber:
                 root, whisper_weight_type, device=device, device_index=device_index, compute_type=compute_type
             )
             self.transcription_engine = "Whisper"
+        elif transcription_engine == "SenseVoice" and checkSenseVoiceWeight(root) is True:
+            self.sensevoice_recognizer = getSenseVoiceRecognizer(root)
+            self.transcription_engine = "SenseVoice"
         elif transcription_engine in _API_TRANSCRIPTION_ENGINES:
             self.transcription_engine = transcription_engine
             try:
@@ -201,6 +207,10 @@ class AudioTranscriber:
             if self.whisper_model is None:
                 return None
             return LocalWhisperProvider(self.whisper_model)
+        if self.transcription_engine == "SenseVoice":
+            if self.sensevoice_recognizer is None:
+                return None
+            return SenseVoiceProvider(self.sensevoice_recognizer)
         if self.transcription_engine in _CLOUD_TRANSCRIPTION_ENGINES:
             return self._api_provider
         return GoogleProvider(self.audio_recognizer)

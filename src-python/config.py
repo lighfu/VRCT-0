@@ -1090,8 +1090,14 @@ class Config:
         self._SELECTABLE_TRANSLATION_ENGINE_LIST = getattr(translation_lang, 'keys', lambda: [])()
         try:
             # transcription_lang is nested dict; attempt to extract keys defensively
-            first_key = next(iter(transcription_lang))
-            self._SELECTABLE_TRANSCRIPTION_ENGINE_LIST = list(transcription_lang[first_key].values())[0].keys()
+            # 対応言語が限られるエンジン (SenseVoice) は先頭の言語に列が無い
+            # ため、全言語の列を出現順に集める。
+            engines = {}
+            for country_map in transcription_lang.values():
+                for codes in country_map.values():
+                    for engine in codes:
+                        engines.setdefault(engine, None)
+            self._SELECTABLE_TRANSCRIPTION_ENGINE_LIST = list(engines)
         except Exception:
             self._SELECTABLE_TRANSCRIPTION_ENGINE_LIST = []
         self._SELECTABLE_UI_LANGUAGE_LIST = ["en", "ja", "ko", "zh-Hant", "zh-Hans"]

@@ -21,10 +21,13 @@ a = Analysis(
         ('./../.venv/Lib/site-packages/zeroconf', 'zeroconf/'),
         ('./../.venv/Lib/site-packages/openvr', 'openvr/'),
         ('./../.venv/Lib/site-packages/faster_whisper', 'faster_whisper/'),
+        # SenseVoice: keep sherpa_onnx/lib together so _sherpa_onnx.pyd finds
+        # its onnxruntime.dll / sherpa-onnx-c-api.dll next to it.
+        ('./../.venv/Lib/site-packages/sherpa_onnx', 'sherpa_onnx/'),
         ('./../.venv/Lib/site-packages/hf_xet', 'hf_xet/'),
         ('./../.venv/Lib/site-packages/rapidocr', 'rapidocr/'),
         ],
-    hiddenimports=['faster_whisper.vad', 'rapidocr', 'cv2', 'OpenGL', 'glfw', 'models.ocr'],
+    hiddenimports=['faster_whisper.vad', 'sherpa_onnx', 'rapidocr', 'cv2', 'OpenGL', 'glfw', 'models.ocr'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

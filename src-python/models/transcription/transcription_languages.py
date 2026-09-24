@@ -760,3 +760,12 @@ for _country_map in transcription_lang.values():
     for _codes in _country_map.values():
         if "Whisper" in _codes:
             _codes["Deepgram"] = _codes["Whisper"]
+# ローカル SenseVoice (sherpa-onnx) は日本語・英語・中国語・広東語・韓国語
+# のみ対応し、言語コードは Whisper と同じ ("ja"/"en"/"zh"/"yue"/"ko")。
+# 対応外の言語にはキーを作らない (選択中の言語の対応可否判定に使われる)。
+_SENSEVOICE_LANGUAGE_CODES = ("ja", "en", "zh", "yue", "ko")
+
+for _country_map in transcription_lang.values():
+    for _codes in _country_map.values():
+        if _codes.get("Whisper") in _SENSEVOICE_LANGUAGE_CODES:
+            _codes["SenseVoice"] = _codes["Whisper"]

@@ -90,6 +90,7 @@ class ErrorCode(str, Enum):
     # ============================================================================
     WEIGHT_CTRANSLATE2_DOWNLOAD = "WEIGHT_CTRANSLATE2_DOWNLOAD"
     WEIGHT_WHISPER_DOWNLOAD = "WEIGHT_WHISPER_DOWNLOAD"
+    WEIGHT_SENSEVOICE_DOWNLOAD = "WEIGHT_SENSEVOICE_DOWNLOAD"
     WEIGHT_SUDACHI_DICT_DOWNLOAD = "WEIGHT_SUDACHI_DICT_DOWNLOAD"
     
     # ============================================================================
@@ -400,6 +401,12 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
     ErrorCode.WEIGHT_WHISPER_DOWNLOAD: {
         "category": ErrorCategory.WEIGHT,
         "message": "Whisper weight download error",
+        "severity": "error",
+        "user_action_required": True,
+    },
+    ErrorCode.WEIGHT_SENSEVOICE_DOWNLOAD: {
+        "category": ErrorCategory.WEIGHT,
+        "message": "SenseVoice weight download error",
         "severity": "error",
         "user_action_required": True,
     },

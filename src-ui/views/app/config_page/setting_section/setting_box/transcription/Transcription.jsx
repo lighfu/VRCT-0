@@ -197,7 +197,8 @@ const SpeakerMaxWords_Box = () => {
 
 const TranscriptionEngine_Container = () => {
     const { t } = useI18n();
-    const { currentSelectedTranscriptionEngine } = useTranscription();
+    const { currentSelectedTranscriptionEngine, currentSenseVoiceWeightTypeStatus } = useTranscription();
+    const is_sensevoice_downloaded = currentSenseVoiceWeightTypeStatus.data.some(item => item.is_downloaded);
 
     return (
         <div>
@@ -209,13 +210,22 @@ const TranscriptionEngine_Container = () => {
                     <TranscriptionComputeDevice_Box />
                 </>
             )}
+            {/* 未ダウンロードの間は SenseVoice を選べないため、取得欄を常に出す。 */}
+            {(currentSelectedTranscriptionEngine.data === "SenseVoice" || !is_sensevoice_downloaded) && (
+                <SenseVoiceWeightType_Box />
+            )}
         </div>
     );
 };
 
 const TranscriptionEngine_Box = () => {
     const { t } = useI18n();
-    const { currentSelectedTranscriptionEngine, setSelectedTranscriptionEngine } = useTranscription();
+    const {
+        currentSelectedTranscriptionEngine,
+        setSelectedTranscriptionEngine,
+        currentSenseVoiceWeightTypeStatus,
+    } = useTranscription();
+    const is_sensevoice_downloaded = currentSenseVoiceWeightTypeStatus.data.some(item => item.is_downloaded);
 
     return (
         <RadioButtonContainer
@@ -225,6 +235,7 @@ const TranscriptionEngine_Box = () => {
             options={[
                 { id: "Google", label: "Google" },
                 { id: "Whisper", label: "Whisper" },
+                { id: "SenseVoice", label: "SenseVoice", disabled: !is_sensevoice_downloaded },
             ]}
             checked_variable={currentSelectedTranscriptionEngine}
         />
@@ -271,6 +282,38 @@ const WhisperWeightType_Box = () => {
                 downloadStartFunction={downloadStartFunction}
             />
         </>
+    );
+};
+
+const SenseVoiceWeightType_Box = () => {
+    const { t } = useI18n();
+    const {
+        currentSenseVoiceWeightTypeStatus,
+        pendingSenseVoiceWeightTypeStatus,
+        downloadSenseVoiceWeightTypeStatus,
+    } = useTranscription();
+
+    const downloadStartFunction = (id) => {
+        pendingSenseVoiceWeightTypeStatus(id);
+        downloadSenseVoiceWeightTypeStatus(id);
+    };
+
+    const sensevoice_weight_types = currentSenseVoiceWeightTypeStatus.data.map(item => ({
+        ...item,
+        label: item.id,
+    }));
+
+    // 重みは1種類だけなので選択肢は常にそれ (ダウンロード済みなら選択表示)。
+    return (
+        <DownloadModelsContainer
+            label={t("config_page.transcription.sensevoice_weight_type.label")}
+            desc={t("config_page.transcription.sensevoice_weight_type.desc")}
+            name="sensevoice_weight_type"
+            options={sensevoice_weight_types}
+            checked_variable={{ data: sensevoice_weight_types[0]?.id, state: "ok" }}
+            selectFunction={() => {}}
+            downloadStartFunction={downloadStartFunction}
+        />
     );
 };
 

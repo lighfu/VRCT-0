@@ -40,6 +40,7 @@ from models.translation.translation_languages import translation_lang
 from models.transcription.transcription_languages import transcription_lang
 from models.translation.translation_utils import checkCTranslate2Weight, downloadCTranslate2Weight, downloadCTranslate2Tokenizer, backwardCompatibleRenameWeightsDir
 from models.transcription.transcription_whisper import checkWhisperWeight, downloadWhisperWeight
+from models.transcription.transcription_sensevoice import checkSenseVoiceWeight, downloadSenseVoiceWeight
 from models.transcription.transcription_openai_compatible import checkTranscriptionApiKey, getAvailableTranscriptionModels
 from models.transcription.transcription_deepgram import (
     checkDeepgramApiKey,
@@ -1043,6 +1044,12 @@ class Model:
     def downloadWhisperModelWeight(self, weight_type, callback=None, end_callback=None):
         return downloadWhisperWeight(config.PATH_LOCAL, weight_type, callback, end_callback)
 
+    def checkSenseVoiceModelWeight(self) -> bool:
+        return checkSenseVoiceWeight(config.PATH_LOCAL)
+
+    def downloadSenseVoiceModelWeight(self, callback=None, end_callback=None):
+        return downloadSenseVoiceWeight(config.PATH_LOCAL, callback, end_callback)
+
     def authenticationTranscriptionApiKey(self, api_key: str, base_url: str) -> bool:
         return checkTranscriptionApiKey(api_key, base_url)
 
@@ -1309,6 +1316,7 @@ class Model:
         """VRCT の (Language, Country) を、指定した文字起こしエンジンが
         対応しているかどうかを返す。
 
+        SenseVoice は対応する5言語だけ True を返す。
         Google/Whisper/Groq_Whisper/OpenAI_Whisper/Custom_Whisper は
         transcription_lang の全エントリを網羅しているため常に True
         (Groq/OpenAI/カスタムサーバーはローカルWhisperと同じ言語コードを
@@ -1320,6 +1328,10 @@ class Model:
         if engine == "Deepgram":
             model_languages = config.DEEPGRAM_MODEL_LANGUAGES.get(config.SELECTED_DEEPGRAM_MODEL, [])
             return isLanguageSupportedByDeepgramModel(language, country, model_languages)
+        if engine == "SenseVoice":
+            # SenseVoice は日本語・英語・中国語・広東語・韓国語のみ。対応する
+            # 言語にだけ "SenseVoice" 列がある (transcription_languages.py)。
+            return "SenseVoice" in transcription_lang[language][country]
         return True
 
     def getTranscriptionLanguagesForEngine(self, engine: str) -> list:

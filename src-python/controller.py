@@ -13,6 +13,7 @@ from model import model
 from utils import removeLog, printLog, errorLogging, errorLog, isConnectedNetwork, isValidIpAddress, isWildcardBindAddress, isAvailableWebSocketServer
 from errors import ErrorCode, VRCTError
 from models.transcription.transcription_openai_compatible import TRANSCRIPTION_MODEL_KEYWORDS, TRANSCRIPTION_API_ENGINES
+from models.transcription.transcription_sensevoice import SENSEVOICE_WEIGHT_TYPE
 from models.translation.translation_providers import TRANSLATION_PROVIDER_REGISTRY, CONNECTION_PROVIDER_REGISTRY
 from models.message_pipeline import MessageDirectionSpec, MIC_MESSAGE_SPEC, SPEAKER_MESSAGE_SPEC, CHAT_MESSAGE_SPEC, OCR_MESSAGE_SPEC
 
@@ -940,6 +941,45 @@ class Controller:
                     error_response["result"],
                 )
 
+    class DownloadSenseVoice:
+        def __init__(self, run_mapping:dict, weight_type:str, run:Callable[[int, str, Any], None]) -> None:
+            self.run_mapping = run_mapping
+            self.weight_type = weight_type
+            self.run = run
+            self._last_progress = -1.0
+            self._last_time = 0.0
+
+        def progressBar(self, progress) -> None:
+            if not _shouldEmitDownloadProgress(self, progress):
+                return
+            printLog("SenseVoice Weight Download Progress", progress)
+            self.run(
+                200,
+                self.run_mapping["download_progress_sensevoice_weight"],
+                {"weight_type": self.weight_type, "progress": progress},
+            )
+
+        def downloaded(self) -> None:
+            if model.checkSenseVoiceModelWeight() is True:
+                # Whisper と違い重みは1種類だけなので、ダウンロードできた
+                # 時点でエンジンとして使える状態にする (再起動を待たない)。
+                config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS["SenseVoice"] = True
+                self.run(
+                    200,
+                    self.run_mapping["downloaded_sensevoice_weight"],
+                    self.weight_type,
+                )
+            else:
+                error_response = VRCTError.create_error_response(
+                    ErrorCode.WEIGHT_SENSEVOICE_DOWNLOAD,
+                    data=None
+                )
+                self.run(
+                    error_response["status"],
+                    self.run_mapping["error_sensevoice_weight"],
+                    error_response["result"],
+                )
+
     class DownloadSudachiDict:
         def __init__(self, run_mapping: dict, run: Callable[[int, str, Any], None]) -> None:
             self.run_mapping = run_mapping
@@ -1433,6 +1473,13 @@ class Controller:
     @staticmethod
     def getSelectableWhisperWeightTypeDict(*args, **kwargs) -> dict:
         return {"status":200, "result":config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT}
+
+    @staticmethod
+    def getSelectableSenseVoiceWeightTypeDict(*args, **kwargs) -> dict:
+        # SenseVoice の重みは1種類だけ。エンジンが使える (= 重みが揃って
+        # いる) かどうかをそのままダウンロード済みかどうかとして返す。
+        downloaded = config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS.get("SenseVoice", False) is True
+        return {"status":200, "result":{SENSEVOICE_WEIGHT_TYPE: downloaded}}
 
     @staticmethod
     def getSelectableSudachiDictTypeDict(*args, **kwargs) -> dict:
@@ -3702,6 +3749,23 @@ class Controller:
         model.downloadCTranslate2ModelTokenizer(weight_type)
         return {"status":200, "result":True}
 
+    def downloadSenseVoiceWeight(self, data:str=SENSEVOICE_WEIGHT_TYPE, asynchronous:bool=True, *args, **kwargs) -> dict:
+        download_sensevoice = self.DownloadSenseVoice(
+            self.run_mapping,
+            SENSEVOICE_WEIGHT_TYPE,
+            self.run
+        )
+        if asynchronous is True:
+            th_download = Thread(
+                target=model.downloadSenseVoiceModelWeight,
+                args=(download_sensevoice.progressBar, download_sensevoice.downloaded),
+            )
+            th_download.daemon = True
+            th_download.start()
+        else:
+            model.downloadSenseVoiceModelWeight(download_sensevoice.progressBar, download_sensevoice.downloaded)
+        return {"status":200, "result":True}
+
     def downloadWhisperWeight(self, data:str, asynchronous:bool=True, *args, **kwargs) -> dict:
         weight_type = str(data)
         download_whisper = self.DownloadWhisper(
@@ -4121,7 +4185,8 @@ class Controller:
                     config.SELECTED_TRANSCRIPTION_ENGINE = alternate if alternate in selected_engines else None
                 else:
                     config.SELECTED_TRANSCRIPTION_ENGINE = "Whisper"
-        elif current_engine in TRANSCRIPTION_API_ENGINES or current_engine == "Deepgram":
+        elif current_engine in TRANSCRIPTION_API_ENGINES or current_engine in ("Deepgram", "SenseVoice"):
+            # SenseVoice も重みが無い (未ダウンロード) 間は同じ扱い。
             # Groq/OpenAI/カスタムサーバー/Deepgramはキー無効化等で使えなく
             # なった場合のみ、ローカル Whisper (オフラインで最も安定) へ
             # フォールバックする。まだ有効なら維持する (この elif が無いと
@@ -5105,6 +5170,10 @@ class Controller:
                     case "Whisper":
                         # キャッシュされた結果を使用（重複チェックを回避）
                         status = self._whisper_available_cache
+                    case "SenseVoice":
+                        # ネットワーク不要。重みがダウンロード済みなら使える
+                        # (起動時に自動ダウンロードはせず、設定画面から取得する)。
+                        status = model.checkSenseVoiceModelWeight() is True
                     case "Groq_Whisper":
                         api_key = config.TRANSCRIPTION_AUTH_KEYS.get(engine)
                         if not api_key:

@@ -3,6 +3,7 @@ import { createAtomWithHook } from "@store";
 import {
     ctranslate2_weight_type_status,
     whisper_weight_type_status,
+    sensevoice_weight_type_status,
     sudachi_dict_type_status,
     ui_configs,
 } from "@ui_configs";
@@ -577,6 +578,14 @@ export const SETTINGS_ARRAY = [
         ui_template_id: "list",
         logics_template_id: "weight_download_status",
         base_endpoint_name: "whisper_weight",
+    },
+    {
+        Category: "Transcription",
+        Base_Name: "SenseVoiceWeightTypeStatus",
+        default_value: sensevoice_weight_type_status,
+        ui_template_id: "list",
+        logics_template_id: "weight_download_status",
+        base_endpoint_name: "sensevoice_weight",
     },
     {
         Category: "Transcription",

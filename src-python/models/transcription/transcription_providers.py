@@ -17,6 +17,7 @@ VRCT の既存パイプラインは「フレーズ確定後にまとめて1回�
 """
 
 import math
+import re
 from typing import List, Optional, Protocol, Tuple
 
 import numpy as np
@@ -209,6 +210,64 @@ class LocalWhisperProvider:
 
         is_definitive = force_language or transcription_lang[language][country]["Whisper"] == info.language
         return text, info.language_probability, is_definitive
+
+
+# SenseVoice は日本語・中国語でも単語の間に空白を入れて返すことがある
+# (例: "天然 記念物級 の 規模")。かな・漢字・全角記号どうしの間の空白だけを
+# 詰め、英単語の間の空白は残す。
+_CJK = r"\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef"
+_SPACE_BETWEEN_CJK = re.compile(rf"(?<=[{_CJK}])\s+(?=[{_CJK}])")
+
+
+class SenseVoiceProvider:
+    """ローカル SenseVoice (sherpa-onnx) 向けプロバイダ。
+
+    認識器は言語を自動判定する設定で読み込む (`getSenseVoiceRecognizer`
+    参照)。1クリップにつき推論は1回だけ行い、候補言語ごとの呼び出しでは
+    その結果を使い回す。判定された言語が候補と一致すれば is_definitive を
+    返して呼び出し元のループを打ち切る。SenseVoice は信頼度を返さないため、
+    一致した候補を 1.0、一致しない候補を 0.5 とする (どの候補とも一致
+    しなければ最初の候補の結果が残る)。
+    """
+
+    def __init__(self, recognizer) -> None:
+        self._recognizer = recognizer
+        self._decoded_for: Optional[AudioData] = None
+        self._decoded: Tuple[str, str] = ("", "")
+
+    def _decode(self, audio_data: AudioData) -> Tuple[str, str]:
+        if self._decoded_for is audio_data:
+            return self._decoded
+        sample_rate = getattr(audio_data, "sample_rate", WHISPER_SAMPLE_RATE)
+        if not isinstance(sample_rate, int) or sample_rate <= 0:
+            sample_rate = WHISPER_SAMPLE_RATE
+        audio = resample_pcm16_to_float32(audio_data.get_raw_data(convert_width=2), sample_rate)
+        stream = self._recognizer.create_stream()
+        stream.accept_waveform(WHISPER_SAMPLE_RATE, audio)
+        self._recognizer.decode_stream(stream)
+        # lang は "<|ja|>" の形で返る。
+        detected = (stream.result.lang or "").strip("<|>")
+        text = _SPACE_BETWEEN_CJK.sub("", stream.result.text or "")
+        self._decoded_for = audio_data
+        self._decoded = (text, detected)
+        return self._decoded
+
+    def transcribe(
+        self,
+        audio_data: AudioData,
+        language: str,
+        country: str,
+        *,
+        avg_logprob: float,
+        no_speech_prob: float,
+        no_repeat_ngram_size: int,
+        force_language: bool,
+    ) -> Tuple[str, float, bool]:
+        text, detected = self._decode(audio_data)
+        if not text:
+            return "", 0.0, False
+        matches = detected == transcription_lang[language][country].get("SenseVoice")
+        return text, 1.0 if matches else 0.5, matches or force_language
 
 
 OpenAI = None  # 使うときに _openai() が読み込む (起動時間の短縮, A-1)

@@ -81,6 +81,9 @@ run_mapping = {
     "download_progress_whisper_weight":"/run/download_progress_whisper_weight",
     "downloaded_whisper_weight":"/run/downloaded_whisper_weight",
     "error_whisper_weight":"/run/error_whisper_weight",
+    "download_progress_sensevoice_weight":"/run/download_progress_sensevoice_weight",
+    "downloaded_sensevoice_weight":"/run/downloaded_sensevoice_weight",
+    "error_sensevoice_weight":"/run/error_sensevoice_weight",
     "download_progress_sudachi_dict":"/run/download_progress_sudachi_dict",
     "downloaded_sudachi_dict":"/run/downloaded_sudachi_dict",
     "error_sudachi_dict":"/run/error_sudachi_dict",
@@ -457,6 +460,9 @@ mapping = {
     "/set/data/selected_transcription_compute_type": {"status": True, "variable":controller.setSelectedTranscriptionComputeType},
 
     "/run/download_whisper_weight": {"status": True, "variable":controller.downloadWhisperWeight},
+
+    "/get/data/selectable_sensevoice_weight_type_dict": {"status": True, "variable":controller.getSelectableSenseVoiceWeightTypeDict},
+    "/run/download_sensevoice_weight": {"status": True, "variable":controller.downloadSenseVoiceWeight},
     "/get/data/selectable_sudachi_dict_type_dict": {"status": True, "variable":controller.getSelectableSudachiDictTypeDict},
     "/get/data/selected_sudachi_dict_type": {"status": True, "variable":controller.getSudachiDictType},
     "/set/data/selected_sudachi_dict_type": {"status": True, "variable":controller.setSudachiDictType},

@@ -100,6 +100,10 @@ export const whisper_weight_type_status = [
     { id: "large-v3-turbo", capacity: "1.58GB"},
 ].map(item => ({ is_default: false, ...item, is_downloaded: false, progress: null }));
 
+export const sensevoice_weight_type_status = [
+    { id: "sensevoice-small", capacity: "229MB", is_default: true },
+].map(item => ({ is_default: false, ...item, is_downloaded: false, progress: null }));
+
 export const sudachi_dict_type_status = [
     { id: "core", capacity: "", is_default: true },
     { id: "full", capacity: "127MB" },

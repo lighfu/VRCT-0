@@ -70,6 +70,25 @@ class UpdateTranscriptionEngineApiEnginesTests(unittest.TestCase):
         pushed_endpoints = [endpoint for _, endpoint, _ in self.calls]
         self.assertIn("selectable_language_list", pushed_endpoints)
 
+    def test_keeps_sensevoice_selected_while_its_weight_is_available(self) -> None:
+        config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {}
+        config._SELECTED_TRANSCRIPTION_ENGINE = "SenseVoice"
+        config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = {"Google": True, "Whisper": False, "SenseVoice": True}
+
+        self.controller.updateTranscriptionEngine()
+
+        self.assertEqual(config.SELECTED_TRANSCRIPTION_ENGINE, "SenseVoice")
+        self.assertEqual(self.calls, [])
+
+    def test_falls_back_to_whisper_when_sensevoice_weight_is_missing(self) -> None:
+        config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {}
+        config._SELECTED_TRANSCRIPTION_ENGINE = "SenseVoice"
+        config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = {"Google": True, "Whisper": False, "SenseVoice": False}
+
+        self.controller.updateTranscriptionEngine()
+
+        self.assertEqual(config.SELECTED_TRANSCRIPTION_ENGINE, "Whisper")
+
     def test_google_still_falls_back_to_whisper_when_unavailable(self) -> None:
         # 既存挙動 (Whisper/Google 間のフォールバック) の回帰チェック。
         config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {"base": True}
