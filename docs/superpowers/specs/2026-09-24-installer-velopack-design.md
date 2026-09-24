@@ -70,11 +70,11 @@
 **導入**（`VRCT-0-win-Setup.exe`）
 - ページを出さずに `%LocalAppData%\VRCT-0` に入れ、スタートメニューとデスクトップにショートカットを作って起動する。入れている間は VRCT-0 の画像と進み具合を出す（`vpk pack --splashImage`）。
 - 今インストーラーで選ばせているものはなくす:
-  - 言語: 初回起動時に OS の言語から決める（`installer_language.txt` の受け渡しは廃止）。
+  - 言語: 初回起動時（config.json が無いとき）に OS の表示言語（`GetUserDefaultUILanguage`）から決める。今はこの処理が無い（既定は英語）ので新しく作る。`installer_language.txt` の受け渡しは廃止。
   - CPU / GPU: サブプロジェクト 1 では CPU 版のみ。
   - 導入先・ライセンス・スタートメニューのページ: 出さない。
 - Velopack の標準の引数（`-s` で黙って入れる、`--installto` で導入先を変える）は使える。
-- WebView2: Windows 11 には入っている。Windows 10 で無い場合に `vpk pack --framework` で前提として入れられるかを実装計画の段階で確かめる。入れられなければ、起動時に案内を出して終了する。
+- WebView2: Windows 11 には入っている。Windows 10 で無い場合に備えて `vpk pack --framework webview2` で前提として入れる（2026-09-24 に vpk 1.2.0 で指定できることを確認）。
 
 **削除**（Windows の「設定 → アプリ」から）
 - Velopack が `%LocalAppData%\VRCT-0` を丸ごと消す（ショートカットと Windows のアンインストール登録も消える）。`data\` も中にあるので、設定・モデル・辞書・ログ・CUDA 部品・AI CLI の作業フォルダまで消える。
@@ -96,11 +96,11 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 **流れ**
 1. 起動して画面が出たあと、裏で 1 回だけ新しい版を確かめる。見つかったら「新しい版 vX.Y.Z が出ています（約 N MB）」とリリースノートへのリンクを通知する（サイズは差分があれば差分）。
 2. 「更新」を押すと裏でダウンロードする。進み具合は更新の設定欄に出し、その間もアプリは使える。差分が使えないときは Velopack が丸ごとのパッケージに切り替える。
-3. 落とし終えたら「今すぐ再起動して更新」と「終了するときに更新」を出す。後者を選ぶと、次にアプリを閉じたときに黙って入れ替える（再起動はしない）。アプリが落ちて適用されなかった場合は、次の起動で「再起動して更新」を再び出す。
+3. 落とし終えたら「今すぐ再起動して更新」と「終了するときに更新」の説明を出す。何も押さなければ、次にアプリを閉じたときに黙って入れ替える（再起動はしない）。アプリが落ちて閉じる処理を通らなかった場合は、次の起動時に Velopack が自動で入れ替える（Velopack の既定の動き。計画の段階で `VelopackApp::run()` の実装を読んで確認）。
 4. 入れ替えに失敗しても、旧版の `current\` はそのまま残って起動する（実装計画で Velopack の適用処理の振る舞いを確かめ、実機でも確かめる）。次の確認でまた通知する。
 
 **設定欄**（今の「更新」セクションを作り直す）
-- チャンネル（安定版／ベータ版）: 今の `SELECTED_RELEASE_CHANNEL` を使う。画面が Rust のコマンドに渡す。
+- チャンネル（安定版／ベータ版）: 今の `SELECTED_RELEASE_CHANNEL` を使う。画面が Rust のコマンドに渡す。初回（config.json に値が無いとき）の既定値は、この版がプレリリースならベータ版、そうでなければ安定版（ベータ版の Setup で入れた人に、いきなり安定版へ戻す更新を勧めないため）。起動のたびに版からチャンネルを上書きする NSIS 由来の処理はやめる。
 - 今の版の表示と「更新を確認」ボタン。
 - 版を選ぶ一覧（古い版に戻す機能）はなくす。例外: ベータ版から安定版に切り替えたときは、版が下がっても最新の安定版を入れる。
 - CPU / GPU の選択はここから外す（サブプロジェクト 2 で「デバイス」の設定に移す）。
@@ -117,7 +117,9 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 - Python は `PATH_LOCAL` を 2 つに分ける:
   - `PATH_APP`: アプリに同梱したもの（実行ファイルのフォルダ）
   - `PATH_DATA`: 設定・ログ・モデル・辞書・AI CLI の作業フォルダなど（`VRCT_DATA_DIR` があればそこ、無ければ実行ファイルのフォルダ）
-- 今 `PATH_LOCAL` を使っている 37 か所（`model.py` 29、`config.py` 7、`controller.py` 1）を 1 つずつどちらかに振り分ける。
+- 今 `PATH_LOCAL` を使っている 37 か所（`model.py` 29、`config.py` 7、`controller.py` 1）を 1 つずつどちらかに振り分ける。AI CLI の作業フォルダは `PATH_DATAi_cli_workspace` に、プロンプトの設定は `PATH_APP` から読む。
+- サイドカーが相対パスで書くログ（`process.log`・`error.log`・`crash_trace.log`・`freeze_trace.log`）は、作業フォルダが `data\` になることで `data\` に入る。
+- CUDA の DLL の外部フォルダ（今は元の VRCT の `%LOCALAPPDATA%\VRCT\cudain` を読んでいる）を `VRCT_DATA_DIR\cudain` に移す（元の VRCT のフォルダを読まないため。取得処理はサブプロジェクト 2）。
 
 **リリースの作り方**（`.github/workflows/release.yml` を作り直す）
 1. `v*` のタグで動く。版の一致の確認（`package.json`・`tauri.conf.json`・`config.py`）は残す。
@@ -148,7 +150,14 @@ Python 側の更新処理（`checkSoftwareUpdated`、`listAvailableReleases`、`
 2. GitHub Releases からの更新は、公開用の最初のリリースを出すときに確かめる（テスト用のリリースを公開リポジトリに出さないため）。
 3. 起動テストのスキル `run-vrct` に、Velopack で入れた版を起動する手順を足す。
 
-## 実装計画の段階で確かめること
+## 実装計画の段階で確かめること（2026-09-24 に計画を書く段階で確認した結果）
+
+- `velopack` 1.2.158 の Rust API に `VelopackApp`（削除前のフック `on_before_uninstall_fast_callback`）、`UpdateManager`、`sources::GithubSource::new(repo, token, prerelease)`、`sources::FileSource` がある。Velopack で入れていないと `UpdateManager::new` がエラーを返すので、開発版の判定に使える。
+- `vpk pack --framework webview2` は受け付けられる。
+- Tauri 2.5.1 は `WebviewWindowBuilder::data_directory` で WebView2 のデータ置き場を指定できる（ウィンドウを `create: false` にして Rust で作る）。
+- 残り（入れ替えの失敗時の振る舞い、削除時のプロセスの扱い、Setup の表示言語）は実機での確認で確かめる。
+
+当初の一覧:
 
 - `velopack` クレートを Tauri 2 の `main` に組み込めること（`VelopackApp::build().run()` を Tauri の起動より前に呼ぶ）と、GitHub のソースが Rust の API にあること（C API には `vpkc_new_source_github` がある）。
 - `vpk pack --framework` で WebView2 を前提として入れられるか。
