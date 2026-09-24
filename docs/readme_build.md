@@ -44,29 +44,23 @@ npm install
 
 ### 3. Python環境のセットアップ
 
-以下のコマンドで、CPU版とCUDA版の両方の仮想環境を作成します:
+以下のコマンドで、仮想環境を作成します:
 
 ```bash
 npm run setup-python
 ```
 
 このコマンドは以下の処理を実行します:
-- `.venv` (CPU版) の作成と依存関係のインストール
-- `.venv_cuda` (CUDA版) の作成と依存関係のインストール
+- `.venv` の作成と依存関係のインストール
 
-> **注意**: CUDA版を使用する場合は、CUDA 12.8対応のNVIDIA GPUドライバーが必要です。
-> CUDA Toolkit のインストールは不要です。ctranslate2 が使う cuBLAS / cuDNN は
-> `requirements_cuda.txt` の `nvidia-*-cu12` wheel で入り、ビルド時に同梱されます。
+> **注意**: GPU はアプリの設定から GPU 高速化パックを導入して使います（ダウンロード約 1.3 GB、
+> `<データの置き場所>\cuda\bin`）。開発中も同じで、`.venv_cuda` は要りません。
 
 ## ビルドの種類
 
-VRCTでは、以下の2種類のビルドが可能です:
-
-### CPU版
-標準的なCPUで動作するバージョン。GPUは不要。
-
-### CUDA版
-NVIDIA GPUを活用した高速処理版。CUDA対応GPUが必要。
+VRCTのビルドは1種類のみです。GPU 対応も含めて同じビルドで動作し、GPU
+使用時に必要な cuBLAS / cuDNN はアプリの設定から導入する GPU 高速化パックとして
+実行時に取得します。
 
 ## 開発ビルド
 
@@ -85,14 +79,6 @@ npm run dev
 4. Pythonバックエンドのビルド (`build-python`)
 5. ViteとTauriの開発サーバー起動
 
-### CUDA版の開発ビルド
-
-```bash
-npm run dev-cuda
-```
-
-CPU版と同様ですが、CUDA対応のPythonバックエンドをビルドします。
-
 ### UIのみの開発
 
 バックエンドのビルドをスキップして、UIのみを開発する場合:
@@ -108,14 +94,10 @@ Python を直接 sidecar として起動する高速ループです。Python コ
 修正した検証も、プロセス再起動だけで反映されます（数分 → 数秒）。
 
 ```bash
-# 標準環境: .venv/Scripts/python.exe
 npm run dev-fast
-
-# CUDA環境: .venv_cuda/Scripts/python.exe
-npm run dev-cuda-fast
 ```
 
-どちらのコマンドも以下を実行します:
+以下を実行します:
 
 1. 実行中のプロセスを終了 (`task-kill`)
 2. dev 用 sidecar ラッパー（`utils/dev_sidecar/`, Rust 製の薄いバイナリ）を
@@ -124,9 +106,7 @@ npm run dev-cuda-fast
 
 前提:
 
-- 選択した仮想環境と依存関係が準備済みであること
-  - `dev-fast`: `.venv/Scripts/python.exe`
-  - `dev-cuda-fast`: `.venv_cuda/Scripts/python.exe`（`.venv` は不要）
+- `.venv/Scripts/python.exe` と依存関係が準備済みであること
 - Rust ツールチェーン (`cargo`) が使えること（既に Tauri で必要）
 
 各コマンドが `VRCT_DEV_VENV` を設定し、Tauri 経由で dev 用 sidecar に
@@ -145,47 +125,28 @@ npm run dev-cuda-fast
 
 ## リリースビルド
 
-配布用のインストーラーを作成するビルドです。
+配布用のインストーラー（Velopack）を作成するビルドです。
 
-### CPU版のリリースビルド
+タグ `v<版>` を push すると CI（`.github/workflows/release.yml`）が
+`npm run build` → `vpk pack`（`utils/pack_release.py`）→ `vpk upload github` を実行し、
+GitHub Releases に `VRCT-0-win-Setup.exe` と差分パッケージ（nupkg）を公開します。
 
-```bash
-npm run build
-```
-
-または、ZIP形式でパッケージング:
+手元で作る場合:
 
 ```bash
 npm run release
 ```
 
-生成されるファイル:
-- インストーラー: `src-tauri/target/release/bundle/nsis/`
-- ZIPファイル: `VRCT.zip` (releaseコマンド使用時)
-
-### CUDA版のリリースビルド
+`vpk` が入っていない場合は先に入れてください:
 
 ```bash
-npm run build-cuda
+dotnet tool install -g vpk --version 1.2.158
 ```
 
-または、ZIP形式でパッケージング:
-
-```bash
-npm run release-cuda
-```
-
-生成されるファイル:
-- インストーラー: `src-tauri/target/release/bundle/nsis/`
-- ZIPファイル: `VRCT_cuda.zip` (release-cudaコマンド使用時)
-
-### 両バージョンの同時ビルド
-
-CPU版とCUDA版の両方をビルドする場合:
-
-```bash
-npm run release-all
-```
+生成されるファイル（`release/velopack/`）:
+- `VRCT-0-win-Setup.exe`
+- `VRCT-0-<版>-full.nupkg`（前の版の full.nupkg が同じ場所にあれば `-delta.nupkg` も）
+- `releases.win.json`
 
 ## ビルドプロセスの詳細
 
@@ -204,16 +165,13 @@ npm run update-version
 ### どこにバージョンを設定すればReleaseに反映されるか
 
 - **設定箇所**: `package.json` の `version` が唯一のソース・オブ・トゥルース。
-- **反映方法**: `npm run update-version`（`build`/`build-cuda`/`release`コマンド内でも自動実行）により、
-	- `src-tauri/tauri.conf.json` の `version` に同期（Tauri/NSISインストーラーの表示・メタデータに使用）
+- **反映方法**: `npm run update-version`（`build`/`release`コマンド内でも自動実行）により、
+	- `src-tauri/tauri.conf.json` の `version` に同期（Tauri アプリの表示・メタデータに使用）
 	- `src-python/config.py` の `self._VERSION` に同期（ランタイム表示等に使用）
 - **成果物への影響**:
-	- インストーラー（NSIS）は `tauri.conf.json` の `version` を取り込み、プロダクトバージョンとして反映。
-	- ZIPパッケージ名はスクリプト既定では固定（`VRCT.zip`/`VRCT_cuda.zip`）。ファイル名にバージョンを含めたい場合は、`package.json` の `release` スクリプトを調整してください。
+	- `utils/pack_release.py` は `package.json` の `version` を読んで Velopack の packVersion に使うため、`VRCT-0-win-Setup.exe` とファイル名がそのバージョンになります。
 
 ### Pythonバックエンドのビルド
-
-#### CPU版
 
 ```bash
 npm run build-python
@@ -223,18 +181,6 @@ npm run build-python
 
 - `.venv` 環境をアクティベート
 - PyInstallerで `spec/backend.spec` を使用してビルド
-- 出力先: `src-tauri/bin/`
-
-#### CUDA版
-
-```bash
-npm run build-python-cuda
-```
-
-実行内容:
-
-- `.venv_cuda` 環境をアクティベート
-- PyInstallerで `spec/backend_cuda.spec` を使用してビルド
 - 出力先: `src-tauri/bin/`
 
 ### フロントエンドのビルド
@@ -255,97 +201,10 @@ Tauriを使用して最終的なデスクトップアプリケーションをビ
 
 ## GitHub ActionsでのRelease自動化
 
-Windows用のReleaseをGitHub Actionsで自動生成・公開する例です。`package.json` のバージョンをタグ・リリース名に使い、TauriのNSISインストーラーとZIPを添付します。
-
-### 推奨トリガー
-
-- タグプッシュ（例: `v*`）または手動実行（`workflow_dispatch`）
-
-### サンプルワークフロー（Windows）
-
-```yaml
-name: Release (Windows)
-
-on:
-	workflow_dispatch: {}
-	push:
-		tags:
-			- 'v*'
-
-jobs:
-	build-release-windows:
-		runs-on: windows-latest
-
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
-
-			- name: Setup Node
-				uses: actions/setup-node@v4
-				with:
-					node-version: '20'
-
-			- name: Setup Python
-				uses: actions/setup-python@v5
-				with:
-					python-version: '3.11'
-
-			- name: Setup Rust
-				uses: dtolnay/rust-toolchain@stable
-
-			- name: Install dependencies
-				run: |
-					npm ci
-
-			- name: Setup Python envs (.venv/.venv_cuda)
-				run: |
-					npm run setup-python
-
-			- name: Sync versions from package.json
-				run: |
-					npm run update-version
-
-			- name: Build (CPU)
-				run: |
-					npm run build
-
-			- name: Package ZIP (CPU)
-				run: |
-					python utils/zip.py --zip_name VRCT.zip
-
-			- name: Read version from package.json
-				id: pkg
-				shell: pwsh
-				run: |
-					$version = (Get-Content package.json | ConvertFrom-Json).version
-					echo "version=$version" >> $env:GITHUB_OUTPUT
-
-			- name: Upload artifacts
-				uses: actions/upload-artifact@v4
-				with:
-					name: VRCT-windows-${{ steps.pkg.outputs.version }}
-					path: |
-						src-tauri/target/release/bundle/nsis/**/*
-						VRCT.zip
-
-			- name: Create GitHub Release
-				uses: softprops/action-gh-release@v2
-				with:
-					tag_name: v${{ steps.pkg.outputs.version }}
-					name: VRCT v${{ steps.pkg.outputs.version }}
-					files: |
-						src-tauri/target/release/bundle/nsis/**/*
-						VRCT.zip
-				env:
-					GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-### ポイント
-- ビルド前に必ず `npm run update-version` を実行して、`tauri.conf.json` と `config.py` にバージョンを同期します。
-- アーティファクトのパスは既定構成に合わせています：
-	- インストーラー: `src-tauri/target/release/bundle/nsis/`
-	- ZIP: ルート直下の `VRCT.zip`
-- CUDA版も同様にビルドする場合は、`npm run build-cuda` と `python utils/zip.py --zip_name VRCT_cuda.zip` を追加して、別アーティファクト名でアップロード・添付してください。
+`.github/workflows/release.yml` がタグ `v*` の push をトリガーに、版と `BUILD_CHANNEL` の確認、
+`npm run build`、`vpk pack`（`utils/pack_release.py`）、`vpk upload github` までを実行し、
+GitHub Releases に Velopack のパッケージを公開します。ベータ版（タグに `-beta`/`-rc` を含む）は
+プレリリースとして扱われます。手順の詳細は同ファイルを参照してください。
 
 ## ユーティリティコマンド
 
@@ -372,7 +231,7 @@ npm run clean-soft
 
 ### PyInstaller のオプション環境変数
 
-`build-python` / `build-python-cuda` は以下の環境変数で挙動を切り替えられます:
+`build-python` は以下の環境変数で挙動を切り替えられます:
 
 - `VRCT_PYINSTALLER_CLEAN=1` — PyInstaller に `--clean` を渡し、
   Analysis キャッシュを破棄してからビルド（依存追加時・リリース前確認用）。
@@ -395,13 +254,11 @@ VRCTに関連する実行中のプロセスを終了します。
 ```
 VRCT/
 ├── bat/                    # バッチスクリプト
-│   ├── build.bat          # CPU版Pythonビルド
-│   ├── build_cuda.bat     # CUDA版Pythonビルド
+│   ├── build.bat          # Pythonビルド
 │   ├── install.bat        # Python環境セットアップ
 │   └── sidecar_dev.bat    # dev-fast用sidecarラッパービルド
 ├── spec/                   # PyInstallerスペックファイル
-│   ├── backend.spec       # CPU版ビルド設定
-│   └── backend_cuda.spec  # CUDA版ビルド設定
+│   └── backend.spec       # ビルド設定
 ├── src-python/            # Pythonバックエンドソースコード
 ├── src-tauri/             # Tauriアプリケーション設定
 │   ├── bin/              # ビルド済みPythonバイナリ（生成）
@@ -412,10 +269,9 @@ VRCT/
 │   ├── dev_sidecar/     # dev-fast用のvenv直起動ラッパー(Rust)
 │   ├── task_kill.py     # プロセス終了スクリプト
 │   ├── update_version.py # バージョン更新スクリプト
-│   └── zip.py           # ZIPパッケージング
+│   └── pack_release.py  # Velopack パッケージング
 ├── package.json          # Node.js設定とバージョン管理
-├── requirements.txt      # Python依存関係（CPU版）
-└── requirements_cuda.txt # Python依存関係（CUDA版。requirements.txt + CUDAライブラリ）
+└── requirements.txt      # Python依存関係
 ```
 
 ## トラブルシューティング
@@ -445,13 +301,13 @@ npm install
 npm run build
 ```
 
-### CUDA版が動作しない
+### GPUが動作しない
 
 - NVIDIA GPUドライバーが最新か確認（CUDA Toolkit のインストールは不要）
-- `requirements_cuda.txt` の依存関係が正しくインストールされているか確認
-- `.venv_cuda/Lib/site-packages/nvidia/{cublas,cudnn}/bin/` にDLLがあるか確認。
-  ctranslate2 はGPU実行時にここの `cublas64_12.dll` / `cudnn64_9.dll` を
-  実行時ロードする。無ければGPUは計算デバイス一覧に出ない
+- アプリの設定から GPU 高速化パック（約 1.3 GB）を導入し、再起動したか確認
+- `<データの置き場所>\cuda\bin\` にDLLがあるか確認。ctranslate2 はGPU実行時に
+  ここの `cublas64_12.dll` / `cudnn64_9.dll` を実行時ロードする。無ければ
+  GPUは計算デバイス一覧に出ない
 
 ### プロセスが残っている
 
@@ -465,10 +321,9 @@ npm run task-kill
 
 ### PyInstallerスペックファイル
 
-- `spec/backend.spec` - CPU版の設定
-- `spec/backend_cuda.spec` - CUDA版の設定
+- `spec/backend.spec` - ビルド設定
 
-これらのファイルでは、以下を設定しています:
+このファイルでは、以下を設定しています:
 - エントリーポイント: `src-python/mainloop.py`
 - データファイル（フォント、プロンプト、言語ファイル等）のパス
 - 依存ライブラリのパス
@@ -507,39 +362,55 @@ Hugging Face 2リポジトリ構成は廃止)。
 
 ### チャンネル切り替え・旧バージョンへのロールバック
 
-GitHub Releasesで配布されるsetup.exeは、実行時に同じリポジトリのGitHub
-Releaseから本体一式(`VRCT.zip` / `VRCT_cuda.zip`)をダウンロードする
-ダウンローダー形式です。ダウンロード先はタグ `v<バージョン>` の
-Release固定で、`/VERSION=` を指定しない場合はこのsetup.exe自身の
-`${VERSION}` をそのままターゲットとして使います(GitHubの「Latest
-release」はprereleaseを含まないため使わない)。
+更新は Velopack ベースで、アプリを起動した状態のまま行います。コマンドライン
+引数でバージョンを指定する仕組みはもう存在しません(旧 NSIS 版の
+`/VERSION=` / `/CHANNEL=` は廃止)。
 
-どのバージョンをダウンロードするかはGUI画面ではなく `/VERSION=` のCLI引数
-のみで決まります(省略時はこのsetup.exe自身の `${VERSION}`。setup.exe自体は
-どのバージョンのものでも構いません)。setup.exeを単体でダブルクリックした
-場合はこの引数が付かないため、CPU/GPU選択のみでこのsetup.exe自身の
-バージョンがインストールされます(GUI上に選択肢を増やさないための意図的な
-設計です)。VRCT本体のUpdaterタブからの更新は、実際に解決・ダウンロード・
-ハッシュ検証した release のバージョンを常に `/VERSION=` として付与して
-起動します。
+- アプリ内の設定 → アップデートから、安定版 (stable) / ベータ版 (beta) の
+  チャンネルを選べます。
+- ベータ版チャンネルでは GitHub のプレリリースも更新対象になります。
+- チャンネルを「安定版」に切り替えると、今の版がプレリリースであっても
+  最新の安定版へ更新します(バージョンを下げる形になっても構いません)。
+  それ以外のケースでバージョンを下げることはありません。
+- 更新の確認・ダウンロードはアプリが行い、適用は「今すぐ再起動」または
+  「次に閉じたときに入れ替え」のどちらかをユーザーが選びます。
 
-`/CHANNEL=` も引数としては引き続き受け付けます(旧バージョンのUpdaterタブ
-との互換性のため)が、**どのパッケージをダウンロードするかには一切影響
-しません**。ダウンロード対象はあくまで `/VERSION=`(省略時はsetup.exe自身の
-バージョン)だけで決まります。
+Velopack の Setup.exe 自体は `-s`(サイレントインストール)、
+`--installto <導入先ディレクトリ>` などのオプションを受け付けます(詳細は
+`Setup.exe --help`)。
 
-```bash
-VRCT_setup.exe /VERSION=3.4.2
-```
+入れてある上から `VRCT-0-win-Setup.exe` を実行すると、Velopack は版に応じて
+「修復」(同じ版)・「更新」(新しい版)・「ダウングレード」(古い版。Velopack は
+勧めていない)を尋ね、導入先を丸ごと `%LocalAppData%\VRCT-0.<英数字16文字>` に
+退避してから入れ直し、終わると退避したフォルダを消します。そのままでは
+`data\`(設定・API キー・単語の一覧・モデル)も消えるので、VRCT-0 は導入のフック
+(`--veloapp-install`)で退避したフォルダから `data\` を戻します
+(`src-tauri/src/reinstall.rs`。2026-09-24 に 3 通りとも実機で確認)。
+戻すのは入れる側の版の `VRCT-0.exe` なので、この処理が入る前の版の Setup で
+上書きすると `data\` は消えます(公開した版にはすべて入っています)。
+また、フックのあとで Setup 自体が失敗して元に戻すとき(アンインストールの登録や
+アプリの起動に失敗したとき)は、Velopack が新しい導入先ごと消すので、戻した
+`data\` も消えます。古い版に戻したいときは、先に `data\` を別の場所へ写してから
+Setup を実行してください。
 
-`/VERSION=` を指定した場合は、`v<バージョン>` タグのGitHub Releaseから
-本体一式をダウンロードします。指定したバージョンのReleaseがGitHub上に
-存在しない場合はダウンロードに失敗し、インストールが中断されます。
+Velopack の GitHub の更新元(`GithubSource`)は、GitHub Releases の新しいほうから
+10 件だけを読み、そのあとでプレリリースを除きます。安定版を出さないまま
+ベータ版を 10 回以上出すと、安定版チャンネルの人(とベータ版から安定版に切り替えた人)
+には安定版が見えなくなり、「最新版です」と表示されます。ベータ版を続けて出すときは、
+古いプレリリースを消すか、間に安定版を出してください。
+
+### アンインストール
+
+Windows の 設定 → アプリ から `VRCT-0` をアンインストールします。
+`%LocalAppData%\VRCT-0` 以下(アプリ本体・データとも)がまとめて削除されます。
+Setup が消し損ねた退避フォルダ(`%LocalAppData%\VRCT-0.<英数字16文字>`)があれば、
+それも削除の直前のフックで消します。Velopack 自身のログ
+(`%LocalAppData%\velopack\velopack_VRCT-0.log` など)は残ります。
 
 ### リリースパッケージの内容
 
-ZIPファイルには以下が含まれます:
-- `VRCT.exe` - メインアプリケーション
+`utils/pack_release.py` が Velopack 用にステージするファイル:
+- `VRCT-0.exe` - メインアプリケーション
 - `VRCT-sidecar.exe` - Pythonバックエンド
 - `_internal/` - 必要な依存ファイル
 

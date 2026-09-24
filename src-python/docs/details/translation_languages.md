@@ -341,7 +341,7 @@ def validate_translation_pair(engine, source_lang, target_lang):
 
 ### 外部 YAML 言語マッピング導入
 
-`models/translation/languages/languages.yml` を追加し、`config.init_config()` 内で `loadTranslationLanguages(path=config.PATH_LOCAL)` を呼び出し、既存 `translation_lang` にマージ/上書き。読込失敗時は空辞書を返しフォールバック。（PyYAML 追加）
+`models/translation/languages/languages.yml` を追加し、`config.init_config()` 内で `loadTranslationLanguages(path=config.PATH_APP)` を呼び出し、既存 `translation_lang` にマージ/上書き。読込失敗時は空辞書を返しフォールバック。（PyYAML 追加）
 
 ### LMStudio / Ollama 翻訳モデル対応準備
 

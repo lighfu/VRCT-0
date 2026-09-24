@@ -2,7 +2,6 @@ from typing import Callable, Any, List, Optional
 from subprocess import Popen
 from threading import Thread, Lock, RLock
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict
 import copy
 import functools
 import re
@@ -16,6 +15,7 @@ from models.transcription.transcription_openai_compatible import TRANSCRIPTION_M
 from models.transcription.transcription_sensevoice import SENSEVOICE_WEIGHT_TYPE
 from models.translation.translation_providers import TRANSLATION_PROVIDER_REGISTRY, CONNECTION_PROVIDER_REGISTRY
 from models.message_pipeline import MessageDirectionSpec, MIC_MESSAGE_SPEC, SPEAKER_MESSAGE_SPEC, CHAT_MESSAGE_SPEC, OCR_MESSAGE_SPEC
+from models.cuda_pack import RESULT_IN_USE as CUDA_PACK_RESULT_IN_USE
 
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -314,6 +314,9 @@ class Controller:
         # 取るため、start*Message の中から呼ぶとデッドロックする)。
         self.mic_lifecycle_lock: Lock = Lock()
         self.speaker_lifecycle_lock: Lock = Lock()
+        self._cuda_pack_lock = Lock()
+        self._cuda_pack_downloading = False
+        self._cuda_pack_gpu_missing = False
 
     def _is_overlay_available(self) -> bool:
         """Safe check whether overlay is present and initialized.
@@ -1014,6 +1017,20 @@ class Controller:
                     error_response["result"],
                 )
 
+    class DownloadCudaPack:
+        def __init__(self, controller: "Controller") -> None:
+            self.controller = controller
+            self._last_progress = -1.0
+            self._last_time = 0.0
+
+        def progressBar(self, progress) -> None:
+            if not _shouldEmitDownloadProgress(self, progress):
+                return
+            self.controller.run(200, self.controller.run_mapping["download_progress_cuda_pack"], {"progress": progress})
+
+        def downloaded(self, result=None) -> None:
+            self.controller.finishCudaPackDownload(result)
+
     def _processMessage(
         self,
         spec: MessageDirectionSpec,
@@ -1439,18 +1456,6 @@ class Controller:
             }
         result = self._processMessage(CHAT_MESSAGE_SPEC, message, None, msg_id=msg_id)
         return {"status": 200, "result": result}
-
-
-    def checkSoftwareUpdated(self) -> dict:
-        software_update_info = model.checkSoftwareUpdated()
-        self.run(
-            200,
-            self.run_mapping["software_update_info"],
-            software_update_info,
-        )
-        return {"status":200, "result": software_update_info}
-
-
 
 
     def setSelectedTranslationComputeDevice(self, device:str, *args, **kwargs) -> dict:
@@ -2079,12 +2084,6 @@ class Controller:
     def setSelectedReleaseChannel(data, *args, **kwargs) -> dict:
         config.SELECTED_RELEASE_CHANNEL = str(data)
         return {"status":200, "result":config.SELECTED_RELEASE_CHANNEL}
-
-    @staticmethod
-    def listAvailableReleases(*args, **kwargs) -> dict:
-        releases = model.listAvailableReleases()
-        return {"status":200, "result":[asdict(r) for r in releases]}
-
 
     @staticmethod
     def setEnableConvertMessageToRomaji(*args, **kwargs) -> dict:
@@ -3627,7 +3626,7 @@ class Controller:
 
     @staticmethod
     def openFilepathConfigFile(*args, **kwargs) -> dict:
-        Popen(['explorer', config.PATH_LOCAL.replace('/', '\\')], shell=True)
+        Popen(['explorer', config.PATH_DATA.replace('/', '\\')], shell=True)
         return {"status":200, "result":True}
 
     def setEnableTranscriptionSend(self, *args, **kwargs) -> dict:
@@ -3716,20 +3715,6 @@ class Controller:
                 }
             }
 
-    def updateSoftware(self, data:Optional[str]=None, *args, **kwargs) -> dict:
-        target_version = str(data) if data else None
-        th_start_update_software = Thread(target=model.updateSoftware, args=(target_version,))
-        th_start_update_software.daemon = True
-        th_start_update_software.start()
-        return {"status":200, "result":True}
-
-    def updateCudaSoftware(self, data:Optional[str]=None, *args, **kwargs) -> dict:
-        target_version = str(data) if data else None
-        th_start_update_cuda_software = Thread(target=model.updateCudaSoftware, args=(target_version,))
-        th_start_update_cuda_software.daemon = True
-        th_start_update_cuda_software.start()
-        return {"status":200, "result":True}
-
     def downloadCtranslate2Weight(self, data:str, asynchronous:bool=True, *args, **kwargs) -> dict:
         weight_type = str(data)
         download_ctranslate2 = self.DownloadCTranslate2(
@@ -3795,6 +3780,97 @@ class Controller:
         else:
             model.downloadSudachiFullDict(handler.progressBar, handler.downloaded)
         return {"status":200, "result":True}
+
+    def _cudaPackStatusPayload(self) -> dict:
+        return {
+            "status": model.cudaPackStatus(downloading=self._cuda_pack_downloading),
+            "prompted": bool(config.CUDA_PACK_PROMPTED),
+        }
+
+    def _pushCudaPackStatus(self) -> None:
+        self.run(200, self.run_mapping["cuda_pack_status"], self._cudaPackStatusPayload())
+
+    def getCudaPackStatus(self, *args, **kwargs) -> dict:
+        return {"status": 200, "result": self._cudaPackStatusPayload()}
+
+    def downloadCudaPack(self, *args, **kwargs) -> dict:
+        with self._cuda_pack_lock:
+            if self._cuda_pack_downloading or model.cudaPackStatus() != "not_installed":
+                return {"status": 200, "result": self._cudaPackStatusPayload()}
+            self._cuda_pack_downloading = True
+        self._pushCudaPackStatus()
+        handler = self.DownloadCudaPack(self)
+        Thread(target=model.downloadCudaPack, args=(handler.progressBar, handler.downloaded), daemon=True).start()
+        return {"status": 200, "result": self._cudaPackStatusPayload()}
+
+    def finishCudaPackDownload(self, result=None) -> None:
+        """取得が終わったとき。result は cuda_pack.downloadCudaPack の結果 (RESULT_*)。"""
+        with self._cuda_pack_lock:
+            self._cuda_pack_downloading = False
+        if model.isCudaPackInstalled() is True:
+            config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = True
+            self.run(200, self.run_mapping["downloaded_cuda_pack"], True)
+        else:
+            # 古いパックを使っているプロセスが残っていて置き換えられないときは、原因に合った文言にする。
+            error_code = ErrorCode.CUDA_PACK_IN_USE if result == CUDA_PACK_RESULT_IN_USE else ErrorCode.CUDA_PACK_DOWNLOAD
+            error_response = VRCTError.create_error_response(error_code, data=None)
+            self.run(error_response["status"], self.run_mapping["error_cuda_pack"], error_response["result"])
+        self._pushCudaPackStatus()
+
+    def removeCudaPack(self, *args, **kwargs) -> dict:
+        if model.cudaPackStatus() in ("installed", "installed_restart_required"):
+            model.requestCudaPackRemoval()
+            # 導入して再起動する前に削除したとき、次の起動で GPU へ切り替えようとして
+            # 「GPU 高速化パックを読み込めませんでした」を出さないように。
+            config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = False
+        self._pushCudaPackStatus()
+        return {"status": 200, "result": self._cudaPackStatusPayload()}
+
+    def markCudaPackPrompted(self, *args, **kwargs) -> dict:
+        config.CUDA_PACK_PROMPTED = True
+        return {"status": 200, "result": True}
+
+    def applyCudaPackGpuSelection(self) -> None:
+        """GPU 高速化パックを導入した直後の起動で、翻訳と文字起こしのデバイスを GPU にする (1 回だけ)。"""
+        if config.CUDA_PACK_SELECT_GPU_ON_NEXT_START is not True:
+            return
+        config.CUDA_PACK_SELECT_GPU_ON_NEXT_START = False
+        gpu = next((d for d in config.SELECTABLE_COMPUTE_DEVICE_LIST if d.get("device") == "cuda"), None)
+        if gpu is None:
+            errorLog("The GPU acceleration pack was installed but no GPU device is available; staying on the CPU.")
+            self._cuda_pack_gpu_missing = True
+            return
+        compute_types = gpu.get("compute_types") or []
+        compute_type = "auto" if "auto" in compute_types else (compute_types[0] if compute_types else "auto")
+        original_translation_device = copy.deepcopy(config.SELECTED_TRANSLATION_COMPUTE_DEVICE)
+        original_translation_type = config.SELECTED_TRANSLATION_COMPUTE_TYPE
+        original_transcription_device = copy.deepcopy(config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE)
+        original_transcription_type = config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE
+        try:
+            config.SELECTED_TRANSLATION_COMPUTE_DEVICE = copy.deepcopy(gpu)
+            config.SELECTED_TRANSLATION_COMPUTE_TYPE = compute_type
+            config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE = copy.deepcopy(gpu)
+            config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = compute_type
+        except Exception:
+            # 未知のGPUの compute_types 組み合わせなどで ValidatedProperty が
+            # 例外を投げても、init() を止めずにCPUのままの状態に戻して動かし続ける。
+            errorLogging()
+            try:
+                config.SELECTED_TRANSLATION_COMPUTE_DEVICE = original_translation_device
+                config.SELECTED_TRANSLATION_COMPUTE_TYPE = original_translation_type
+                config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE = original_transcription_device
+                config.SELECTED_TRANSCRIPTION_COMPUTE_TYPE = original_transcription_type
+            except Exception:
+                errorLogging()
+            self._cuda_pack_gpu_missing = True
+
+    def reportCudaPackNotLoaded(self) -> None:
+        """applyCudaPackGpuSelection が GPU を見つけられなかったら、画面が出たあとに 1 回だけ知らせる。"""
+        if not self._cuda_pack_gpu_missing:
+            return
+        self._cuda_pack_gpu_missing = False
+        error_response = VRCTError.create_error_response(ErrorCode.CUDA_PACK_NOT_LOADED, data=None)
+        self.run(error_response["status"], self.run_mapping["error_cuda_pack"], error_response["result"])
 
     @staticmethod
     def updateDownloadedSudachiDict() -> None:
@@ -5303,6 +5379,9 @@ class Controller:
         printLog("Transcription Engine Status Init completed")
         self.initializationProgress(2)
 
+        # GPU 高速化パックを導入した直後の起動なら、デバイスを GPU にする (設定を集めて送る前に)。
+        self.applyCudaPackGpuSelection()
+
         # Set Translation Engine
         printLog("Set Translation Engine")
         self.updateDownloadedCTranslate2ModelWeight()
@@ -5324,22 +5403,6 @@ class Controller:
         # Set Word Filter
         printLog("Set Word Filter")
         model.addKeywords()
-
-        # Check Software Updated (Background)
-        printLog("Check Software Updated (Background)")
-
-        def check_software_updated_background():
-            """ソフトウェア更新チェックをバックグラウンドで実行"""
-            try:
-                self.checkSoftwareUpdated()
-                printLog("[Background] Software update check completed")
-            except Exception:
-                errorLogging()
-                printLog("[Background] Software update check failed")
-
-        bg_thread = Thread(target=check_software_updated_background)
-        bg_thread.daemon = True
-        bg_thread.start()
 
         # Init Logger
         printLog("Init Logger")
@@ -5436,6 +5499,7 @@ class Controller:
         # Update Settings
         printLog("Update settings")
         self.updateConfigSettings()
+        self.reportCudaPackNotLoaded()
 
         # どのタブも AI CLI を使っていないときに後回しにした、AI CLI のモデル一覧の取得。
         self._listAiCliModelsInBackground()

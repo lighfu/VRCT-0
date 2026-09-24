@@ -25,7 +25,7 @@ REM tauri.conf.json's resources entry expects the production PyInstaller
 REM onedir output (bin\_internal). Remove any production payload first so
 REM dev-fast cannot leave stale frozen Python files behind. Create a marked
 REM placeholder because PyInstaller is intentionally skipped here and the
-REM dev sidecar launches the selected venv directly (.venv or .venv_cuda).
+REM dev sidecar launches the selected venv directly (.venv).
 if exist src-tauri\bin\_internal (
     rmdir /S /Q src-tauri\bin\_internal
     if exist src-tauri\bin\_internal (
@@ -35,7 +35,7 @@ if exist src-tauri\bin\_internal (
 )
 mkdir src-tauri\bin\_internal
 if errorlevel 1 exit /b 1
-echo VRCT dev-fast placeholder; production builds must run build.bat or build_cuda.bat.> src-tauri\bin\_internal\.vrct-dev-placeholder
+echo VRCT dev-fast placeholder; production builds must run build.bat.> src-tauri\bin\_internal\.vrct-dev-placeholder
 if errorlevel 1 exit /b 1
 echo dev sidecar wrapper installed at src-tauri\bin\VRCT-sidecar-x86_64-pc-windows-msvc.exe
 endlocal

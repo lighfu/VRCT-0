@@ -214,7 +214,7 @@ except Exception:
 **処理:**
 ```python
 self.translator.changeCTranslate2Model(
-    path=config.PATH_LOCAL,
+    path=config.PATH_DATA,
     model_type=config.CTRANSLATE2_WEIGHT_TYPE,
     device=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device"],
     device_index=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device_index"],
@@ -251,7 +251,7 @@ CTranslate2 モデルがロード済みかチェック。
 
 **責務:** Groq API キーの検証
 
-**処理:** `translator.authenticationGroqAuthKey()` に委譲し、`root_path=config.PATH_LOCAL` を渡す
+**処理:** `translator.authenticationGroqAuthKey()` に委譲し、`root_path=config.PATH_APP` を渡す
 
 **戻り値:** 認証成功時 True
 
@@ -285,7 +285,7 @@ CTranslate2 モデルがロード済みかチェック。
 
 **責務:** OpenRouter API キーの検証
 
-**処理:** `translator.authenticationOpenRouterAuthKey()` に委譲し、`root_path=config.PATH_LOCAL` を渡す
+**処理:** `translator.authenticationOpenRouterAuthKey()` に委譲し、`root_path=config.PATH_APP` を渡す
 
 **戻り値:** 認証成功時 True
 
@@ -413,7 +413,7 @@ Whisper モデルウェイトのダウンロード。
        phrase_timeout=config.MIC_PHRASE_TIMEOUT,
        max_phrases=config.MIC_MAX_PHRASES,
        transcription_engine=config.SELECTED_TRANSCRIPTION_ENGINE,
-       root=config.PATH_LOCAL,
+       root=config.PATH_DATA,
        whisper_weight_type=config.WHISPER_WEIGHT_TYPE,
        device=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device"],
        device_index=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device_index"],
@@ -602,7 +602,7 @@ return self.overlay_image.createOverlayImageSmallLog(message, language)
 
 **特殊処理:**
 ```python
-overlay_image = OverlayImage(config.PATH_LOCAL)
+overlay_image = OverlayImage(config.PATH_APP)
 for _ in range(2):
     # 2回繰り返して画像を生成（理由は不明、バグ修正のため？）
     overlay_image.createOverlayImageLargeLog("send", message, language)
@@ -937,41 +937,6 @@ self.logger.disabled = False
 
 ##### `stopLogger() -> None`
 ファイルロギングの停止。
-
----
-
-### 14. ソフトウェアアップデート
-
-##### `checkSoftwareUpdated() -> dict`
-
-**責務:** 最新バージョンの確認
-
-**処理:**
-```python
-update_flag = False
-version = ""
-try:
-    # GitHub API 等から最新バージョン情報を取得
-    # packaging.version.parse でバージョン比較
-except Exception:
-    errorLogging()
-return {
-    "is_update_available": update_flag,
-    "new_version": version,
-}
-```
-
-##### `updateSoftware() -> None`
-
-**責務:** CPU版へのアップデート/切替実行
-
-**処理:**
-1. Hugging Faceから `VRCT_setup.exe`（NSISインストーラー）をダウンロード（最大5回リトライ）
-2. `Popen(["VRCT_setup.exe", "/EDITION=cpu"])` でセットアップウィザードを起動（CPU版が初期選択された状態で表示される）
-3. 実行中のVRCT本体の終了確認・再起動は起動されたセットアップウィザード側が行う
-
-##### `updateCudaSoftware() -> None`
-GPU版へのアップデート/切替実行。`updateSoftware()`と同様だが `/EDITION=gpu` 付きでセットアップウィザードを起動し、GPU版が初期選択された状態で表示される。
 
 ---
 

@@ -7,6 +7,12 @@ common:
     go_back_button_label: "返回"
     default_label: "預設"
 
+cuda_pack_prompt:
+    title: "Install the GPU acceleration pack to run translation and transcription on your GPU?"
+    desc: "An NVIDIA GPU was found. With the GPU acceleration pack, translation and transcription run faster on the GPU (about 1.3 GB download, 1.8 GB on disk). You can also install it later from the device settings for translation and transcription."
+    install_button: "Install"
+    later_button: "Not now"
+
 common_error:
     no_device_mic: "未偵測到麥克風裝置。"
     no_device_speaker: "未偵測到喇叭裝置。"
@@ -29,6 +35,10 @@ common_error:
     invalid_value_speaker_max_phrase: "可以設置 0 或更高的數值。"
 
     invalid_hex_color: "請輸入有效的 HEX 顏色代碼（例：{{brand_color_hex}}）格式。"
+
+    failed_download_cuda_pack: "Could not install the GPU acceleration pack. Check your connection and free disk space (about 3.1 GB needed), then try again."
+    cuda_pack_in_use: "The GPU acceleration pack is in use and can't be replaced. Restart the app and try again."
+    cuda_pack_not_loaded: "Could not load the GPU acceleration pack. The app runs on the CPU."
 
 common_warning:
     unable_to_use_osc_query: "由於 OSC IP Address 的設定無法接收 OSC 資料，以下功能已自動停用。"
@@ -68,32 +78,28 @@ main_page:
         title_target_language: "選擇目標語言"
 
     update_available: "有新版本可供使用！"
-    updating: "正在更新..."
 
 update_modal:
     title: "更新"
     summary_up_to_date_desc: "您正在使用最新版本，無需更新。"
     channel_stable: "穩定版"
     channel_beta: "測試版"
-    compute_mode_cpu: "CPU 版"
-    compute_mode_cuda: "GPU 版 (CUDA)"
-    latest_label: "最新"
-    install_latest_button: "更新至最新版本"
-    install_button: "以此設定重新安裝"
-    section_pick_variant: "選擇其他版本或組建"
     refresh_button: "檢查更新"
     channel_label: "發布頻道"
     channel_desc: "測試版可搶先體驗新功能，但可能不穩定。"
-    compute_mode_label: "裝置組建"
-    compute_mode_desc: "GPU 版可在 NVIDIA GPU 上高速運行，但需要約 5GB 的額外磁碟空間。"
-    version_label: "要安裝的版本"
-    version_desc: "可從所選頻道公開發布的版本中選擇。"
-    no_versions_available: "所選頻道暫無可用版本。"
-    change_col_current: "目前"
-    change_col_after: "安裝後"
-    warn_downgrade: "這是從 {{from}} 到 {{to}} 的降級。設定檔的相容性無法保證。"
-    warn_cuda_extra_size: "GPU 版大約需要 5GB 的額外下載。"
-    warn_switch_channel: "將切換至{{channel}}頻道，之後的更新通知也將以{{channel}}為主。"
+    checking: "Checking for a new version..."
+    available: "Version {{version}} is available (about {{size}})"
+    available_downgrade: "You can switch to the latest stable version {{version}} (about {{size}})"
+    release_notes: "Release notes"
+    download_button: "Update"
+    downloading: "Downloading... {{percent}}%"
+    ready: "Version {{version}} is ready"
+    restart_now_button: "Restart now to update"
+    apply_on_exit_desc: "If you keep using the app, the update is applied the next time you close it."
+    check_failed: "Could not check for a new version: {{message}}"
+    download_failed: "The update failed: {{message}}"
+    retry_button: "Retry"
+    not_installed: "This is a development build, so it cannot be updated."
 
 config_page:
     common:
@@ -118,6 +124,18 @@ config_page:
             type_template_high: "{{type_name}}（精度較高，處理較慢）"
         warning_labels:
             unable_to_use_osc_query: "由於 OSC IP Address 的設定無法接收 OSC 資料，目前無法使用此功能。"
+        cuda_pack:
+            label: "GPU acceleration pack"
+            desc: "Makes translation and transcription faster on NVIDIA GPUs (about 1.3 GB download, 1.8 GB on disk). It takes effect after a restart."
+            driver_too_old: "Your NVIDIA driver is too old. Please update the driver."
+            install_button: "Install"
+            downloading: "Downloading... {{percent}}%"
+            restart_to_use_button: "Restart to use the GPU"
+            remove_button: "Remove"
+            remove_pending: "It will be removed at the next start."
+            restart_button: "Restart"
+            download_started_notification: "Started downloading the GPU acceleration pack. You can follow the progress under \"GPU acceleration pack\" in Settings > Translation."
+            installed_notification: "The GPU acceleration pack is installed. Restart to use it."
 
     side_menu_labels:
         device: "裝置"
@@ -392,25 +410,6 @@ config_page:
         bubble_min_text_length:
             label: "最小文字長度"
             desc: "字元數低於此值的氣泡將被忽略。預設值：2。"
-
-    updater:
-        install_panel:
-            section_label:
-            current_summary_label:
-            current_summary_value: "{{version}} / {{compute_mode}} / {{channel}}"
-            channel_label:
-            channel_stable:
-            channel_beta:
-            compute_mode_label:
-            compute_mode_cpu: "CPU"
-            compute_mode_gpu: "GPU (CUDA)"
-            version_label: "要安裝的版本"
-            version_desc:
-            no_versions_available:
-            beta_suffix: "測試版"
-            latest_suffix:
-            install_button:
-            reinstall_button:
 
     hotkeys:
         input_placeholder: "請輸入按鍵組合"

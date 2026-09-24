@@ -17,7 +17,6 @@ export const store = {
     setting_box_scroll_container: null,
     log_box_ref: null,
     text_area_ref: null,
-    is_fetched_available_releases_already: false,
     last_executed_time_startTyping: 0,
 };
 
@@ -146,23 +145,19 @@ export const { atomInstance: Atom_MainFunctionsStateMemory, useHook: useStore_Ma
     transcription_receive: false,
 }, "MainFunctionsStateMemory");
 export const { atomInstance: Atom_OpenedQuickSetting, useHook: useStore_OpenedQuickSetting } = createAtomWithHook("", "OpenedQuickSetting");
-export const { atomInstance: Atom_LatestSoftwareVersionInfo, useHook: useStore_LatestSoftwareVersionInfo } = createAtomWithHook({
-    is_update_available: false,
-    new_version: "0.0.0",
-}, "LatestSoftwareVersionInfo");
 export const { atomInstance: Atom_InitProgress, useHook: useStore_InitProgress } = createAtomWithHook(0, "InitProgress");
 export const { atomInstance: Atom_IsBreakPoint, useHook: useStore_IsBreakPoint } = createAtomWithHook(false, "IsBreakPoint");
-export const { atomInstance: Atom_IsSoftwareUpdating, useHook: useStore_IsSoftwareUpdating } = createAtomWithHook(false, "IsSoftwareUpdating");
 export const { atomInstance: Atom_NotificationStatus, useHook: useStore_NotificationStatus } = createAtomWithHook({
     status: "",
     is_open: false,
     key: 0,
     message: "",
 }, "NotificationStatus");
-export const { atomInstance: Atom_AvailableReleases, useHook: useStore_AvailableReleases } = createAtomWithHook([], "AvailableReleases");
+export const { atomInstance: Atom_AppUpdate, useHook: useStore_AppUpdate } = createAtomWithHook({ status: "idle" }, "AppUpdate", { is_state_ok: true });
 export const { atomInstance: Atom_IsLMStudioConnected, useHook: useStore_IsLMStudioConnected } = createAtomWithHook(false, "IsLMStudioConnected");
 export const { atomInstance: Atom_IsOllamaConnected, useHook: useStore_IsOllamaConnected } = createAtomWithHook(false, "IsOllamaConnected");
 export const { atomInstance: Atom_IsAiCliConnected, useHook: useStore_IsAiCliConnected } = createAtomWithHook(false, "IsAiCliConnected");
+export const { atomInstance: Atom_CudaPack, useHook: useStore_CudaPack } = createAtomWithHook({ status: "no_gpu", prompted: true, progress: null }, "CudaPack", { is_state_ok: true });
 
 // Main Page
 // Common

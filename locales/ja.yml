@@ -7,6 +7,12 @@ common:
     go_back_button_label: "戻る"
     default_label: "デフォルト"
 
+cuda_pack_prompt:
+    title: "GPU 高速化パックを導入して、翻訳と文字起こしを GPU で動かしますか？"
+    desc: "NVIDIA の GPU が見つかりました。GPU 高速化パックを導入すると、翻訳と文字起こしを GPU で速く動かせます（ダウンロード約 1.3 GB、展開後 1.8 GB）。あとからでも、設定の翻訳・文字起こしのデバイス欄で導入できます。"
+    install_button: "導入する"
+    later_button: "今はしない"
+
 common_error:
     no_device_mic: "マイクデバイスが検出されませんでした。"
     no_device_speaker: "スピーカーデバイスが検出されませんでした。"
@@ -29,6 +35,10 @@ common_error:
     invalid_value_speaker_max_phrase: "0 以上の数値を設定できます。"
 
     invalid_hex_color: "有効なHEXカラーコード（例: {{brand_color_hex}}）形式で入力してください。"
+
+    failed_download_cuda_pack: "GPU 高速化パックを導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。"
+    cuda_pack_in_use: "GPU 高速化パックが使用中のため置き換えられません。再起動してからもう一度試してください。"
+    cuda_pack_not_loaded: "GPU 高速化パックを読み込めませんでした。CPU で動きます。"
 
 common_warning:
     unable_to_use_osc_query: "OSC IP Address の設定によりOSCデータの受信ができないため、以下の機能が自動的に無効になっています。"
@@ -68,32 +78,28 @@ main_page:
         title_target_language: "相手の言語"
 
     update_available: "新しいバージョンが出ました！"
-    updating: "アップデート中..."
 
 update_modal:
     title: "アップデート"
     summary_up_to_date_desc: "最新版を使用中です。アップデートの必要はありません。"
     channel_stable: "安定版"
     channel_beta: "Beta版"
-    compute_mode_cpu: "CPU版"
-    compute_mode_cuda: "GPU版 (CUDA)"
-    latest_label: "最新"
-    install_latest_button: "最新バージョンへ更新"
-    install_button: "この設定で再インストール"
-    section_pick_variant: "別のバージョン・構成を選ぶ"
     refresh_button: "更新を確認"
     channel_label: "リリースチャンネル"
     channel_desc: "Beta版は新機能を先取りできますが、動作が不安定な場合があります。"
-    compute_mode_label: "デバイス構成"
-    compute_mode_desc: "GPU版はNVIDIA GPUで高速に動作しますが、約 5GB のディスク容量が必要です。"
-    version_label: "インストールするバージョン"
-    version_desc: "選択したチャンネルで公開されているリリースから選べます。"
-    no_versions_available: "選択中のチャンネルには利用可能なバージョンがありません。"
-    change_col_current: "現在"
-    change_col_after: "インストール後"
-    warn_downgrade: "{{from}} から {{to}} へのダウングレードになります。設定ファイルの互換性は保証されません。"
-    warn_cuda_extra_size: "GPU版は約 5GB の追加ダウンロードが必要です。"
-    warn_switch_channel: "{{channel}}チャンネルに切り替わります。次回以降のアップデート通知も{{channel}}が対象になります。"
+    checking: "新しい版を確かめています…"
+    available: "新しい版 {{version}} が出ています（約 {{size}}）"
+    available_downgrade: "安定版の最新 {{version}} に切り替えられます（約 {{size}}）"
+    release_notes: "リリースノートを見る"
+    download_button: "更新"
+    downloading: "ダウンロード中… {{percent}}%"
+    ready: "{{version}} の準備ができました"
+    restart_now_button: "今すぐ再起動して更新"
+    apply_on_exit_desc: "このまま使い続けても、次にアプリを閉じたときに入れ替わります。"
+    check_failed: "新しい版を確かめられませんでした: {{message}}"
+    download_failed: "更新に失敗しました: {{message}}"
+    retry_button: "再試行"
+    not_installed: "開発版のため更新できません。"
 
 config_page:
     common:
@@ -118,6 +124,18 @@ config_page:
             type_template_high: "{{type_name}} （精度が良く、処理は遅い）"
         warning_labels:
             unable_to_use_osc_query: "OSC IP Address の設定によりOSCデータの受信ができないため、現在この機能は使用できません。"
+        cuda_pack:
+            label: "GPU 高速化パック"
+            desc: "NVIDIA の GPU で翻訳と文字起こしを速くします（ダウンロード約 1.3 GB、展開後 1.8 GB）。導入したあと、再起動すると使えます。"
+            driver_too_old: "NVIDIA のドライバーが古いため使えません。ドライバーを更新してください。"
+            install_button: "導入する"
+            downloading: "ダウンロード中… {{percent}}%"
+            restart_to_use_button: "再起動して GPU を使う"
+            remove_button: "削除"
+            remove_pending: "次の起動で削除します。"
+            restart_button: "再起動"
+            download_started_notification: "GPU 高速化パックのダウンロードを始めました。進み具合は、設定の「翻訳」にある「GPU 高速化パック」欄で見られます。"
+            installed_notification: "GPU 高速化パックを導入しました。再起動すると使えます。"
 
     side_menu_labels:
         device: "デバイス"
@@ -398,25 +416,6 @@ config_page:
         bubble_min_text_length:
             label: "最小文字数"
             desc: "この文字数未満の吹き出しは無視されます。既定値: 2。"
-
-    updater:
-        install_panel:
-            section_label: "バージョン・構成の選択"
-            current_summary_label: "現在の状態"
-            current_summary_value: "{{version}} / {{compute_mode}} / {{channel}}"
-            channel_label: "リリースチャンネル"
-            channel_stable: "安定版"
-            channel_beta: "β版"
-            compute_mode_label: "デバイス構成"
-            compute_mode_cpu: "CPU版"
-            compute_mode_gpu: "GPU版 (CUDA)"
-            version_label: "インストールするバージョン"
-            version_desc: "過去のバージョンを選ぶとダウングレードできます。リストは選択中のチャンネルで絞り込まれます。"
-            no_versions_available: "選択中のチャンネルには利用可能なバージョンがありません。"
-            beta_suffix: "β版"
-            latest_suffix: "最新"
-            install_button: "この設定でインストール"
-            reinstall_button: "この設定で再インストール"
 
     hotkeys:
         input_placeholder: "キーの組み合わせを入力"

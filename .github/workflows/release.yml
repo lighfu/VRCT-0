@@ -1,22 +1,25 @@
-name: Release VRCT
+name: Release VRCT-0
 
 on:
   push:
     tags:
-      - 'v*' # タグが 'v' で始まる場合にトリガー (例: v1.0.0)
+      - 'v*'
 
 jobs:
   release:
-    name: Build VRCT
+    name: Build and publish VRCT-0
     runs-on: windows-latest
     permissions:
       contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Do not leave GITHUB_TOKEN (contents: write) in .git/config, where every
+          # later npm/pip install script could read it. vpk gets it explicitly.
+          persist-credentials: false
 
       - name: Get version from tag
-        id: get_version
         shell: pwsh
         run: |
           $TAG_WITH_V = $env:GITHUB_REF -replace "^refs/tags/", ""
@@ -83,92 +86,56 @@ jobs:
             exit 1
           }
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22.15.0'
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+          node-version: 22.15.0
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-dotnet@v4
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
+          dotnet-version: '9.0.x'
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.158
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          npm run setup-python
 
-      - name: Setup Python environment
-        run: npm run setup-python
+      - name: Build
+        run: npm run build
 
-      - name: Install Python script dependencies
-        run: pip install tqdm
+      # Fails the job on a network error or a rate limit instead of silently
+      # publishing a release without delta packages. When the repository has no
+      # release yet (the first one), vpk only warns "No releases found" and
+      # exits with 0 (checked with vpk 1.2.158), so that case still passes.
+      - name: Download previous release (for delta packages)
+        shell: pwsh
+        env:
+          VPK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $extra = @()
+          if ("${{ steps.channel.outputs.is_beta }}" -eq "true") { $extra += "--pre" }
+          vpk download github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack --token $env:VPK_TOKEN @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Build and package
-        run: npm run release-all
+      - name: Pack
+        run: python utils/pack_release.py
 
-      - name: Stage release assets
-        id: stage
+      - name: Check asset sizes (GitHub limit 2 GiB)
         shell: pwsh
         run: |
-          # The updater (NSIS template.nsi / src-python model.py) always
-          # downloads the fixed filename "VRCT_setup.exe" from the tagged
-          # release, not the versioned build output filename -- copy it
-          # under that name here. The versioned "VRCT_${VERSION}_x64-setup.exe"
-          # asset is also kept for humans grabbing a specific build off the
-          # release page.
-          $versionedExe = "./src-tauri/target/release/bundle/nsis/VRCT_${{ env.VERSION }}_x64-setup.exe"
-          $stageDir = "./release_assets"
-          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+          $limit = 2GB
+          $big = Get-ChildItem release/velopack -File | Where-Object { $_.Length -ge $limit }
+          if ($big) { $big | ForEach-Object { Write-Error "$($_.Name) is $($_.Length) bytes" }; exit 1 }
 
-          Copy-Item -Path $versionedExe -Destination "$stageDir/VRCT_${{ env.VERSION }}_x64-setup.exe"
-          Copy-Item -Path $versionedExe -Destination "$stageDir/VRCT_setup.exe"
-          Copy-Item -Path ./VRCT.zip -Destination "$stageDir/VRCT.zip"
-          Copy-Item -Path ./VRCT_cuda.zip -Destination "$stageDir/VRCT_cuda.zip"
-
-          foreach ($name in @("VRCT_setup.exe", "VRCT.zip", "VRCT_cuda.zip")) {
-            $hash = (Get-FileHash -Path "$stageDir/$name" -Algorithm SHA256).Hash.ToLower()
-            Set-Content -Path "$stageDir/$name.sha256" -Value $hash -NoNewline -Encoding ascii
-          }
-
-          echo "dir=$stageDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Enforce GitHub's 2 GiB per-asset limit
+      - name: Publish
         shell: pwsh
+        env:
+          VPK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # GitHub Releases requires every asset to be strictly under 2 GiB
-          # (an asset AT 2 GiB is already rejected). Fail early with a clear
-          # message instead of letting the upload step 422.
-          $limitBytes = 2GB
-          $failed = $false
-          Get-ChildItem -Path "${{ steps.stage.outputs.dir }}" -File | ForEach-Object {
-            if ($_.Length -ge $limitBytes) {
-              $mb = [Math]::Round($_.Length / 1MB, 1)
-              Write-Host "::error::$($_.Name) is $mb MB, which is at or over GitHub's 2 GiB per-file release asset limit"
-              $failed = $true
-            }
-          }
-          if ($failed) {
-            exit 1
-          }
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ env.VERSION }}
-          draft: false
-          prerelease: ${{ steps.channel.outputs.is_beta }}
-          files: |
-            ${{ steps.stage.outputs.dir }}/VRCT_${{ env.VERSION }}_x64-setup.exe
-            ${{ steps.stage.outputs.dir }}/VRCT_setup.exe
-            ${{ steps.stage.outputs.dir }}/VRCT_setup.exe.sha256
-            ${{ steps.stage.outputs.dir }}/VRCT.zip
-            ${{ steps.stage.outputs.dir }}/VRCT.zip.sha256
-            ${{ steps.stage.outputs.dir }}/VRCT_cuda.zip
-            ${{ steps.stage.outputs.dir }}/VRCT_cuda.zip.sha256
+          $extra = @()
+          if ("${{ steps.channel.outputs.is_beta }}" -eq "true") { $extra += "--pre" }
+          vpk upload github --repoUrl https://github.com/lighfu/VRCT-0 --outputDir release/velopack --token $env:VPK_TOKEN --tag "v${{ env.VERSION }}" --releaseName "VRCT-0 ${{ env.VERSION }}" --publish @extra

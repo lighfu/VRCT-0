@@ -57,6 +57,24 @@ a = Analysis(
 a.datas = [d for d in a.datas if not d[0].replace("\\", "/").startswith("sudachidict_full")]
 a.binaries = [b for b in a.binaries if not b[0].replace("\\", "/").startswith("sudachidict_full")]
 
+# rapidocr/models: bundle only the models the rapidocr wheel itself ships
+# (PP-OCRv6 small det/rec + the cls model). rapidocr downloads other models
+# (PP-OCRv5 per-script ones: Korean, Thai, ...) into this same folder of the
+# build venv the first time a developer uses them, and without this filter a
+# local `npm run release` would bundle whatever happens to be there while a
+# clean CI build would not. The installed app downloads missing models into
+# PATH_DATA/weights/rapidocr instead (models/ocr/ocr_engine_rapidocr.py).
+from importlib.metadata import files as _dist_files
+_rapidocr_wheel_models = {
+    str(f).replace("\\", "/") for f in (_dist_files("rapidocr") or [])
+    if str(f).replace("\\", "/").startswith("rapidocr/models/")
+}
+a.datas = [
+    d for d in a.datas
+    if not d[0].replace("\\", "/").startswith("rapidocr/models/")
+    or d[0].replace("\\", "/") in _rapidocr_wheel_models
+]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(

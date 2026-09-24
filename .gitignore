@@ -19,8 +19,6 @@ common-voice-scripted-speech-*.tar.gz
 error.log
 *.exe
 *.ipynb
-VRCT.zip
-VRCT_cuda.zip
 
 .qoder/
 
@@ -76,3 +74,8 @@ src-python/telemetry_state.json
 
 # CodeGraph index
 .codegraph/
+
+release/
+
+# GPU 高速化パック (ソースから動かしたときの置き場所)
+src-python/cuda/

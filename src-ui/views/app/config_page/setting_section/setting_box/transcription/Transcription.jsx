@@ -20,6 +20,7 @@ import {
 } from "../_components";
 
 import { ComputeDevice } from "../_components/compute_device/ComputeDevice";
+import { CudaPack } from "../_components";
 
 export const Transcription = () => {
     return (
@@ -208,6 +209,7 @@ const TranscriptionEngine_Container = () => {
                 <>
                     <WhisperWeightType_Box />
                     <TranscriptionComputeDevice_Box />
+                    <CudaPack />
                 </>
             )}
             {/* 未ダウンロードの間は SenseVoice を選べないため、取得欄を常に出す。 */}

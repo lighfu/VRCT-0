@@ -49,7 +49,8 @@ def VERSION(self) -> str
 
 ```python  
 @property
-def PATH_LOCAL(self) -> str
+def PATH_APP(self) -> str
+def PATH_DATA(self) -> str
 ```
 - ローカルディレクトリパス
 

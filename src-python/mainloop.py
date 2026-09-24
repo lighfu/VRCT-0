@@ -87,6 +87,10 @@ run_mapping = {
     "download_progress_sudachi_dict":"/run/download_progress_sudachi_dict",
     "downloaded_sudachi_dict":"/run/downloaded_sudachi_dict",
     "error_sudachi_dict":"/run/error_sudachi_dict",
+    "cuda_pack_status":"/run/cuda_pack_status",
+    "download_progress_cuda_pack":"/run/download_progress_cuda_pack",
+    "downloaded_cuda_pack":"/run/downloaded_cuda_pack",
+    "error_cuda_pack":"/run/error_cuda_pack",
 
     "selected_mic_host":"/run/selected_mic_host",
     "selected_mic_device":"/run/selected_mic_device",
@@ -133,8 +137,6 @@ run_mapping = {
     "selectable_mic_device_list":"/run/selectable_mic_device_list",
     "selectable_speaker_device_list":"/run/selectable_speaker_device_list",
 
-    "software_update_info":"/run/software_update_info",
-
     "initialization_progress":"/run/initialization_progress",
     "initialization_complete":"/run/initialization_complete",
 
@@ -147,6 +149,35 @@ def run(status:int, endpoint:str, result:Any) -> None:
 controller = Controller()
 controller.setRunMapping(run_mapping)
 controller.setRun(run)
+
+# /run/shutdown (画面が閉じる・起動し直す前に送る) のあと、サイドカーが自分で終わるまでの秒数。
+# 画面は /run/shutdown を送って 2 秒後に閉じるので、普通は Tauri (tauri-plugin-shell) が
+# そこでサイドカーを止め、この時計は鳴らない。親が止めなかったときの保険: watchdog は
+# controller.shutdown() が止めるので、ここで終わらないと誰にも止められず、RAM と (GPU を
+# 使っていれば) VRAM と GPU 高速化パックの DLL を掴んだまま残る (2026-09-24 の実機確認で起きた)。
+# 止める処理 (設定の保存を含む) が終わってから数えるので、保存するものは失わない。
+_SHUTDOWN_SELF_EXIT_DELAY_SEC = 3
+
+
+def _startExitTimer(seconds: float, exit_code: int) -> Timer:
+    timer = Timer(seconds, os._exit, args=(exit_code,))
+    timer.daemon = True
+    timer.start()
+    return timer
+
+
+def shutdownThenExit(*args, **kwargs) -> dict:
+    """/run/shutdown。止める処理を済ませ、_SHUTDOWN_SELF_EXIT_DELAY_SEC 秒後にプロセスを終える。
+
+    止める処理が詰まっても _WATCHDOG_GRACE_PERIOD_SEC 秒で必ず終わる (escalateShutdown と同じ考え)。
+    """
+    hard_deadline = _startExitTimer(_WATCHDOG_GRACE_PERIOD_SEC, 1)
+    try:
+        return controller.shutdown(*args, **kwargs)
+    finally:
+        hard_deadline.cancel()
+        _startExitTimer(_SHUTDOWN_SELF_EXIT_DELAY_SEC, 0)
+
 
 mapping = {
     # Main Window
@@ -218,7 +249,6 @@ mapping = {
     "/get/data/selectable_release_channels": {"status": True, "variable":controller.getSelectableReleaseChannels},
     "/get/data/release_channel": {"status": True, "variable":controller.getSelectedReleaseChannel},
     "/set/data/release_channel": {"status": True, "variable":controller.setSelectedReleaseChannel},
-    "/get/data/available_releases": {"status": True, "variable":controller.listAvailableReleases},
 
     "/run/send_message_box": {"status": False, "variable":controller.sendMessageBox},
     "/run/typing_message_box": {"status": False, "variable":controller.typingMessageBox},
@@ -229,12 +259,9 @@ mapping = {
     "/get/data/telemetry" : {"status": True, "variable":controller.getTelemetry},
     "/set/enable/telemetry" : {"status": True, "variable":controller.setEnableTelemetry},
     "/set/disable/telemetry" : {"status": True, "variable":controller.setDisableTelemetry},
-    "/run/shutdown": {"status": True, "variable":controller.shutdown},
+    "/run/shutdown": {"status": True, "variable":shutdownThenExit},
 
     "/run/swap_your_language_and_target_language": {"status": True, "variable":controller.swapYourLanguageAndTargetLanguage},
-
-    "/run/update_software": {"status": True, "variable":controller.updateSoftware},
-    "/run/update_cuda_software": {"status": True, "variable":controller.updateCudaSoftware},
 
     # Config Window
     # Appearance
@@ -467,6 +494,10 @@ mapping = {
     "/get/data/selected_sudachi_dict_type": {"status": True, "variable":controller.getSudachiDictType},
     "/set/data/selected_sudachi_dict_type": {"status": True, "variable":controller.setSudachiDictType},
     "/run/download_sudachi_dict": {"status": True, "variable":controller.downloadSudachiDict},
+    "/get/data/cuda_pack_status": {"status": True, "variable":controller.getCudaPackStatus},
+    "/run/download_cuda_pack": {"status": True, "variable":controller.downloadCudaPack},
+    "/run/remove_cuda_pack": {"status": True, "variable":controller.removeCudaPack},
+    "/run/mark_cuda_pack_prompted": {"status": True, "variable":controller.markCudaPackPrompted},
 
     # VR
     "/get/data/overlay_small_log": {"status": True, "variable":controller.getOverlaySmallLog},
@@ -592,20 +623,9 @@ mapping = {
     # "/run/stop_watchdog": {"status": True, "variable":controller.stopWatchdog},
 }
 
-# 起動時の一括取得 (updateConfigSettings) から除外するエンドポイント。
-# init_mapping を舐め終えてから /run/initialization_complete を送る = UIの
-# ローディング解除がここの合計時間で決まるため、ネットワークI/Oを伴うものを
-# 入れてはいけない。available_releases は GitHub API への同期リクエスト
-# (timeout (10, 60)) で、起動を最大70秒遅らせうる。UI側は Updater.jsx の
-# マウント時に自分で /get/data/available_releases を叩くので、ここから
-# 外しても取得経路は失われない。
-_INIT_MAPPING_EXCLUDED_ENDPOINTS = frozenset({
-    "/get/data/available_releases",
-})
-
 init_mapping = {
     key: value for key, value in mapping.items()
-    if key.startswith("/get/data/") and key not in _INIT_MAPPING_EXCLUDED_ENDPOINTS
+    if key.startswith("/get/data/")
 }
 controller.setInitMapping(init_mapping)
 

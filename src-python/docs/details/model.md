@@ -45,7 +45,7 @@ VRCTアプリケーションの中核となるModelクラスを定義するモ�
 ### トークナイザ・リソース取得安定化
 
 - CTranslate2 トークナイザダウンロード処理を `downloadCTranslate2ModelTokenizer()` で明示化し PyInstaller パス周りの不整合回避
-- フォントパス探索は OverlayImage 側へ委譲 (`OverlayImage(config.PATH_LOCAL)`) し Model は生成と更新呼び出しのみ保持
+- フォントパス探索は OverlayImage 側へ委譲 (`OverlayImage(config.PATH_APP)`) し Model は生成と更新呼び出しのみ保持
 
 ### 翻訳失敗時のフェールセーフ再試行
 

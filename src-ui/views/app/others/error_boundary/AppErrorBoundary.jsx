@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import CopySvg from "@images/copy.svg?react";
@@ -9,10 +9,9 @@ import { ContactsContainer } from "./contacts_container/ContactsContainer";
 
 import {
     useWindow,
-    useUpdateSoftware,
-    useIsSoftwareUpdating,
+    useAppUpdate,
+    useAppUpdateStateListener,
     useSoftwareVersion,
-    useComputeMode,
     useCopyToClipboard,
 } from "@logics_common";
 import { CloseButton } from "@common_components";
@@ -98,46 +97,51 @@ const SafeActionButtons = () => {
 };
 
 const ActionButtons = () => {
-    const { updateSoftware, updateSoftware_CUDA } = useUpdateSoftware();
-    const { currentIsSoftwareUpdating, updateIsSoftwareUpdating } = useIsSoftwareUpdating();
-    const { currentLatestSoftwareVersionInfo } = useSoftwareVersion();
-    const { currentComputeMode } = useComputeMode();
+    const { currentAppUpdate, downloadAppUpdate, restartToApplyUpdate } = useAppUpdate();
+    const { asyncCloseApp } = useWindow();
+    // エラー画面では AppUpdateController が外れて状態が届かなくなるので、ここで受け取る。
+    // 受け取らないと「更新」を押しても表示が「ダウンロード中」から先に進まない。
+    useAppUpdateStateListener();
+    const update = currentAppUpdate?.data;
+    // ダウンロードに失敗したときも、ここから再試行できるようにする。
+    const status = update?.status === "failed" && update?.stage === "download" ? "download_failed" : update?.status;
+    const is_busy_ref = useRef(false);
+    const [is_busy, setIsBusy] = useState(false);
 
-    const is_update_available = currentLatestSoftwareVersionInfo?.data?.is_update_available === true;
-    const is_updating = currentIsSoftwareUpdating?.data === true;
-    const is_cpu = currentComputeMode?.data === "cpu";
-
-    const onClickUpdate = () => {
+    const onClickUpdate = async () => {
+        if (is_busy_ref.current) return;
+        is_busy_ref.current = true;
+        setIsBusy(true);
         try {
-            updateIsSoftwareUpdating(true);
-            if (is_cpu) {
-                updateSoftware();
-            } else {
-                updateSoftware_CUDA();
+            if (status === "available" || status === "download_failed") {
+                await downloadAppUpdate();
+            } else if (status === "ready" && (await restartToApplyUpdate())) {
+                await asyncCloseApp();
+                return;
             }
         } catch (e) {
             console.error("[AppErrorBoundary] Update failed:", e);
+        } finally {
+            is_busy_ref.current = false;
+            setIsBusy(false);
         }
     };
 
+    const labels = {
+        available: "Update Available — Update Now",
+        downloading: "Downloading update...",
+        ready: "Restart to Update",
+        download_failed: "Update Failed — Retry",
+    };
 
     return (
         <div className={styles.action_buttons_container}>
-            {is_update_available && (
-                <button
-                    className={styles.update_button}
-                    onClick={onClickUpdate}
-                    disabled={is_updating}
-                >
-                    {is_updating ? "Updating..." : "Update Available — Update Now"}
+            {labels[status] && (
+                <button className={styles.update_button} onClick={onClickUpdate} disabled={status === "downloading" || is_busy}>
+                    {labels[status]}
                 </button>
             )}
-            <a
-                className={styles.status_link_button}
-                href={VRCT_STATUS_URL}
-                target="_blank"
-                rel="noreferrer"
-            >
+            <a className={styles.status_link_button} href={VRCT_STATUS_URL} target="_blank" rel="noreferrer">
                 <span>Check VRCT Status</span>
                 <ExternalLinkSvg className={styles.external_link_svg} />
             </a>

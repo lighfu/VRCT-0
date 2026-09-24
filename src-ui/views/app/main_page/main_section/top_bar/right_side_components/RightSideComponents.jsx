@@ -5,7 +5,7 @@ import HelpSvg from "@images/help.svg?react";
 
 import { useStore_OpenedQuickSetting } from "@store";
 import {
-    useSoftwareVersion,
+    useAppUpdate,
     useIsOscAvailable,
 } from "@logics_common";
 
@@ -100,14 +100,17 @@ const OpenVrcMicMuteSyncQuickSetting = () => {
 
 const SoftwareUpdateAvailableButton = () => {
     const { t } = useI18n();
-    const { currentLatestSoftwareVersionInfo } = useSoftwareVersion();
+    const { currentAppUpdate } = useAppUpdate();
     const { updateOpenedQuickSetting } = useStore_OpenedQuickSetting();
 
-    if (currentLatestSoftwareVersionInfo.data.is_update_available === false) return null;
+    const status = currentAppUpdate.data?.status;
+    // ダウンロードに失敗したときも出す (再試行ボタンは更新の画面にある)。
+    const is_download_failed = status === "failed" && currentAppUpdate.data?.stage === "download";
+    if (!["available", "downloading", "ready"].includes(status) && !is_download_failed) return null;
 
     return (
-        <button className={styles.software_update_button} onClick={()=>updateOpenedQuickSetting("update_software")}>
-            <RefreshSvg className={styles.refresh_svg}/>
+        <button className={styles.software_update_button} onClick={() => updateOpenedQuickSetting("update_software")}>
+            <RefreshSvg className={styles.refresh_svg} />
             <p className={styles.software_update_label}>{t("main_page.update_available")}</p>
         </button>
     );

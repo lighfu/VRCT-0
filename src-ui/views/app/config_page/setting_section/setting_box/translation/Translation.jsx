@@ -15,6 +15,7 @@ import {
 } from "../_templates/Templates";
 
 import { ComputeDevice } from "../_components/compute_device/ComputeDevice";
+import { CudaPack } from "../_components";
 
 import {
     deepl_auth_key_url,
@@ -32,6 +33,7 @@ export const Translation = () => {
         <>
             <CTranslate2WeightType_Box />
             <TranslationComputeDevice_Box />
+            <CudaPack />
 
             <DeepLAuthKey_Box />
 

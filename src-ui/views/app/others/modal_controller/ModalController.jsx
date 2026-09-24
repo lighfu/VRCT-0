@@ -1,6 +1,8 @@
+import clsx from "clsx";
 import styles from "./ModalController.module.scss";
 import { useStore_OpenedQuickSetting } from "@store";
 import { Vr, Updater } from "@setting_box";
+import { CudaPackPrompt } from "../cuda_pack_prompt/CudaPackPrompt";
 
 export const ModalController = () => {
     const { currentOpenedQuickSetting, updateOpenedQuickSetting } = useStore_OpenedQuickSetting();
@@ -8,7 +10,7 @@ export const ModalController = () => {
     return (
         <div className={styles.container}>
             <div className={styles.bg_onclick_close_area} onClick={() => updateOpenedQuickSetting("")}></div>
-            <div className={styles.wrapper}>
+            <div className={clsx(styles.wrapper, currentOpenedQuickSetting.data === "cuda_pack_prompt" && styles.wrapper_compact)}>
                 <QuickSettingsController />
             </div>
         </div>
@@ -23,6 +25,8 @@ const QuickSettingsController = () => {
             return <Vr />;
         case "update_software":
             return <Updater />;
+        case "cuda_pack_prompt":
+            return <CudaPackPrompt />;
         default:
             return null;
     }

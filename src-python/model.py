@@ -2,25 +2,17 @@ import atexit
 import copy
 import asyncio
 import faulthandler
-import hashlib
 import json
-from subprocess import Popen
 from os import makedirs as os_makedirs
 from os import path as os_path
-from os import getppid as os_getppid
-from os import _exit as os_exit
 from os import remove as os_remove
 from os import stat as os_stat
-from psutil import Process as psutil_Process
 from datetime import datetime
 from time import sleep
 from queue import Queue, Empty
 from threading import Thread, Lock, current_thread
 from concurrent.futures import ThreadPoolExecutor
-from requests import get as requests_get
 from typing import Callable, Optional, cast
-from packaging.version import parse
-from dataclasses import dataclass
 
 from flashtext import KeywordProcessor
 
@@ -56,22 +48,14 @@ from models.watchdog.watchdog import Watchdog
 from models.websocket.websocket_server import WebSocketServer
 from models.obs.obs_browser_source_server import ObsBrowserSourceServer
 from models.clipboard.clipboard import Clipboard
-from models.ocr import OcrPipeline
+from models.ocr import OcrPipeline, ocr_engine_rapidocr
 from models.ocr.ocr_languages import SELECTABLE_LANGUAGES as OCR_SELECTABLE_LANGUAGES, isSupported as isSupportedOcrLanguage
+from models import cuda_pack
 from models.telemetry import Telemetry
 from utils import errorLogging, errorLog, setupLogger, printLog
 from errors import AudioPipelineError, AudioPipelineFailure, ERROR_METADATA, ErrorCode
 
 TRANSCRIPT_STOP_JOIN_TIMEOUT = 15
-
-# GitHub API 呼び出し / setup.exe ダウンロードの (connect, read) タイムアウト。
-# 無指定だと「接続はするが応答しない」相手に requests が無期限にブロック
-# しうる。checkSoftwareUpdated()/listAvailableReleases() は
-# Controller.init() から呼ばれるため、これが起きると初期化そのものが
-# 固まる。translation_utils.py/transcription_whisper.py の
-# _DOWNLOAD_TIMEOUT と同じ値を使う (大きめの read 側はモデル重みと同様、
-# setup.exe のダウンロードにも余裕を持たせるため)。
-_HTTP_TIMEOUT = (10, 60)
 
 # フリーズ調査用の恒久計装。mainloop.py の faulthandler.enable() は
 # ネイティブフォルト (access violation 等) 発生時にしか全スレッドの
@@ -108,26 +92,6 @@ def _cleanupFreezeTraceIfEmpty() -> None:
 
 
 atexit.register(_cleanupFreezeTraceIfEmpty)
-
-
-@dataclass
-class ReleaseInfo:
-    tag: str
-    version: str
-    is_prerelease: bool
-    published_at: str
-
-
-class SetupSha256Unavailable(Exception):
-    """setup.exe の ".sha256" サイドカーアセットが GitHub Release に存在する
-    のに、その中身をリトライしても取得/パースできなかったことを表す。
-
-    ".sha256" アセットがそもそも無い古い Release (この検証より前に公開された
-    もの) は「検証対象が無い」だけなのでサイズチェックのみへフォールバック
-    してよい。一方こちらは「チェックサムが公開されているのに入手できな
-    かった」状態であり、配布物がすり替えられている可能性を排除できない。
-    呼び出し側はサイズチェックへ格下げせず、更新自体を中止する。
-    """
 
 
 # audio_queue の有界化 (フェーズ3項目20)。文字起こしが実時間に追いつけ
@@ -796,7 +760,7 @@ class MicSession(_AudioDeviceSession):
             phrase_timeout=phrase_timeout,
             max_phrases=config.MIC_MAX_PHRASES,
             transcription_engine=config.SELECTED_TRANSCRIPTION_ENGINE,
-            root=config.PATH_LOCAL,
+            root=config.PATH_DATA,
             whisper_weight_type=config.WHISPER_WEIGHT_TYPE,
             device=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device"],
             device_index=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device_index"],
@@ -858,7 +822,7 @@ class SpeakerSession(_AudioDeviceSession):
             phrase_timeout=phrase_timeout,
             max_phrases=config.SPEAKER_MAX_PHRASES,
             transcription_engine=config.SELECTED_TRANSCRIPTION_ENGINE,
-            root=config.PATH_LOCAL,
+            root=config.PATH_DATA,
             whisper_weight_type=config.WHISPER_WEIGHT_TYPE,
             device=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device"],
             device_index=config.SELECTED_TRANSCRIPTION_COMPUTE_DEVICE["device_index"],
@@ -959,7 +923,7 @@ class Model:
             "large": overlay_large_log_settings,
         }
         self.overlay = Overlay(overlay_settings)
-        self.overlay_image = OverlayImage(config.PATH_LOCAL)
+        self.overlay_image = OverlayImage(config.PATH_APP)
         self.mic_mute_status = None
         # OSC ミュート同期 (changeHandlerMute) が実行する pause()/resume() を
         # Controller.mic_lifecycle_lock 配下で行うためのフック。
@@ -1005,15 +969,15 @@ class Model:
                 errorLogging()
 
     def backwardCompatibleTranslatorCTranslate2ModelRenameWeightsDir(self):
-        return backwardCompatibleRenameWeightsDir(config.PATH_LOCAL)
+        return backwardCompatibleRenameWeightsDir(config.PATH_DATA)
         
     def checkTranslatorCTranslate2ModelWeight(self, weight_type:str):
-        return checkCTranslate2Weight(config.PATH_LOCAL, weight_type)
+        return checkCTranslate2Weight(config.PATH_DATA, weight_type)
 
     def changeTranslatorCTranslate2Model(self):
         self.ensure_initialized()
         self.translator.changeCTranslate2Model(
-            path=config.PATH_LOCAL,
+            path=config.PATH_DATA,
             model_type=config.CTRANSLATE2_WEIGHT_TYPE,
             device=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device"],
             device_index=config.SELECTED_TRANSLATION_COMPUTE_DEVICE["device_index"],
@@ -1021,10 +985,10 @@ class Model:
             )
 
     def downloadCTranslate2ModelWeight(self, weight_type, callback=None, end_callback=None):
-        return downloadCTranslate2Weight(config.PATH_LOCAL, weight_type, callback, end_callback)
+        return downloadCTranslate2Weight(config.PATH_DATA, weight_type, callback, end_callback)
 
     def downloadCTranslate2ModelTokenizer(self, weight_type):
-        return downloadCTranslate2Tokenizer(config.PATH_LOCAL, weight_type)
+        return downloadCTranslate2Tokenizer(config.PATH_DATA, weight_type)
 
     def isLoadedCTranslate2Model(self):
         self.ensure_initialized()
@@ -1039,10 +1003,10 @@ class Model:
         self.translator.setChangedTranslatorParameters(is_changed)
 
     def checkTranscriptionWhisperModelWeight(self, weight_type:str):
-        return checkWhisperWeight(config.PATH_LOCAL, weight_type)
+        return checkWhisperWeight(config.PATH_DATA, weight_type)
 
     def downloadWhisperModelWeight(self, weight_type, callback=None, end_callback=None):
-        return downloadWhisperWeight(config.PATH_LOCAL, weight_type, callback, end_callback)
+        return downloadWhisperWeight(config.PATH_DATA, weight_type, callback, end_callback)
 
     def checkSenseVoiceModelWeight(self) -> bool:
         return checkSenseVoiceWeight(config.PATH_LOCAL)
@@ -1077,7 +1041,7 @@ class Model:
         return result
 
     def authenticationTranslatorPlamoAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationPlamoAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationPlamoAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorPlamoModelList(self) -> list[str]:
@@ -1094,7 +1058,7 @@ class Model:
         self.translator.updatePlamoClient()
 
     def authenticationTranslatorGeminiAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationGeminiAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationGeminiAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorGeminiModelList(self) -> list[str]:
@@ -1111,7 +1075,7 @@ class Model:
         self.translator.updateGeminiClient()
 
     def authenticationTranslatorOpenAIAuthKey(self, auth_key: str, base_url: Optional[str] = None) -> bool:
-        result = self.translator.authenticationOpenAIAuthKey(auth_key, base_url=base_url, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationOpenAIAuthKey(auth_key, base_url=base_url, root_path=config.PATH_APP)
         return result
 
     def getTranslatorOpenAIModelList(self) -> list[str]:
@@ -1129,7 +1093,7 @@ class Model:
 
     def authenticationTranslatorOpenAICompatibleAuthKey(self, auth_key: str, base_url: Optional[str] = None) -> bool:
         result = self.translator.authenticationOpenAICompatibleAuthKey(
-            auth_key, base_url=base_url, root_path=config.PATH_LOCAL
+            auth_key, base_url=base_url, root_path=config.PATH_APP
         )
         return result
 
@@ -1146,7 +1110,7 @@ class Model:
         self.translator.updateOpenAICompatibleClient()
 
     def authenticationTranslatorGroqAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationGroqAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationGroqAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorGroqModelList(self) -> list[str]:
@@ -1163,7 +1127,7 @@ class Model:
         self.translator.updateGroqClient()
 
     def authenticationTranslatorOpenRouterAuthKey(self, auth_key: str) -> bool:
-        result = self.translator.authenticationOpenRouterAuthKey(auth_key, root_path=config.PATH_LOCAL)
+        result = self.translator.authenticationOpenRouterAuthKey(auth_key, root_path=config.PATH_APP)
         return result
 
     def getTranslatorOpenRouterModelList(self) -> list[str]:
@@ -1184,7 +1148,7 @@ class Model:
         return self.translator.getLMStudioConnected()
 
     def authenticationTranslatorLMStudio(self, base_url: str) -> bool:
-        result = self.translator.setLMStudioClientURL(base_url=base_url, root_path=config.PATH_LOCAL)
+        result = self.translator.setLMStudioClientURL(base_url=base_url, root_path=config.PATH_APP)
         return result
 
     def getTranslatorLMStudioModelList(self) -> list[str]:
@@ -1204,7 +1168,7 @@ class Model:
         return self.translator.getOllamaConnected()
 
     def authenticationTranslatorOllama(self) -> bool:
-        result = self.translator.checkOllamaClient(root_path=config.PATH_LOCAL)
+        result = self.translator.checkOllamaClient(root_path=config.PATH_APP)
         return result
 
     def getTranslatorOllamaModelList(self) -> list[str]:
@@ -1229,12 +1193,21 @@ class Model:
 
     def authenticationTranslatorAiCli(self) -> bool:
         self.ensure_initialized()
-        return self.translator.checkAiCliClient(tool=config.SELECTED_AI_CLI_TOOL, root_path=config.PATH_LOCAL,
-                                                client_version=config.VERSION)
+        return self.translator.checkAiCliClient(
+            tool=config.SELECTED_AI_CLI_TOOL,
+            root_path=config.PATH_APP,
+            client_version=config.VERSION,
+            workspace=os_path.join(config.PATH_DATA, "ai_cli_workspace"),
+        )
 
     def setTranslatorAiCliTool(self, tool: str) -> bool:
         self.ensure_initialized()
-        return self.translator.checkAiCliClient(tool=tool, root_path=config.PATH_LOCAL, client_version=config.VERSION)
+        return self.translator.checkAiCliClient(
+            tool=tool,
+            root_path=config.PATH_APP,
+            client_version=config.VERSION,
+            workspace=os_path.join(config.PATH_DATA, "ai_cli_workspace"),
+        )
 
     def setTranslatorAiCliStatusCallback(self, callback) -> None:
         """AI CLI が使えなくなった/立ち直ったときに呼ぶ関数 (引数は bool) を登録する。"""
@@ -1597,8 +1570,8 @@ class Model:
 
     def _transliterationDictPath(self):
         if config.SUDACHI_DICT_TYPE == "full":
-            if checkSudachiFullDict(config.PATH_LOCAL):
-                return sudachiFullDictPath(config.PATH_LOCAL)
+            if checkSudachiFullDict(config.PATH_DATA):
+                return sudachiFullDictPath(config.PATH_DATA)
             errorLog(
                 "SUDACHI_DICT_TYPE is 'full' but the full dictionary is not downloaded; "
                 "falling back to the standard (core) Sudachi dictionary."
@@ -1622,10 +1595,22 @@ class Model:
             self.transliterator = Transliterator(dict_path=self._transliterationDictPath())
 
     def checkSudachiFullDict(self):
-        return checkSudachiFullDict(config.PATH_LOCAL)
+        return checkSudachiFullDict(config.PATH_DATA)
 
     def downloadSudachiFullDict(self, callback=None, end_callback=None):
-        return downloadSudachiFullDict(config.PATH_LOCAL, callback, end_callback)
+        return downloadSudachiFullDict(config.PATH_DATA, callback, end_callback)
+
+    def cudaPackStatus(self, downloading: bool = False) -> str:
+        return cuda_pack.status(downloading=downloading)
+
+    def downloadCudaPack(self, callback=None, end_callback=None) -> bool:
+        return cuda_pack.downloadCudaPack(callback, end_callback)
+
+    def isCudaPackInstalled(self) -> bool:
+        return cuda_pack.isInstalled()
+
+    def requestCudaPackRemoval(self) -> None:
+        cuda_pack.requestRemoval()
 
     def convertMessageToTransliteration(self, message: str, hiragana: bool=True, romaji: bool=True) -> list:
         self.ensure_initialized()
@@ -1747,373 +1732,6 @@ class Model:
     def getIsOscQueryEnabled(self):
         self.ensure_initialized()
         return self.osc_handler.getIsOscQueryEnabled()
-
-    @staticmethod
-    def _isVersionSupported(version_str: str) -> bool:
-        # VRCT 3.4.2 fails to start (fixed in 3.4.3); keep it out of both the
-        # update-check comparison and the version picker.
-        try:
-            return parse(version_str) >= parse(config.MIN_SUPPORTED_VERSION)
-        except Exception:
-            return False
-
-    @staticmethod
-    def _fetchGithubReleases() -> list:
-        # All releases (including prereleases), newest first, drafts excluded.
-        # timeout 無しだと GitHub 側が「接続はするが応答しない」状態になった
-        # 場合に無期限にブロックし、これを呼ぶ checkSoftwareUpdated() は
-        # Controller.init() から呼ばれるため、初期化そのものが固まる。
-        response = requests_get(config.GITHUB_RELEASES_LIST_URL, timeout=_HTTP_TIMEOUT)
-        response.raise_for_status()
-        releases = response.json()
-        if not isinstance(releases, list):
-            return []
-        return [r for r in releases if isinstance(r, dict) and not r.get("draft", False)]
-
-    @staticmethod
-    def checkSoftwareUpdated():
-        # check update
-        update_flag = False
-        version = ""
-        try:
-            if config.SELECTED_RELEASE_CHANNEL == "beta":
-                # beta を使っている間は beta 同士でのみ最新判定する。
-                # ここで prerelease を絞らないと、GitHub の公開順(作成日時順)
-                # によっては後から出た stable 版が候補[0]に来てしまい、
-                # betaユーザーにstableへの「更新あり」通知が出てしまう。
-                candidates = [
-                    r["name"] for r in Model._fetchGithubReleases()
-                    if isinstance(r.get("name"), str) and Model._isVersionSupported(r["name"])
-                    and r.get("prerelease", False)
-                ]
-                version = candidates[0] if candidates else None
-            else:
-                response = requests_get(config.GITHUB_URL, timeout=_HTTP_TIMEOUT)
-                json_data = response.json()
-                version = json_data.get("name", None)
-            if isinstance(version, str):
-                new_version = parse(version)
-                current_version = parse(config.VERSION)
-                if new_version > current_version:
-                    update_flag = True
-        except Exception:
-            errorLogging()
-        return {
-            "is_update_available": update_flag,
-            "new_version": version,
-        }
-
-    @staticmethod
-    def listAvailableReleases() -> list:
-        # Version picker data source: all supported (>= MIN_SUPPORTED_VERSION)
-        # releases across both channels, newest first.
-        result = []
-        try:
-            for r in Model._fetchGithubReleases():
-                version = r.get("name")
-                tag = r.get("tag_name")
-                if not isinstance(version, str) or not isinstance(tag, str):
-                    continue
-                if not Model._isVersionSupported(version):
-                    continue
-                result.append(ReleaseInfo(
-                    tag=tag,
-                    version=version,
-                    is_prerelease=bool(r.get("prerelease", False)),
-                    published_at=str(r.get("published_at", "")),
-                ))
-        except Exception:
-            errorLogging()
-        return result
-
-    # setup.exe と一緒に CI が公開する SHA-256 サイドカーアセットのファイル名。
-    # release.yml は VRCT.zip.sha256 / VRCT_cuda.zip.sha256 も同じ release に
-    # アセットとして公開しているため、単純な ".sha256" 拡張子一致では別
-    # ファイルのハッシュを誤って採用しかねない。setup.exe (固定ファイル名)
-    # のものだけを厳密に名前一致させる。
-    _SHA256_ASSET_NAME = "VRCT_setup.exe.sha256"
-    # ".sha256" サイドカー (数十バイトの小さなファイル) の取得リトライ回数。
-    # これ1つの一時的な通信失敗で更新全体を止めてしまわないための保険。
-    # setup.exe 本体の _downloadSetup (5回) より軽い処理なので控えめに3回。
-    _SHA256_SIDECAR_ATTEMPTS = 3
-
-    @staticmethod
-    def _resolveReleaseForVersion(target_version: Optional[str] = None) -> Optional[dict]:
-        # target_version (完全なバージョン文字列) に対応する GitHub Release
-        # オブジェクト (assets を含む) を返す。target_version が None の
-        # 場合は checkSoftwareUpdated() と同じロジックで、現在の
-        # SELECTED_RELEASE_CHANNEL における最新版の Release を返す。
-        # 見つからない/取得失敗の場合は None。
-        try:
-            if target_version is not None:
-                for r in Model._fetchGithubReleases():
-                    if r.get("name") == target_version:
-                        return r
-                return None
-            if config.SELECTED_RELEASE_CHANNEL == "beta":
-                # checkSoftwareUpdated() と同じ理由で prerelease のみに限定。
-                candidates = [
-                    r for r in Model._fetchGithubReleases()
-                    if isinstance(r.get("name"), str) and Model._isVersionSupported(r["name"])
-                    and r.get("prerelease", False)
-                ]
-                return candidates[0] if candidates else None
-            response = requests_get(config.GITHUB_URL, timeout=_HTTP_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
-            return data if isinstance(data, dict) else None
-        except Exception:
-            errorLogging()
-            return None
-
-    @staticmethod
-    def _fetchExpectedSha256(release: Optional[dict]) -> Optional[str]:
-        # release の assets から "<setup.exe名>.sha256" というサイドカー
-        # アセットを探し、中身 (16進ダイジェスト文字列) を取得して返す。
-        #
-        # 戻り値の意味:
-        #   - digest 文字列 : 期待する SHA-256 が取れた
-        #   - None          : この release には ".sha256" アセットが存在しない
-        #                     (この検証より前に公開された古い release)。呼び出し
-        #                     側はサイズチェックのみへフォールバックしてよい。
-        #                     古いバージョンの再インストール/ダウングレードを
-        #                     壊さないための措置。
-        # 例外 SetupSha256Unavailable:
-        #   ".sha256" アセットは存在するのに、リトライしても有効なダイジェスト
-        #   を取得できなかった。「検証対象が無い」のとは異なり、すり替えの
-        #   可能性を排除できないため、呼び出し側は更新を中止する。
-        if not isinstance(release, dict):
-            return None
-        assets = release.get("assets")
-        if not isinstance(assets, list):
-            return None
-        sidecar_urls = [
-            asset["browser_download_url"]
-            for asset in assets
-            if isinstance(asset, dict)
-            and isinstance(asset.get("name"), str)
-            and asset["name"] == Model._SHA256_ASSET_NAME
-            and isinstance(asset.get("browser_download_url"), str)
-        ]
-        if not sidecar_urls:
-            return None
-        for url in sidecar_urls:
-            digest = Model._fetchSha256Digest(url)
-            if digest is not None:
-                return digest
-        raise SetupSha256Unavailable(
-            f"{len(sidecar_urls)} '.sha256' sidecar asset(s) present on the "
-            "release but none yielded a valid SHA-256 digest after retrying"
-        )
-
-    @staticmethod
-    def _fetchSha256Digest(url: str) -> Optional[str]:
-        # ".sha256" は数十バイトの小さなファイルだが、これ1つの一時的な
-        # 取得失敗で更新全体を止めてしまわないよう _SHA256_SIDECAR_ATTEMPTS
-        # 回リトライする。有効な16進ダイジェスト (64桁) が取れなければ None。
-        # レスポンスは得られたが中身がチェックサムでない (空 / 途中で切れた /
-        # HTML エラーページ等) 場合も失敗扱いでリトライする。
-        for _ in range(Model._SHA256_SIDECAR_ATTEMPTS):
-            try:
-                res = requests_get(url, timeout=_HTTP_TIMEOUT)
-                res.raise_for_status()
-                digest = res.text.strip().split()[0].lower()
-                if len(digest) == 64 and all(c in "0123456789abcdef" for c in digest):
-                    return digest
-            except Exception:
-                errorLogging()
-        return None
-
-    @staticmethod
-    def _downloadSetup(setup_url: str, expected_sha256: Optional[str] = None) -> bool:
-        # try to download at most 5 times
-        program_name = "VRCT_setup.exe"
-        current_directory = config.PATH_LOCAL
-        dest_path = os_path.join(current_directory, program_name)
-        # minimum plausible size for a real NSIS installer; guards against
-        # saving/executing a short HTML error page as the installer
-        min_valid_size = 1024 * 1024
-        for _ in range(5):
-            try:
-                res = requests_get(setup_url, stream=True, timeout=_HTTP_TIMEOUT)
-                res.raise_for_status()
-                downloaded_size = 0
-                hasher = hashlib.sha256()
-                with open(dest_path, 'wb') as file:
-                    for chunk in res.iter_content(chunk_size=1024*5):
-                        file.write(chunk)
-                        hasher.update(chunk)
-                        downloaded_size += len(chunk)
-                if downloaded_size < min_valid_size:
-                    raise ValueError(f"Downloaded setup file is too small ({downloaded_size} bytes); likely not a valid installer")
-                if expected_sha256 is not None:
-                    actual_sha256 = hasher.hexdigest()
-                    if actual_sha256 != expected_sha256:
-                        # ハッシュ不一致は改ざん/破損の疑いであり、通信起因
-                        # の一時的な失敗とは性質が異なる (同じレスポンスを
-                        # 再試行しても無意味、あるいは攻撃者に汚染された
-                        # 配信元を再度信頼することになりかねない) ため、
-                        # リトライループには乗せず即座に失敗として扱う。
-                        printLog(
-                            "Setup file SHA-256 mismatch: expected "
-                            f"{expected_sha256}, got {actual_sha256}. Aborting update."
-                        )
-                        try:
-                            os_remove(dest_path)
-                        except Exception:
-                            errorLogging()
-                        return False
-                return True
-            except Exception:
-                errorLogging()
-                try:
-                    if os_path.exists(dest_path):
-                        os_remove(dest_path)
-                except Exception:
-                    errorLogging()
-        return False
-
-    # setup.exe 本体のアセット名。_fetchExpectedSha256 が探す
-    # _SHA256_ASSET_NAME (= このファイル名 + ".sha256") と対をなす。
-    _SETUP_ASSET_NAME = "VRCT_setup.exe"
-
-    @staticmethod
-    def _downloadVerifiedSetup(target_version: Optional[str]) -> Optional[str]:
-        # GitHub Release を解決して期待する SHA-256 を求め、setup.exe を
-        # ダウンロード & 検証する。updateSoftware()/updateCudaSoftware() の
-        # 共通前処理。
-        #
-        # 戻り値 str (バージョン文字列) : VRCT_setup.exe がディスク上にあり
-        #   起動して問題ない。実際にダウンロードした release のバージョン
-        #   (呼び出し側はこれをそのまま /VERSION= に渡し、起動する setup.exe
-        #   がハッシュ検証したのと同じバージョンを再度対象にできるようにする)。
-        # 戻り値 None : 呼び出し側は何も起動せず中止すること。内訳は
-        #   - 対象の GitHub Release を解決できず、かつ target_version も
-        #     指定されていない (どのバージョンを配布すべきか判断できない)。
-        #   - release の assets に setup.exe 本体が見つからない。
-        #   - ダウンロード or ハッシュ検証に失敗した (_downloadSetup が False)。
-        #   - ".sha256" が公開されているのに取得できなかった
-        #     (SetupSha256Unavailable)。サイズチェックのみへは格下げしない。
-        release = Model._resolveReleaseForVersion(target_version)
-
-        # ダウンロードするファイルとハッシュ検証の対象を同じ release に
-        # 揃える: release から解決できた version (release["name"]) を
-        # 最優先する。release が解決できなかった場合は target_version (明示
-        # 的にピン留めされたバージョン) にのみフォールバックする -- release
-        # も target_version も無い場合、どのバージョンを配布すべきかを
-        # 判断する根拠が無いので、現在インストールされているバージョンを
-        # 黙って再インストールするのではなく更新を中止する。
-        if isinstance(release, dict) and isinstance(release.get("name"), str):
-            resolved_version = release["name"]
-            tag = release.get("tag_name")
-            if not isinstance(tag, str):
-                tag = f"v{resolved_version}"
-        elif target_version is not None:
-            resolved_version = target_version
-            tag = f"v{target_version}"
-        else:
-            printLog(
-                "Could not resolve a GitHub Release to update to (no release "
-                "found for the current channel, and no explicit /VERSION= was "
-                "given); aborting update"
-            )
-            return None
-
-        if isinstance(release, dict):
-            assets = release.get("assets")
-            asset_names = {
-                asset.get("name") for asset in assets
-                if isinstance(asset, dict)
-            } if isinstance(assets, list) else set()
-            if Model._SETUP_ASSET_NAME not in asset_names:
-                printLog(f"{Model._SETUP_ASSET_NAME} asset missing for {tag}; aborting update")
-                return None
-
-        setup_url = config.setupDownloadUrlForTag(tag)
-        try:
-            expected_sha256 = Model._fetchExpectedSha256(release)
-        except SetupSha256Unavailable:
-            printLog(
-                f"Setup file SHA-256 sidecar was published for {tag} but "
-                "could not be retrieved; aborting update (not falling back "
-                "to size-only validation)"
-            )
-            return None
-        if expected_sha256 is None:
-            printLog(
-                f"Setup file SHA-256 could not be verified (no .sha256 asset found for {tag}); "
-                "falling back to size-only validation"
-            )
-        if not Model._downloadSetup(setup_url, expected_sha256):
-            return None
-        return resolved_version
-
-    @staticmethod
-    def updateSoftware(target_version: Optional[str] = None):
-        if target_version is not None and not Model._isVersionSupported(target_version):
-            return
-        resolved_version = Model._downloadVerifiedSetup(target_version)
-        if resolved_version is None:
-            return
-        # run the NSIS setup wizard, preselecting the CPU edition; always pin
-        # to the exact version we just resolved/downloaded/hash-verified
-        # (not merely target_version, which may be None for "latest") so the
-        # setup wizard targets the very release this download already
-        # verified, instead of possibly re-resolving "latest" a second time
-        # and landing on a different release; carry over the current UI
-        # language so the installer chrome and the custom "UI Language" page
-        # start on the user's chosen language; carry over the current
-        # release channel so the installer's channel page defaults to what
-        # the user already has selected in VRCT.
-        args = [
-            "VRCT_setup.exe",
-            "/EDITION=cpu",
-            f"/UILANG={config.UI_LANGUAGE}",
-            f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}",
-            f"/VERSION={resolved_version}",
-        ]
-        Popen(args, cwd=config.PATH_LOCAL)
-        Model._quitApp()
-
-    @staticmethod
-    def updateCudaSoftware(target_version: Optional[str] = None):
-        if target_version is not None and not Model._isVersionSupported(target_version):
-            return
-        resolved_version = Model._downloadVerifiedSetup(target_version)
-        if resolved_version is None:
-            return
-        # run the NSIS setup wizard, preselecting the GPU edition; always pin
-        # to the exact version we just resolved/downloaded/hash-verified
-        # (not merely target_version, which may be None for "latest") so the
-        # setup wizard targets the very release this download already
-        # verified, instead of possibly re-resolving "latest" a second time
-        # and landing on a different release; carry over the current UI
-        # language so the installer chrome and the custom "UI Language" page
-        # start on the user's chosen language; carry over the current
-        # release channel so the installer's channel page defaults to what
-        # the user already has selected in VRCT.
-        args = [
-            "VRCT_setup.exe",
-            "/EDITION=gpu",
-            f"/UILANG={config.UI_LANGUAGE}",
-            f"/CHANNEL={config.SELECTED_RELEASE_CHANNEL}",
-            f"/VERSION={resolved_version}",
-        ]
-        Popen(args, cwd=config.PATH_LOCAL)
-        Model._quitApp()
-
-    @staticmethod
-    def _quitApp():
-        # The setup wizard's own running-process check can only kill VRCT
-        # silently or prompt the user for it; quit proactively here so the
-        # app always closes as soon as the wizard has been launched, whether
-        # this was a version update or a CPU/GPU switch.
-        try:
-            psutil_Process(os_getppid()).terminate()
-        except Exception:
-            errorLogging()
-        finally:
-            os_exit(0)
 
     def getListMicHost(self):
         self.ensure_initialized()
@@ -2244,6 +1862,8 @@ class Model:
             printLog(f"OCR: source language {source_language!r} is not selected or not supported, refusing to start")
             return False
 
+        # 同梱していない OCR のモデルは、更新で消えない PATH_DATA に取ってくる (ocr_engine_rapidocr 参照)。
+        ocr_engine_rapidocr.setModelDirectory(os_path.join(config.PATH_DATA, "weights", "rapidocr"))
         try:
             self.ocr_pipeline = OcrPipeline(
                 callback=fnc,
@@ -2443,7 +2063,7 @@ class Model:
             "zh-Hant":"Chinese Traditional",
         }
         language = convert_languages.get(ui_language, "Default")
-        overlay_image = OverlayImage(config.PATH_LOCAL)
+        overlay_image = OverlayImage(config.PATH_APP)
 
         for _ in range(2):
             overlay_image.createOverlayImageLargeLog("send", message, language)
@@ -2743,7 +2363,7 @@ class Model:
         """Model 内で Telemetry を初期化"""
         if storage_path is None:
             try:
-                storage_path = os_path.join(config.PATH_LOCAL, "telemetry_state.json")
+                storage_path = os_path.join(config.PATH_DATA, "telemetry_state.json")
             except Exception:
                 storage_path = None
         self.telemetry.init(enabled=enabled, app_version=app_version, storage_path=storage_path)

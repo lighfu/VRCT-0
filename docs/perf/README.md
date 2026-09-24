@@ -357,3 +357,332 @@ Rust を導入して `npm run build` を実行した（CPU 版、develop `b87f7e
   UI に送る。これは単体テストで確認）。以後の翻訳は CLI を呼ばずに即座に（1 ms 未満で）失敗する（アプリでは CTranslate2 で訳される）。
 
 プロセスの後片付け: 2 回のサイドカーの実行とも、終了後に起動した CLI・VRCT のプロセスは残らなかった。
+
+## 追記（Velopack のインストーラー）: 手元の PC での確認（2026-09-24）
+
+`feat/installer-velopack`（`bbb2ee57`）で作った `3.5.1-beta.1` の Setup で入れ、手元のフォルダを更新元
+（`VRCT_UPDATE_FEED_DIR`）にして、更新・入れ替えの失敗・削除を確かめた。公開はしていない。
+Windows 11（表示言語は日本語）。画面の操作はすべて UI オートメーションで行い、マウスとキーボードは使っていない。
+
+更新用の `3.5.1-beta.2`〜`beta.6` は作り直さず、`src-tauri\target\release` の同じ中身に版ごとの目印のファイル
+（`_internal\velopack_test_marker.txt`）を足して `vpk pack` した（`utils/pack_release.py` の `stage()` と `pack_args()` を使用）。
+そのため画面の版の表示はどれも `v3.5.1-beta.1` のままで、版は `current\sq.version` と目印のファイルで確かめた。
+差分に入るのは `sq.version` と目印のファイルだけなので、本物のリリースの差分はこれより大きくなる。
+
+### 大きさ
+
+| もの | 大きさ |
+|---|---|
+| `VRCT-0-win-Setup.exe` | 399,790,000 バイト（381.3 MiB） |
+| `VRCT-0-3.5.1-beta.1-full.nupkg` | 392,257,968 バイト（374.1 MiB） |
+| 差分 `*-delta.nupkg`（beta.2〜beta.6） | 664,319〜664,576 バイト（0.63 MiB。画面では「約 1 MB」） |
+| 入れたあとの `current\`（アンインストールの登録の EstimatedSize） | 832,519 KB（813 MiB） |
+| `packages\`（最新の full.nupkg を 1 つ置く） | 374 MiB |
+| `data\weights`（初回起動で取る NLLB-600M と Whisper base） | 780 MB |
+
+`vpk pack` は 1 回 86〜122 秒（差分づくりを含む）。
+
+### 導入
+
+- `VRCT-0-win-Setup.exe` を開くと、ページもダイアログも出ず、VRCT-0 の画像（150% 表示で 768×768）と緑の進み具合だけが出て、
+  7.3 秒でアプリが起動した（`startup.log` の「Main window is ready」まで 7.8 秒）。文字を出さないので、Setup の表示言語は問題にならない。
+  WebView2 は入っていたので何も聞かれなかった。
+- 初回起動の画面は日本語（`UI_LANGUAGE: ja`。OS の表示言語どおり）。チャンネルは Beta版（プレリリースの版のため）。
+- `%LocalAppData%\VRCT-0\` に `current\`・`data\`・`packages\`・`Update.exe`・`VRCT-0.exe` ができた。
+  `data\` には `config.json`・`logs\startup.log`・`process.log`・`webview\`・`weights\`。`current\` にはログも設定も書かれなかった。
+- スタートメニューとデスクトップに `VRCT-0.lnk`、`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\VRCT-0` ができた
+  （DisplayName `VRCT-0`、UninstallString `"...\Update.exe" --uninstall`。DisplayVersion は `3.5.1` で、`-beta.1` は付かない）。
+- 設定を 1 つ変え（メッセージ送信ボタンを「表示し、エンターキーでの送信を無効」に）、翻訳を 1 通送った
+  （CTranslate2。「Hello. It's a nice day today.」）。UI サイズのスライダーは UI オートメーションで動かせなかったので、この設定で代えた。
+
+### 更新
+
+| 場面 | 落とした大きさ | 「更新」→ 準備完了 | 閉じる操作のあと | 結果 |
+|---|---|---|---|---|
+| beta.1→2、今すぐ再起動 | 差分 | 31.2 秒 | 2.3 秒で旧版が終了、15.4 秒で新版のプロセス、22.4 秒で画面 | beta.2 で起動。設定とモデルは残った |
+| beta.2→3、終了時（×ボタン） | 差分 | 28.7 秒 | 2.3 秒でアプリが終了、9.2 秒で Update.exe が終了（再起動しない） | 次に起動すると beta.3 |
+| beta.4→5、終了時（WM_CLOSE。Alt+F4 と同じ経路） | 差分 | 24.8 秒 | 0.3 秒でアプリが終了、6.7 秒で Update.exe が終了 | 次に起動すると beta.5 |
+| beta.3→4、強制終了（`Stop-Process`） | 丸ごと 374 MiB | 0.75 秒（手元のフォルダから） | 次の起動で VelopackApp が入れ替えて起動し直す。起動から 6.0 秒で新版のプロセス | beta.4 で起動 |
+
+- 通知は、起動して画面が出てから 0.5 秒で出た（「新しい版 3.5.1-beta.2 が出ています（約 1 MB）」）。「更新を確認」を押したときは 0.1 秒。
+- 差分のときの「ダウンロード」の時間は、ほとんどが Update.exe が差分から丸ごとのパッケージ（392 MB）を組み立て直す時間（約 27 秒）。
+  進み具合は 70% まで一瞬で進み、組み立てのあいだ 70% のまま止まる。
+- 「今すぐ再起動」で起動し直したアプリにも `VRCT_UPDATE_FEED_DIR` が引き継がれた（`VELOPACK_RESTART=true` も付く）。
+  起動用の `VRCT-0.exe`（導入先の直下）から起動したときも引き継がれる。
+- どの閉じ方でも、終了時に起動した Update.exe は「Failed to wait for process (…) to exit (アクセスが拒否されました)」と記録し、
+  アプリの終了を待たずに展開を始める。展開のあとで導入先から動いているプロセスを止めるので、入れ替えは失敗しなかった
+  （×ボタンと WM_CLOSE では、その時点で止める対象は残っていなかった）。
+- 強制終了のあと、サイドカーは親がいないまま動き続け、約 12 秒後に次の起動の Update.exe に止められた。
+- 翻訳エンジンを AI CLI（claude）にしていた場面も含め、どの閉じ方のあとも claude の子プロセスは残らなかった。
+
+### 入れ替えの失敗
+
+- beta.4 を落とし終えたあと、`packages\VRCT-0-3.5.1-beta.4-full.nupkg`（392,258,606 バイト）の真ん中
+  （196,129,303 バイト目。`onnxruntime.dll` の圧縮データの中）の 1 バイトを 0x87 から 0x78 に書き換え、×ボタンで閉じた。
+- Update.exe は 2 秒で「Error applying package: IO error: Invalid checksum」で失敗し、その nupkg を
+  「to prevent update loop」として消した。`current\` は beta.3 のまま。画面には何も出ない。
+- 次の起動は普通に beta.3 で動き（入れ替えのやり直しは起きない）、設定とモデルも残っていた。
+  次の確認で beta.4 がまた通知されたが、差分の元にする beta.3 の nupkg もダウンロードのときに消えているので、丸ごと（約 374 MB）になった。
+
+### 入れ替え中にもう一度起動した場合
+
+beta.5→6 で、×ボタンで閉じて旧版が終わった直後（Update.exe が展開している最中）に起動し直した。
+
+- 起動したアプリ（beta.5）の VelopackApp が落としてある beta.6 を見つけて入れ替えようとし、2 つ目の Update.exe は
+  ロックを取れずに失敗して、beta.5 を起動し直した。
+- その beta.5 は起動し直してから約 6 秒で、最初の Update.exe の「導入先から動いているプロセスを止める」処理に止められた。
+  入れ替えは終わったが、アプリは起動しないまま残った（ユーザーからは、開いたアプリが消えたように見える）。もう一度起動すれば beta.6 で動く。
+- 閉じてから入れ替えが終わるまでは、この PC で 5〜9 秒。
+
+### 動いたまま削除する
+
+- 翻訳エンジンを AI CLI（claude）にして起動すると、起動から約 4 秒で `claude.exe` が立ち上がった（親はサイドカー、その親は VRCT-0.exe）。
+  1 通送ると 2.8 秒で「Good morning. This is a test.」が返った。
+- そのまま、登録されているアンインストールのコマンド（`Update.exe --uninstall`）を実行した。
+  日本語の進み具合の画面（「VRCT-0 をアンインストールしています」）が出て、終わると自分で閉じた。
+- Update.exe は削除の直前のフックを呼ぶ前に、導入先から動いているプロセス（本体とサイドカー）を自分で止める。
+  claude と WebView2 のプロセスも含めて、0.9 秒ですべて終わった。フックも呼ばれたが、止める対象は残っていなかった。
+- ショートカットは 1.6 秒、アンインストールの登録は 3.6 秒で消えた。Update.exe は 10.9 秒で終わり、
+  `%LocalAppData%\VRCT-0` は 14.1 秒で丸ごと消えた（Update.exe が終わってから 3 秒待って `rmdir` する）。
+- 元の VRCT（`%LOCALAPPDATA%\VRCT`、5,811 項目）のファイルの一覧と更新時刻は、確認の前後で同じだった。
+
+### 導入先の外に書かれたもの
+
+- `%LocalAppData%\velopack\velopack.log`: Setup のログ。Velopack を使う他のアプリの Setup と同じファイルに追記する。削除しても残る。
+- `%LocalAppData%\velopack\velopack_VRCT-0.log`: Update.exe（差分の組み立て・入れ替え・起動・削除）と、導入先の直下の `VRCT-0.exe` のログ。
+  削除しても残る（確認のあと手で消した）。入れ替えの失敗はここにだけ記録される。`%TEMP%` にはログは無かった。
+- `%TEMP%\velopack_VRCT-0`: Velopack の一時フォルダ。削除のときに消える。
+- `%LOCALAPPDATA%\com.lighfu.vrct0\.cookies`: **不具合（あとで修正。下の「修正後の再確認」）**。tauri-plugin-http（既定で `cookies` 機能が入る）は起動時に
+  `app_cache_dir()`（Windows では `%LOCALAPPDATA%\com.lighfu.vrct0`）の `.cookies` を開き、アプリを閉じるたびに書く。
+  入れた版でも `data\` ではなくここに書き、削除しても残る。この PC では開発版が作ったフォルダが先にあったため、
+  中身が空から `[]` に変わったこと、更新時刻がアプリを閉じた時刻（12:41:59）、アクセス時刻が起動した時刻（12:48:15）になったことで見つけた。
+- `%USERPROFILE%\.cache\huggingface\xet`: 最終レビューで、hf_xet が使われると `hf_hub_download(cache_dir=...)` を渡しても
+  Xet のチャンクキャッシュがここに書かれると指摘された（この PC の中身は開発版での取得のもの）。修正後の再確認で、配る版の
+  サイドカーは hf_xet を使わず（配布情報の dist-info を同梱していないため）、ここには書かないことが分かった。念のため `HF_HOME` を
+  `data\huggingface` に向けた。
+
+### 確かめられなかったこと
+
+- Windows の「設定 → アプリ」の画面からの削除（登録されている `Update.exe --uninstall` を直接実行した。Windows 自身の確認ダイアログは見ていない）。
+- GitHub Releases からの更新と、ネットワーク越しのダウンロード時間（最初の公開リリースのときに確かめる）。
+- 本物のリリースの大きさの差分（今回の差分は `sq.version` と目印のファイルだけ）。
+- WebView2 が入っていない PC（Windows 10）での Setup。
+- ダウンロード中のスリープやネットワークの切り替え。
+- UI サイズの変更（スライダーを UI オートメーションで動かせなかったので、別の設定で代えた）。
+- 強制終了のあとに残ったサイドカーが、入れ替えが無いときにいつまで動くか。
+
+### 修正後の再確認（最終レビューの修正のあと、2026-09-24）
+
+最終レビューの指摘（tauri-plugin-http の `.cookies`、Hugging Face のキャッシュ、入れてある上からの Setup で `data\` が消えること）を
+直した版（`2e9f93ff`。`3.5.1-beta.1`）で、同じ PC で確かめ直した。更新用の `3.5.1-beta.2` は前と同じく目印のファイルを足して
+`vpk pack` し直した。操作はすべて UI オートメーションで、Setup のダイアログのボタンは `TDM_CLICK_BUTTON` のメッセージで押した
+（マウスとキーボードは使っていない）。
+
+**直す前の Setup の動き**（Task 6 と 7 で作った版で確認）: 入れてある上から Setup を実行すると、版に応じて「修復」（同じ版）・
+「更新」（新しい版）・「ダウングレード」（古い版）のダイアログが出る。どれを押しても Setup は導入先を丸ごと
+`%LocalAppData%\VRCT-0.<英数字16文字>` に退避して入れ直し、終わると退避したフォルダを消すので、3 通りとも `data\` の目印のファイル・
+設定（`SEND_MESSAGE_BUTTON_TYPE`）・モデル（780 MB）が消えた。退避したフォルダは、導入のフック（`--veloapp-install`）が
+終わってアプリが起動するまで `data\` ごと残っていた（Setup のログの順序も同じ）。
+
+**直したあと**:
+
+| 確かめたこと | 結果 |
+|---|---|
+| Setup で入れる（`--silent`） | 5.7 秒。導入のフックは退避したフォルダが無いので何もせず、`data\` も作らない |
+| 初回起動と翻訳 | 起動から 5 秒で画面、0.5 秒後に更新の通知。翻訳をオンにして送ると、NLLB のトークナイザー（22 MB）を `data\weights\...\tokenizer` に取り、「Good morning. This is a test.」。`data\huggingface` はできない（下の「空のプロフィール」）。`data\nvidia\ComputeCache` ができる |
+| アプリ内の更新（beta.1→2、今すぐ再起動） | 差分（約 1 MB）→ 準備完了まで 28 秒、再起動から 11 秒で新版。目印・設定・モデルは残った。準備完了の間は「更新を確認」が押せず（`IsEnabled=False`）、「リリースチャンネル」の見出しは 1 つだけ |
+| 同じ版の Setup（「修復」、アプリが動いたまま） | Setup がアプリを止めて入れ直し、ダイアログを含めて 7.6 秒で終わった。目印・設定・モデル（779.6 MB）が残り、起動ログに「Reinstall: kept the data folder from …\VRCT-0.q1EqKzGbpO5ONfiB」。フックは 0.46 秒 |
+| 古い版の Setup（beta.2 の上に beta.1、「ダウングレード」） | 7.9 秒。目印・設定・モデルが残った。フックは 0.41 秒 |
+| 新しい版の Setup（beta.1 の上に beta.2、「更新」） | 15.3 秒。目印・設定・モデルが残った。フックは 0.78 秒 |
+| 退避したフォルダ | どの場合も Setup が終わるときに消え、`%LocalAppData%\VRCT-0.*` は残らなかった |
+| 動いたままの削除 | Update.exe が本体とサイドカーを止め、フック（0.75 秒）のあとで削除。最後の「アンインストール完了」は OK を押すまで閉じず（45 秒待った）、押して 3 秒後に `%LocalAppData%\VRCT-0` が消えた |
+| Setup が消し損ねた退避フォルダ | `%LocalAppData%\VRCT-0.ZzStaleLeftover0`（中に `data\config.json`）を作ってから削除すると、削除の直前のフックが消した |
+| `%LOCALAPPDATA%\com.lighfu.vrct0` | 確認のあいだ（14:29〜14:36）、`.cookies` の更新時刻もアクセス時刻も 13:39:39（直す前の版を閉じた時刻）のまま |
+| `%USERPROFILE%\.cache`・`%APPDATA%`・`%LOCALAPPDATA%` の直下 | 確認の前後で VRCT-0 のものは増えも変わりもしなかった（変わったのはデスクトップの更新時刻と、ほかのアプリのフォルダだけ） |
+| 元の VRCT（`%LOCALAPPDATA%\VRCT`） | 5,811 項目の一覧のハッシュが確認の前後で同じ |
+
+**空のユーザープロフィール**: この PC の既存のキャッシュに隠れないよう、配るサイドカーを `USERPROFILE`・`HOME`・`APPDATA`・
+`LOCALAPPDATA`・`TEMP` を空のフォルダに向けて起動し、トークナイザーを除いたモデルを置いた `data\` で翻訳を 1 通送った。
+
+- `HF_HOME` を渡さない場合（直す前と同じ）: プロフィールの下にできたのは `AppData\Roaming\NVIDIA\ComputeCache`（空）だけ。
+  `.cache\huggingface` はできなかった。配るサイドカーは hf_xet の配布情報（dist-info）を同梱していないので、huggingface_hub は
+  hf_xet を使えないと判断し、普通の HTTP でトークナイザーを取る（レビューで見つかった Xet のキャッシュは開発版での取得のもの）。
+- `HF_HOME` と `CUDA_CACHE_PATH` を渡す場合（直したあとの入れた版と同じ）: プロフィールの下には何もできなかった。
+  ComputeCache は `data\nvidia\ComputeCache` にできた。
+
+**OCR のモデル**: rapidocr が同梱していないモデル（韓国語の rec と PP-OCRv5 の det、約 18 MB）を開発用の環境で取らせると、
+渡した置き場所（入れた版では `data\weights\rapidocr`）に入り、同梱の cls はパッケージの中のものをそのまま使った。
+配るパッケージの `rapidocr\models` は wheel のモデル 3 つだけになり、full.nupkg は 374.1 MiB から 319.3 MiB に、Setup は 381.3 MiB から 326.5 MiB になった。
+
+## 追記（GPU 高速化パックの後入れ）: 手元の PC での確認（2026-09-24）
+
+`feat/cuda-pack`（`9d83a613`）を消さない手順（`clean.py --soft` → `build-python` → `vite-build` → `tauri build --no-bundle` →
+`pack_release.py`）で `3.5.1-beta.1` にして Setup で入れ、GPU 高速化パック（cuBLAS / cuDNN の wheel）を本物の PyPI
+（`files.pythonhosted.org`）から取った。公開はしていない。この PC は Windows 11、RTX 3070（VRAM 8 GB）、
+NVIDIA のドライバー 581.94（CUDA 13.0）。画面の操作はすべて UI オートメーション（Invoke・SetValue・SelectionItem・ScrollIntoView）で、
+マウスとキーボードは使っていない。更新用の `3.5.1-beta.2` は前の追記と同じく、目印のファイルを足して `vpk pack` し直した。
+画面の文言は、あとで名前を「GPU 高速化パック」に変えたいまの文言で書いている（この確認のときの画面は別の名前だった）。
+
+### 大きさ
+
+| もの | 大きさ |
+|---|---|
+| `nvidia_cublas_cu12-12.8.4.1-py3-none-win_amd64.whl` | 567,544,208 バイト（固定した値と一致） |
+| `nvidia_cudnn_cu12-9.7.1.26-py3-none-win_amd64.whl` | 715,962,100 バイト（固定した値と一致） |
+| 取得の合計 | 1,283,506,308 バイト（1.28 GB） |
+| 展開後の `data\cuda\bin`（DLL 11 個） | 1,852,176,720 バイト（1,766.4 MiB） |
+| そのうち大きいもの | `cublasLt64_12.dll` 674,667,520、`cudnn_engines_precompiled64_9.dll` 528,766,000、`cudnn_adv64_9.dll` 326,072,352 |
+| `data\cuda\pack.json` | 309 バイト（`{"pack_id": "cu12.8-cudnn9.7", "files": [11 個]}`） |
+| この版の `VRCT-0-win-Setup.exe` / `full.nupkg` | 342,327,706 / 334,795,674 バイト（GPU 高速化パックは入っていない） |
+
+### 初回の問いかけと導入
+
+- Setup を開いてから 12 秒でアプリが起動した。初回は既定のモデル（Whisper base と NLLB-600M）を取るので、初期化が終わるまで 60 秒。
+  終わった直後に「GPU 高速化パックを導入して、翻訳と文字起こしを GPU で動かしますか？」が出た（ボタンは「導入する」「今はしない」）。
+  出た時点で `/run/mark_cuda_pack_prompted` が送られ、`config.json` の `CUDA_PACK_PROMPTED` が true になった。
+- 「導入する」を押すと問いかけが閉じ、設定の「翻訳」の GPU 高速化パック欄に「ダウンロード中… N%」と進み具合の棒が出た
+  （表示は 5% から 100% まで 1〜3% 刻みで変わった。サイドカーからの進み具合の通知は 163 回）。終わると欄が「再起動して GPU を使う」に替わった。
+- 取得の途中、`data\cuda\download\` の wheel はファイルを閉じるまで大きさ 0 に見え、閉じたときに固定した大きさになった。
+  展開のあいだは `bin.tmp\` に DLL が 1 つずつ増え、最後に `bin\` と `pack.json` ができて `download\`・`bin.tmp\` が消えた。
+
+| 回 | 取得（押してから 100% まで） | 展開・置き換え | 合計 | 結果 |
+|---|---|---|---|---|
+| 1 回目（初回の問いかけから） | 95.8 秒（13.4 MB/s） | 30.4 秒 | 126.1 秒 | 導入済み（再起動待ち） |
+| 2 回目（削除のあと。下の不具合のため失敗） | 54.4 秒 | 13.3 秒 | 67.8 秒 | `CUDA_PACK_DOWNLOAD` |
+| 3 回目（途中で止めたあと。更新と同時の再起動の前） | 54.5 秒（23.6 MB/s） | 12.7 秒 | 67.2 秒 | 導入済み（再起動待ち） |
+
+- 問いかけは 2 回目以降の起動では出なかった。削除のあと（状態 `not_installed`、`prompted: true`）と、途中で止めたあとの 2 回の起動で確かめた。
+
+### 再起動して GPU を使う
+
+- 押してから 2.1 秒で新しいアプリのプロセス、3.0 秒で新しいサイドカー、6.6 秒で初期化が終わった（旧アプリは 2.5 秒で終了）。
+- `config.json` の翻訳と文字起こしのデバイスが `{"device": "cuda", "device_index": 0, "device_name": "NVIDIA GeForce RTX 3070", ...}`、
+  計算の種類が `auto` になり、`CUDA_PACK_SELECT_GPU_ON_NEXT_START` は false に戻った。起動時の状態は `installed`、`compute_mode` は `cuda`。
+  設定のデバイス欄は「NVIDIA GeForce RTX 3070」「自動」、GPU 高速化パック欄は「削除」、左下の版の表示に「CUDA」が付いた。
+- サイドカーが読み込んだ DLL（`(Get-Process -Id <サイドカー>).Modules`）: `data\cuda\bin\cublas64_12.dll`、`data\cuda\bin\cublasLt64_12.dll`、
+  `nvcuda.dll`。`cudnn64_9.dll` は CPU のときから CTranslate2 に同梱のもの（`current\_internal\ctranslate2\`）が読まれていて、
+  `data\cuda\bin` の cuDNN はこの確認のあいだ一度も読まれなかった（NLLB の翻訳は cuDNN を使わず、文字起こしは声を入れていないため）。
+- サイドカーの専用 GPU メモリ（Windows のパフォーマンス カウンター「GPU Process Memory」）は、翻訳とマイク入力のオン・オフのあとで 875 MB。
+- NVIDIA の ComputeCache は `data\` の中に書かれ、`%APPDATA%\NVIDIA\ComputeCache`（518 項目）は確認の前後で変わらなかった。
+
+### 翻訳の速さ（CPU と GPU）
+
+CTranslate2（NLLB-200-distilled-600M int8）、日本語→英語、計算の種類は自動。同じ 3 文をチャット欄から送り、サイドカーの
+`process.log` の `[latency][chat] translate=…ms` を読んだ。
+
+| 状態 | 文 1 | 文 2 | 文 3 |
+|---|---|---|---|
+| CPU（1 回目の導入のあと、再起動の前） | 456 ms | 567 ms | 590 ms |
+| CPU（3 回目の導入のあと、再起動の前） | 412 ms | 530 ms | 458 ms |
+| GPU（「再起動して GPU を使う」のあと） | 241 ms | 127 ms | 129 ms |
+| GPU（更新と同時の再起動のあと、beta.2） | 232 ms | 124 ms | 115 ms |
+
+文 1「こんにちは、今日はいい天気ですね。」、文 2「明日の夜、一緒にワールドを回りませんか？」、文 3「この翻訳がどれくらい速いか確かめています。」。
+文 2・3 では GPU が約 4.3 倍速い（CPU 458〜590 ms、GPU 115〜129 ms）。GPU の文 1 は起動後の最初の翻訳で、準備の分だけ遅い。
+
+### 文字起こし
+
+- 文字起こしのデバイス欄と GPU 高速化パック欄は、音声認識エンジンが Whisper のときだけ出る（既定のエンジンは Google）。
+  Whisper に切り替えると、デバイスは「NVIDIA GeForce RTX 3070」「自動」、GPU 高速化パック欄は「削除」だった。
+- マイク入力をオンにすると、サイドカーは Whisper base をデバイス `cuda` で作る。エラーは出ず（`error.log` に記録なし）、2 回目にオンにしたとき専用 GPU メモリが 875 MB から 939 MB に増えた。
+  マイク（既定の Virtual Desktop Audio）に声が入らないので、実際の文字起こし（cuDNN を使う推論）は確かめていない。確認のあと Google に戻した。
+
+### 削除（不具合あり。あとで修正、下の「修正後の再確認」）
+
+「削除」→「次の起動で削除します。」と「再起動」→「再起動」で、`remove_pending` が置かれ、押してから 6.6 秒で初期化が終わった。
+デバイスは CPU に戻り、GPU 高速化パック欄は「導入する」、起動時の状態は `not_installed` になった。ところが **`data\cuda\bin` に
+`cublas64_12.dll` と `cublasLt64_12.dll`（合わせて 788,383,744 バイト）が残った**（`remove_pending` と `pack.json` と残りの DLL は消えた）。
+再起動の前のサイドカーが終わらずに残り、この 2 つを読み込んだままだったため（下の「見つかった不具合」）。
+
+この状態でもう一度「導入する」を押すと、1.28 GB を落として展開したあと、古い `bin\` を消すところ
+（`models\cuda_pack.py` 210 行の `shutil.rmtree(final_bin)`）で `PermissionError: [WinError 5] アクセスが拒否されました。: '...\cuda\bin\cublas64_12.dll'`
+になり、「GPU 高速化パックを導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。」が出た。
+失敗の片付けは働き、`download\` と `bin.tmp\` は消え、アプリは CPU のまま動き続けた。残ったサイドカーを止めると、次の導入は成功した。
+
+### 準備済みの更新があるときの再起動
+
+手元の更新元に `3.5.1-beta.2` を足し、「更新を確認」→「更新」で準備完了にした（差分、約 1 MB、25.4 秒）。
+その状態で GPU 高速化パック欄の「再起動して GPU を使う」を押した。
+
+- 2.4 秒で旧サイドカーが終わり、2.7 秒で Update.exe（`apply --package ...beta.2-full.nupkg --waitPid <旧アプリ>`）が始まり、
+  7.6 秒で新しいアプリ（親は Update.exe）、9 秒で新しいサイドカー、11.8 秒で初期化が終わった。
+- `current\sq.version` は `3.5.1-beta.2`、目印のファイルもあり、`VRCT_UPDATE_FEED_DIR` も引き継がれた。
+  デバイスは GPU（自動）、状態は `installed`、サイドカーは `data\cuda\bin` の cuBLAS を読み込み、翻訳は GPU の速さだった（上の表）。
+  更新とパックの読み込みが 1 回の再起動で済んだ。旧サイドカーは残らなかった。
+- `startup.log` では、この道は「Restart requested from the UI」のあとに「VRCT-0 event loop ended」が出る（普通に閉じたときと同じ）。
+
+### 途中で止めた場合
+
+取得中（5% を過ぎたところ）にサイドカーのプロセスを止め、×ボタンで閉じてから起動し直した。
+
+- 残ったもの: `download\nvidia_cublas_cu12-...whl`（途中の 84,340,953 バイト）、空の `bin.tmp\`、上の不具合で残っていた `bin\` の 2 つの DLL。
+  起動し直すと状態は `not_installed` で、残ったものはそのままだった。
+- 次の「導入する」で、始めに `download\` と `bin.tmp\` が作り直され（途中の wheel は 1.5 秒以内に新しいファイルに替わった）、
+  成功したあとは `download\`・`bin.tmp\` が消え、`bin\` は 11 個の新しい DLL に置き換わった。
+- サイドカーが止まっているあいだ、GPU 高速化パック欄は「ダウンロード中… 6%」のままだった（サイドカーが落ちたときに画面が何も知らせないのは、ほかの機能と同じ）。
+
+### アプリの削除
+
+- ×ボタンで閉じると 2.3 秒でアプリとサイドカーが終わった（`startup.log` に「VRCT-0 event loop ended」）。
+- `Update.exe --uninstall` の前の導入先は 1,960 ファイル、3,821,227,283 バイト（`data\cuda` を含む）。
+  削除は 3.2 秒で「アンインストール完了」になり、OK を押すと `%LocalAppData%\VRCT-0` はパックごと消えた。
+  退避フォルダ・アンインストールの登録・ショートカットも残らなかった。
+- 元の VRCT（`%LOCALAPPDATA%\VRCT`、5,811 項目）の一覧と更新時刻、`%USERPROFILE%\.cache\huggingface`（21 項目）、
+  `%APPDATA%\NVIDIA\ComputeCache` は、確認の前後で同じだった。`%LocalAppData%\velopack\velopack.log` には Setup のログが追記され、
+  `velopack_VRCT-0.log` は確認のあと手で消した。
+- 確認のあいだに起動したプロセスは、確認の終わりには 1 つも残っていなかった（残ったサイドカーは確認の途中で止めた）。
+
+### 見つかった不具合
+
+**画面からの再起動（準備済みの更新が無いとき）で、前のサイドカーが終わらずに残る（同じ日に修正。下の「修正後の再確認」）**
+
+- 起きること: 「再起動して GPU を使う」または「再起動」のたびに、前のサイドカーが親の無いまま動き続ける
+  （1 つあたり RAM 約 880 MB。GPU を使っていたものは VRAM も持ったまま）。この確認では、2 回目の再起動のあと 3 つのサイドカーが動いていた。
+  見張り役（watchdog）は `/run/shutdown` で止められているので、自分では終わらない（親が終わってから、止めるまで 10 分と 2.5 分動き続けた）。
+  標準出力の書き込みに失敗して `error.log` に `OSError: [Errno 22] Invalid argument`（`utils.py` の `_writeStdoutLine`）を残す。
+- 削除への影響: GPU を使っていたサイドカーが `data\cuda\bin` の cuBLAS を読んだまま残るので、次の起動の
+  `processPendingCudaPackRemoval()`（`shutil.rmtree(..., ignore_errors=True)`）が 2 つの DLL を消せず、印（`remove_pending`・`pack.json`）だけが消える。
+  そのあとの導入は、落とし終えてから `PermissionError` で失敗する（上の「削除」）。残ったサイドカーは止めるまで残る（更新の入れ替えとアプリの削除では Update.exe が導入先のプロセスを止める）。
+- 原因: `src-tauri/src/restart.rs` の `app_restart` は `async` の付かない Tauri のコマンドなので、メインスレッドで動く。
+  Tauri 2.5.1 の `AppHandle::restart()` は、メインスレッドから呼ばれると `RunEvent::ExitRequested` / `RunEvent::Exit` を出さずに
+  `cleanup_before_exit()` と `process::restart()`（新しいプロセスを起動して `exit`）をする（`tauri-2.5.1/src/app.rs` 542〜566 行）。
+  tauri-plugin-shell 2.2.1 はサイドカーの子プロセスを `RunEvent::Exit` でだけ止める（`tauri-plugin-shell-2.2.1/src/lib.rs` 132〜142 行）。
+  サイドカーの `/run/shutdown`（`Controller.shutdown`）は機能と watchdog を止めるだけでプロセスを終わらせない（普通に閉じるときは
+  shell プラグインが止める前提）。そのため再起動では誰もサイドカーを止めない。証拠として、`startup.log` では
+  この道の「Restart requested from the UI」のあとに「VRCT-0 event loop ended」が出ず、すぐ次の「VRCT-0 startup began」になる。
+  準備済みの更新があるときの道（`app.exit(0)`）と×ボタンでは出て、サイドカーも 2.4 秒以内に終わった。
+- 直し方の候補（この確認の時点）: `app_restart` を `async fn` にするか `request_restart()` を使って `RunEvent::Exit` を通す、
+  または再起動の前に画面からサイドカーを止める。あわせて、削除が DLL を消せなかったときに印を消さない、失敗の文言を原因に合わせる、なども考えられる。
+
+### 修正後の再確認（最終レビューの修正のあと、2026-09-24）
+
+最終レビューの修正（普通の再起動を `request_restart()` にする、サイドカーが `/run/shutdown` のあと自分で終わる、削除の試し直し、
+途中で終わった取得の片付け、使用中の確認、取得の開始と完了の通知）を入れて、同じ消さない手順で作り直し、Setup で入れて
+UI オートメーションだけで確かめた。1 回目のビルドで再起動・GPU・削除を確かめ、呼び名を「GPU 高速化パック」に変えたあとの
+2 回目のビルド（入れ直し）で、初回の問いかけ・途中で止めた取得・導入し直し・再起動・使用中の確認・掴まれた DLL の削除を確かめた。
+サイドカーの数は、押してから 10 秒待って、機械全体の `VRCT-sidecar.exe` を親までたどって数えた。
+
+| 確認 | 結果 |
+|---|---|
+| 「再起動して GPU を使う」（1 回目のビルド） | 旧サイドカーは押してから 2.07 秒で終わった（画面が `/run/shutdown` の 2 秒後に再起動を頼み、shell プラグインが止めた。サイドカー自身の 3 秒の時計より前）。10 秒後の `VRCT-sidecar.exe` は 1 つで、親は新しいアプリ。`startup.log` は「Restart requested from the UI」→「VRCT-0 event loop ended」→「VRCT-0 startup began」。初期化は押してから 8.4 秒 |
+| GPU で動いているか | デバイスは `cuda`（自動）、`compute_mode` は `cuda`、サイドカーは `data\cuda\bin` の `cublas64_12.dll`・`cublasLt64_12.dll` を読み込んだ。翻訳 250 / 119 / 124 ms、サイドカーの専用 GPU メモリ 811 MB |
+| 削除 → 再起動（1 回目のビルド） | 旧サイドカーは 2.22 秒で終わり、10 秒後のサイドカーは 1 つ。`data\cuda` は消え、状態は `not_installed`、デバイスは CPU、欄は「導入する」。エラーの通知は出なかった |
+| 問いかけ（2 回目のビルド） | 「GPU 高速化パックを導入して、翻訳と文字起こしを GPU で動かしますか？」。「導入する」の 0.5 秒後に「GPU 高速化パックのダウンロードを始めました。進み具合は、設定の「翻訳」にある「GPU 高速化パック」欄で見られます。」 |
+| 取得の途中で止めた | 約 51%（650,590,863 バイト）でサイドカーを止めた。`download\` に 664,994,340 バイト、空の `bin.tmp\` が残った。×で閉じて起動し直すと、初期化が終わった時点で `download\`・`bin.tmp\` は無く、状態は `not_installed`、欄は「導入する」 |
+| 導入し直し | 設定の「導入する」から 95 秒で成功（11 個、1,852,176,720 バイト）。「GPU 高速化パックを導入しました。再起動すると使えます。」が出た |
+| 「再起動して GPU を使う」（2 回目のビルド） | 旧サイドカーは 2.46 秒で終わり、10 秒後のサイドカーは 1 つ。`startup.log` に「VRCT-0 event loop ended」。デバイスは `cuda`、cuBLAS を読み込んだ |
+| 使用中の確認 | アプリを閉じて `pack.json` を脇へ置き（未導入の状態）、別のプロセスに `cublasLt64_12.dll` を読み込ませたまま起動して「導入する」を押した。1.4 秒で「GPU 高速化パックが使用中のため置き換えられません。再起動してからもう一度試してください。」が出て、`download\` は作られず、進み具合の通知も無かった |
+| 掴まれた DLL の削除 | 「削除」のあとアプリを閉じ、別のプロセスに `cublasLt64_12.dll` を読み込ませたまま起動した。初期化は 5.8 秒（普段は 4.6 秒。試し直しの分）、`bin\` にはその DLL だけが残り、`remove_pending` は残り、`pack.json` は消え、サイドカーはその DLL を読み込まなかった。欄は「次の起動で削除します。」と「再起動」。掴んでいたプロセスを止めて「再起動」を押すと、旧サイドカーは 2.46 秒で終わり、サイドカーは 1 つ、`data\cuda` は消えた |
+| `/run/shutdown` のあと自分で終わるか | アプリを閉じた状態で、入れたサイドカーを直接起動して初期化のあと `/run/shutdown` を送り、標準入力は開いたまま誰も止めなかった。処理（1.63 秒）が終わってから 3.07 秒で、終了コード 0 で終わった |
+| ×ボタンで閉じる | 2.3 秒でアプリとサイドカーが終わった |
+| アプリの削除 | `%LocalAppData%\VRCT-0` は消え、元の VRCT（`%LOCALAPPDATA%\VRCT`、5,811 項目）の一覧は確認の前後で同じ、導入先のプロセスは残らなかった |
+
+取得の時間は 1 回目が 125.9 秒（100% まで 79 秒、展開 47 秒）、導入し直しが 95 秒（100% まで 84 秒）。
+導入してから再起動する前に「削除」したときに GPU への切り替えを取り消す直しは、画面では再起動待ちの状態に「削除」が出ないので、自動テストだけで確かめた。
+
+### 確かめられなかったこと
+
+- 文字起こしの GPU での推論（声を入れられない。Whisper のモデルを GPU に作るところまで）と、cuDNN の DLL の読み込み。
+- GPU が無い PC（欄を出さない）と、ドライバーが古い PC（`driver_too_old`）の表示。
+- 通信の失敗・SHA-256 の不一致・空き容量の不足での失敗（自動テストの範囲。実機ではファイルのロックによる失敗で、片付けと再試行を確かめた）。
+- GitHub Releases からの更新と、公開の更新元での GPU 高速化パックと更新の組み合わせ。

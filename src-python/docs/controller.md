@@ -903,44 +903,7 @@ Watchdog を停止。
 
 ---
 
-### 20. ソフトウェアアップデート
-
-#### `checkSoftwareUpdated() -> dict`
-
-**責務:** 最新バージョンの確認
-
-**処理:**
-1. `model.checkSoftwareUpdated()` でバージョン情報を取得
-2. フロントエンドに通知（`software_update_info` エンドポイント）
-3. 結果を返却
-
-**バージョン情報形式:**
-```python
-{
-    "current_version": "1.2.3",
-    "latest_version": "1.2.4",
-    "update_available": True,
-    "download_url": "https://..."
-}
-```
-
-#### `updateSoftware(*args, **kwargs) -> dict`
-
-**責務:** 通常版のアップデートを実行
-
-**処理:**
-1. 別スレッドで `model.updateSoftware()` を起動（ブロッキングを避けるため）
-2. 即座に status 200 を返却
-
-#### `updateCudaSoftware(*args, **kwargs) -> dict`
-
-**責務:** CUDA版のアップデートを実行
-
-**処理:** `updateSoftware()` と同様だが、`model.updateCudaSoftware()` を呼び出す。
-
----
-
-### 21. 初期化処理
+### 20. 初期化処理
 
 #### `init(*args, **kwargs) -> None`
 
@@ -1018,7 +981,6 @@ if config.CONVERT_MESSAGE_TO_ROMAJI or config.CONVERT_MESSAGE_TO_HIRAGANA:
 ```python
 self.initializationProgress(4)
 model.addKeywords()  # ワードフィルター
-self.checkSoftwareUpdated()  # バージョンチェック
 if config.LOGGER_FEATURE:
     model.startLogger()  # ログ記録
 model.startReceiveOSC()  # OSC 受信

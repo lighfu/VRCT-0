@@ -139,7 +139,6 @@ class Main:
 
 ### システム管理
 
-- `/run/update_software`: ソフトウェアアップデート
 - `/run/download_ctranslate2_weight`: 翻訳モデルダウンロード
 - `/run/download_whisper_weight`: 音声認識モデルダウンロード
 

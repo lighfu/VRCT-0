@@ -1,8 +1,8 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "VRCT",
+    "productName": "VRCT-0",
     "version": "3.5.1-beta.1",
-    "identifier": "com.vrct.app",
+    "identifier": "com.lighfu.vrct0",
     "build": {
         "beforeDevCommand": "",
         "devUrl": "http://localhost:1420",
@@ -13,7 +13,9 @@
         "enableGTKAppId": false,
         "windows": [
             {
-                "title": "VRCT",
+                "label": "main",
+                "create": false,
+                "title": "VRCT-0",
                 "center": true,
                 "width": 450,
                 "height": 220,
@@ -33,8 +35,7 @@
         }
     },
     "bundle": {
-        "active": true,
-        "targets": "nsis",
+        "active": false,
         "publisher": "m's software",
         "copyright": "Copyright m's software",
         "licenseFile": "../LICENSE",
@@ -51,20 +52,6 @@
         ],
         "resources": {
             "bin/_internal": "_internal"
-        },
-        "windows": {
-            "nsis": {
-                "template": "nsis/template.nsi",
-                "installMode": "currentUser",
-                "displayLanguageSelector": true,
-                "languages": [
-                    "English",
-                    "Japanese",
-                    "Korean",
-                    "TradChinese",
-                    "SimpChinese"
-                ]
-            }
         }
     }
 }

@@ -222,7 +222,7 @@ class TransformersParityTests(unittest.TestCase):
         except ImportError:
             self.skipTest("transformers is not installed")
         from config import config
-        cache_dir = os.path.join(config.PATH_LOCAL, "weights", "ctranslate2", weight_type, "tokenizer")
+        cache_dir = os.path.join(config.PATH_DATA, "weights", "ctranslate2", weight_type, "tokenizer")
         family = ct2tok.tokenizerFamily(weight_type)
         if ct2tok.findTokenizerFiles(cache_dir, repo_id, ct2tok.REQUIRED_FILES[family]) is None:
             self.skipTest(f"tokenizer files for {weight_type} are not cached")

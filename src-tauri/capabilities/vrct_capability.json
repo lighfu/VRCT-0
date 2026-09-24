@@ -22,19 +22,6 @@
         "global-shortcut:allow-unregister",
         "global-shortcut:allow-unregister-all",
 
-        "fs:default",
-        "fs:allow-write-file",
-        "fs:allow-remove",
-        "fs:allow-resource-read-recursive",
-        "fs:allow-resource-meta-recursive",
-        {
-            "identifier": "http:default",
-            "allow": [
-                { "url": "https://api.github.com/repos/**" },
-                { "url": "https://github.com/**" }
-            ]
-        },
-
         "shell:allow-open",
         "shell:allow-stdin-write",
         {

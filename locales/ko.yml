@@ -7,6 +7,12 @@ common:
     go_back_button_label: "돌아가기"
     default_label: "기본값"
 
+cuda_pack_prompt:
+    title: "Install the GPU acceleration pack to run translation and transcription on your GPU?"
+    desc: "An NVIDIA GPU was found. With the GPU acceleration pack, translation and transcription run faster on the GPU (about 1.3 GB download, 1.8 GB on disk). You can also install it later from the device settings for translation and transcription."
+    install_button: "Install"
+    later_button: "Not now"
+
 common_error:
     no_device_mic: "마이크 디바이스를 찾지 못했습니다."
     no_device_speaker: "스피커 디바이스를 찾지 못했습니다."
@@ -29,6 +35,10 @@ common_error:
     invalid_value_speaker_max_phrase: "0 이상의 숫자만 설정할 수 있습니다."
 
     invalid_hex_color: "유효한 HEX 색상 코드(예: {{brand_color_hex}}) 형식으로 입력해 주세요."
+
+    failed_download_cuda_pack: "Could not install the GPU acceleration pack. Check your connection and free disk space (about 3.1 GB needed), then try again."
+    cuda_pack_in_use: "The GPU acceleration pack is in use and can't be replaced. Restart the app and try again."
+    cuda_pack_not_loaded: "Could not load the GPU acceleration pack. The app runs on the CPU."
 
 common_warning:
     unable_to_use_osc_query: "OSC IP 주소 설정으로 인해 OSC 데이터 수신이 불가능하므로, 아래 기능이 자동으로 비활성화되었습니다."
@@ -68,32 +78,28 @@ main_page:
         title_target_language: "상대방의 언어"
 
     update_available: "새로운 버전이 나왔습니다!"
-    updating: "업데이트 중..."
 
 update_modal:
     title: "업데이트"
     summary_up_to_date_desc: "최신 버전을 사용 중입니다. 업데이트가 필요하지 않습니다."
     channel_stable: "정식판"
     channel_beta: "베타판"
-    compute_mode_cpu: "CPU 버전"
-    compute_mode_cuda: "GPU 버전 (CUDA)"
-    latest_label: "최신"
-    install_latest_button: "최신 버전으로 업데이트"
-    install_button: "이 설정으로 재설치"
-    section_pick_variant: "다른 버전 또는 구성 선택"
     refresh_button: "업데이트 확인"
     channel_label: "릴리스 채널"
     channel_desc: "베타판은 새로운 기능을 먼저 사용할 수 있지만 불안정할 수 있습니다."
-    compute_mode_label: "장치 구성"
-    compute_mode_desc: "GPU 버전은 NVIDIA GPU에서 빠르게 동작하지만 약 5GB의 디스크 공간이 필요합니다."
-    version_label: "설치할 버전"
-    version_desc: "선택한 채널에 공개된 릴리스 중에서 선택할 수 있습니다."
-    no_versions_available: "선택한 채널에서 사용할 수 있는 버전이 없습니다."
-    change_col_current: "현재"
-    change_col_after: "설치 후"
-    warn_downgrade: "{{from}}에서 {{to}}로의 다운그레이드입니다. 설정 파일의 호환성은 보장되지 않습니다."
-    warn_cuda_extra_size: "GPU 버전은 약 5GB의 추가 다운로드가 필요합니다."
-    warn_switch_channel: "{{channel}} 채널로 전환됩니다. 이후 업데이트 알림도 {{channel}}을 기준으로 합니다."
+    checking: "Checking for a new version..."
+    available: "Version {{version}} is available (about {{size}})"
+    available_downgrade: "You can switch to the latest stable version {{version}} (about {{size}})"
+    release_notes: "Release notes"
+    download_button: "Update"
+    downloading: "Downloading... {{percent}}%"
+    ready: "Version {{version}} is ready"
+    restart_now_button: "Restart now to update"
+    apply_on_exit_desc: "If you keep using the app, the update is applied the next time you close it."
+    check_failed: "Could not check for a new version: {{message}}"
+    download_failed: "The update failed: {{message}}"
+    retry_button: "Retry"
+    not_installed: "This is a development build, so it cannot be updated."
 
 config_page:
     common:
@@ -118,6 +124,18 @@ config_page:
             type_template_high:
         warning_labels:
             unable_to_use_osc_query:
+        cuda_pack:
+            label: "GPU acceleration pack"
+            desc: "Makes translation and transcription faster on NVIDIA GPUs (about 1.3 GB download, 1.8 GB on disk). It takes effect after a restart."
+            driver_too_old: "Your NVIDIA driver is too old. Please update the driver."
+            install_button: "Install"
+            downloading: "Downloading... {{percent}}%"
+            restart_to_use_button: "Restart to use the GPU"
+            remove_button: "Remove"
+            remove_pending: "It will be removed at the next start."
+            restart_button: "Restart"
+            download_started_notification: "Started downloading the GPU acceleration pack. You can follow the progress under \"GPU acceleration pack\" in Settings > Translation."
+            installed_notification: "The GPU acceleration pack is installed. Restart to use it."
 
     side_menu_labels:
         device: "장치"
@@ -392,25 +410,6 @@ config_page:
         bubble_min_text_length:
             label: "최소 텍스트 길이"
             desc: "이 글자 수보다 짧은 말풍선은 무시됩니다. 기본값: 2."
-
-    updater:
-        install_panel:
-            section_label:
-            current_summary_label:
-            current_summary_value: "{{version}} / {{compute_mode}} / {{channel}}"
-            channel_label:
-            channel_stable:
-            channel_beta:
-            compute_mode_label:
-            compute_mode_cpu: "CPU"
-            compute_mode_gpu: "GPU (CUDA)"
-            version_label: "설치할 버전"
-            version_desc:
-            no_versions_available:
-            beta_suffix: "베타"
-            latest_suffix:
-            install_button:
-            reinstall_button:
 
     hotkeys:
         input_placeholder: "키 조합을 입력하세요"

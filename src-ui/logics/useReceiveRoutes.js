@@ -14,9 +14,6 @@ export const STATIC_ROUTE_META_LIST = [
     // OCR start-failure rollback push (backend flips the flag back off if the pipeline fails to start)
     { endpoint: "/run/enable_ocr_capture", ns: configs, hook_name: "useOcr", method_name: "updateFromBackendEnableOcrCapture" },
 
-    { endpoint: "/run/update_software", ns: null, hook_name: null, method_name: null },
-    { endpoint: "/run/update_cuda_software", ns: null, hook_name: null, method_name: null },
-
     { endpoint: "/get/data/main_window_geometry", ns: common, hook_name: "useWindow", method_name: "restoreWindowGeometry" },
     { endpoint: "/set/data/main_window_geometry", ns: null, hook_name: null, method_name: null },
 
@@ -32,11 +29,18 @@ export const STATIC_ROUTE_META_LIST = [
     { endpoint: "/get/data/connected_ai_cli", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_AiCli" },
     { endpoint: "/run/ai_cli_connection", ns: common, hook_name: "useLLMConnection", method_name: "setConnectionStatus_AiCli" },
 
+    // CUDA Pack (GPU 高速化パック)
+    { endpoint: "/get/data/cuda_pack_status", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackStatus" },
+    { endpoint: "/run/cuda_pack_status", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackStatus" },
+    { endpoint: "/run/download_progress_cuda_pack", ns: common, hook_name: "useCudaPack", method_name: "updateCudaPackProgress" },
+    { endpoint: "/run/downloaded_cuda_pack", ns: common, hook_name: "useCudaPack", method_name: "notifyCudaPackInstalled" },
+    { endpoint: "/run/download_cuda_pack", ns: null, hook_name: null, method_name: null },
+    { endpoint: "/run/remove_cuda_pack", ns: null, hook_name: null, method_name: null },
+    { endpoint: "/run/mark_cuda_pack_prompted", ns: null, hook_name: null, method_name: null },
+    { endpoint: "/run/error_cuda_pack", ns: null, hook_name: null, method_name: null },
+
     // Software Version
     { endpoint: "/get/data/version", ns: common, hook_name: "useSoftwareVersion", method_name: "updateSoftwareVersion" },
-    { endpoint: "/get/data/available_releases", ns: common, hook_name: "useAvailableReleases", method_name: "updateAvailableReleasesFromBackend" },
-    // Latest Software Version Info
-    { endpoint: "/run/software_update_info", ns: common, hook_name: "useSoftwareVersion", method_name: "updateSoftwareVersionInfo" },
 
     { endpoint: "/run/connected_network", ns: common, hook_name: "useHandleNetworkConnection", method_name: "handleNetworkConnection" },
     { endpoint: "/run/enable_osc_query", ns: common, hook_name: "useHandleOscQuery", method_name: "handleOscQuery" },

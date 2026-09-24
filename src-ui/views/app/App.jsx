@@ -10,6 +10,8 @@ import {
     FontFamilyController,
     TransparencyController,
     CornerRadiusController,
+    AppUpdateController,
+    CudaPackPromptController,
 } from "./_app_controllers";
 
 import styles from "./App.module.scss";
@@ -20,13 +22,12 @@ import { ConfigPage } from "./config_page/ConfigPage";
 import {
     WindowTitleBar,
     SplashComponent,
-    UpdatingComponent,
     ModalController,
     SnackbarController,
     AppErrorBoundary,
 } from "./others";
 
-import { useIsBackendReady, useIsSoftwareUpdating, useIsVrctAvailable, useWindow } from "@logics_common";
+import { useIsBackendReady, useIsVrctAvailable, useWindow } from "@logics_common";
 
 export const App = () => {
     const { currentIsVrctAvailable } = useIsVrctAvailable();
@@ -39,6 +40,8 @@ export const App = () => {
                 <KeyEventController />
                 <StartPythonController />
                 <GlobalHotKeyController />
+                <AppUpdateController />
+                <CudaPackPromptController />
                 <UiLanguageController />
                 <ConfigPageCloseTriggerController />
                 <UiSizeController />
@@ -59,22 +62,16 @@ export const App = () => {
 
 const Contents = () => {
     const { WindowGeometryController } = useWindow();
-    const { currentIsSoftwareUpdating } = useIsSoftwareUpdating();
     return (
         <>
             <WindowGeometryController />
 
             <WindowTitleBar />
-            {currentIsSoftwareUpdating.data === false
-            ?
             <div className={styles.pages_wrapper}>
                 <ConfigPage />
                 <MainPage />
                 <ModalController />
             </div>
-            :
-            <UpdatingComponent />
-            }
         </>
     );
 };
