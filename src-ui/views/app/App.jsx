@@ -11,6 +11,7 @@ import {
     TransparencyController,
     CornerRadiusController,
     AppUpdateController,
+    CudaPackPromptController,
 } from "./_app_controllers";
 
 import styles from "./App.module.scss";
@@ -40,6 +41,7 @@ export const App = () => {
                 <StartPythonController />
                 <GlobalHotKeyController />
                 <AppUpdateController />
+                <CudaPackPromptController />
                 <UiLanguageController />
                 <ConfigPageCloseTriggerController />
                 <UiSizeController />

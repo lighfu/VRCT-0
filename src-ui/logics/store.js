@@ -157,6 +157,7 @@ export const { atomInstance: Atom_AppUpdate, useHook: useStore_AppUpdate } = cre
 export const { atomInstance: Atom_IsLMStudioConnected, useHook: useStore_IsLMStudioConnected } = createAtomWithHook(false, "IsLMStudioConnected");
 export const { atomInstance: Atom_IsOllamaConnected, useHook: useStore_IsOllamaConnected } = createAtomWithHook(false, "IsOllamaConnected");
 export const { atomInstance: Atom_IsAiCliConnected, useHook: useStore_IsAiCliConnected } = createAtomWithHook(false, "IsAiCliConnected");
+export const { atomInstance: Atom_CudaPack, useHook: useStore_CudaPack } = createAtomWithHook({ status: "no_gpu", prompted: true, progress: null }, "CudaPack", { is_state_ok: true });
 
 // Main Page
 // Common

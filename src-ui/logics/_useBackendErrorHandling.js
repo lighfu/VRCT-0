@@ -151,6 +151,16 @@ export const _useBackendErrorHandling = () => {
                 return;
 
             // ============================================================================
+            // GPU 部品ダウンロード関連エラー (CUDA_PACK_*)
+            // ============================================================================
+            case "CUDA_PACK_DOWNLOAD":
+                showNotification_Error(t("common_error.failed_download_cuda_pack"), { category_id: error_code });
+                return;
+            case "CUDA_PACK_NOT_LOADED":
+                showNotification_Error(t("common_error.cuda_pack_not_loaded"), { category_id: error_code });
+                return;
+
+            // ============================================================================
             // バリデーションエラー (VALIDATION_*)
             // ============================================================================
             case "VALIDATION_MIC_THRESHOLD":

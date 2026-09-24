@@ -20,6 +20,7 @@ import {
 } from "../_components";
 
 import { ComputeDevice } from "../_components/compute_device/ComputeDevice";
+import { CudaPack } from "../_components";
 
 export const Transcription = () => {
     return (
@@ -207,6 +208,7 @@ const TranscriptionEngine_Container = () => {
                 <>
                     <WhisperWeightType_Box />
                     <TranscriptionComputeDevice_Box />
+                    <CudaPack />
                 </>
             )}
         </div>

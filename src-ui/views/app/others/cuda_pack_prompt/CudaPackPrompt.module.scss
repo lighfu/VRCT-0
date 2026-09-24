@@ -1,0 +1,39 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+}
+
+.title {
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.desc {
+    font-size: 1.4rem;
+    line-height: 1.6;
+}
+
+.buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.button,
+.button_secondary {
+    padding: 0.8rem 1.8rem;
+    border-radius: 0.4rem;
+    font-size: 1.4rem;
+    cursor: pointer;
+}
+
+.button {
+    background-color: var(--primary_600_color);
+    color: var(--dark_basic_text_color);
+}
+
+.button_secondary {
+    background-color: var(--dark_750_color);
+    color: var(--dark_basic_text_color);
+}

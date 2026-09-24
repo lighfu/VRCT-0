@@ -7,6 +7,12 @@ common:
     go_back_button_label: "Go Back"
     default_label: "Default"
 
+cuda_pack_prompt:
+    title: "Install the parts that make translation and transcription faster on your GPU?"
+    desc: "An NVIDIA GPU was found. With these parts, translation and transcription run faster on the GPU (about 1.3 GB download, 1.8 GB on disk). You can also install them later from the device settings for translation and transcription."
+    install_button: "Install"
+    later_button: "Not now"
+
 common_error:
     no_device_mic: "No mic device detected."
     no_device_speaker: "No speaker device detected."
@@ -28,6 +34,9 @@ common_error:
     invalid_value_speaker_max_phrase: "You can set a number equal to or greater than 0."
 
     invalid_hex_color: "Please enter a valid HEX color code (e.g., {{brand_color_hex}})."
+
+    failed_download_cuda_pack: "Could not install the GPU parts. Check your connection and free disk space (about 3.1 GB needed), then try again."
+    cuda_pack_not_loaded: "Could not load the GPU parts. The app runs on the CPU."
 
 common_warning:
     unable_to_use_osc_query: "The following functions have been automatically disabled due to the OSC IP Address settings preventing OSC data from being received."
@@ -113,6 +122,16 @@ config_page:
             type_template_high: "{{type_name}} (Higher accuracy, slower processing)"
         warning_labels:
             unable_to_use_osc_query: "Due to the OSC IP Address settings, OSC data cannot be received, so this feature is currently unavailable."
+        cuda_pack:
+            label: "GPU parts"
+            desc: "Parts that make translation and transcription faster on NVIDIA GPUs (about 1.3 GB download, 1.8 GB on disk). They take effect after a restart."
+            driver_too_old: "Your NVIDIA driver is too old. Please update the driver."
+            install_button: "Install"
+            downloading: "Downloading... {{percent}}%"
+            restart_to_use_button: "Restart to use the GPU"
+            remove_button: "Remove"
+            remove_pending: "They will be removed at the next start."
+            restart_button: "Restart"
 
     side_menu_labels:
         device: "Device"

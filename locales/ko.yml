@@ -7,6 +7,12 @@ common:
     go_back_button_label: "돌아가기"
     default_label: "기본값"
 
+cuda_pack_prompt:
+    title: "Install the parts that make translation and transcription faster on your GPU?"
+    desc: "An NVIDIA GPU was found. With these parts, translation and transcription run faster on the GPU (about 1.3 GB download, 1.8 GB on disk). You can also install them later from the device settings for translation and transcription."
+    install_button: "Install"
+    later_button: "Not now"
+
 common_error:
     no_device_mic: "마이크 디바이스를 찾지 못했습니다."
     no_device_speaker: "스피커 디바이스를 찾지 못했습니다."
@@ -28,6 +34,9 @@ common_error:
     invalid_value_speaker_max_phrase: "0 이상의 숫자만 설정할 수 있습니다."
 
     invalid_hex_color: "유효한 HEX 색상 코드(예: {{brand_color_hex}}) 형식으로 입력해 주세요."
+
+    failed_download_cuda_pack: "Could not install the GPU parts. Check your connection and free disk space (about 3.1 GB needed), then try again."
+    cuda_pack_not_loaded: "Could not load the GPU parts. The app runs on the CPU."
 
 common_warning:
     unable_to_use_osc_query: "OSC IP 주소 설정으로 인해 OSC 데이터 수신이 불가능하므로, 아래 기능이 자동으로 비활성화되었습니다."
@@ -113,6 +122,16 @@ config_page:
             type_template_high:
         warning_labels:
             unable_to_use_osc_query:
+        cuda_pack:
+            label: "GPU parts"
+            desc: "Parts that make translation and transcription faster on NVIDIA GPUs (about 1.3 GB download, 1.8 GB on disk). They take effect after a restart."
+            driver_too_old: "Your NVIDIA driver is too old. Please update the driver."
+            install_button: "Install"
+            downloading: "Downloading... {{percent}}%"
+            restart_to_use_button: "Restart to use the GPU"
+            remove_button: "Remove"
+            remove_pending: "They will be removed at the next start."
+            restart_button: "Restart"
 
     side_menu_labels:
         device: "장치"
