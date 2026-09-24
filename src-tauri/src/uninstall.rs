@@ -30,10 +30,16 @@ pub fn stop_script(current_dir: &Path, self_pid: u32) -> String {
     )
 }
 
-/// 導入先の `current\` から動いているプロセスを止める。最長 20 秒で打ち切る。
-pub fn stop_app_processes() {
+/// 削除の直前のフックから呼ぶ。動いている VRCT-0 を止め、Setup が消し損ねた退避フォルダも消す。
+pub fn before_uninstall() {
     let Ok(exe) = std::env::current_exe() else { return };
     let Some(root) = install_root(&exe) else { return };
+    stop_app_processes(&root);
+    crate::reinstall::remove_rollback_dirs(&root);
+}
+
+/// 導入先の `current\` から動いているプロセスを止める。最長 20 秒で打ち切る。
+pub fn stop_app_processes(root: &Path) {
     let script = stop_script(&root.join("current"), std::process::id());
 
     let mut command = Command::new("powershell.exe");

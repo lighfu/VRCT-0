@@ -1,4 +1,5 @@
 pub mod app_paths;
+pub mod reinstall;
 pub mod uninstall;
 pub mod updater;
 
