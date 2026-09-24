@@ -1,9 +1,12 @@
 pub mod app_paths;
 pub mod uninstall;
+pub mod updater;
 
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::{Error, Write};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{Emitter, Manager};
 
 pub(crate) fn startup_log(message: &str) {
     let Ok(executable_path) = std::env::current_exe() else {
@@ -31,7 +34,10 @@ pub fn run() {
         .ok()
         .and_then(|exe| app_paths::prepare_data_dir(&exe));
     startup_log("VRCT-0 startup began");
+    let updater = updater::Updater::new(Arc::new(updater::VelopackBackend::new(updater::REPO_URL)));
+    let exit_updater = updater.clone();
     let result = tauri::Builder::default()
+        .manage(updater)
         .setup(move |app| {
             let window_config = app
                 .config()
@@ -55,6 +61,11 @@ pub fn run() {
             #[cfg(debug_assertions)]
             { main_window.open_devtools(); }
 
+            let handle = app.handle().clone();
+            app.state::<updater::Updater>().set_emitter(Arc::new(move |state| {
+                let _ = handle.emit(updater::STATE_EVENT, state);
+            }));
+
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
@@ -62,10 +73,21 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_font_list])
-        .run(tauri::generate_context!());
+        .invoke_handler(tauri::generate_handler![
+            get_font_list,
+            updater::updater_state,
+            updater::updater_check,
+            updater::updater_download,
+            updater::updater_restart_now
+        ])
+        .build(tauri::generate_context!());
     match result {
-        Ok(()) => startup_log("VRCT-0 event loop ended"),
+        Ok(app) => app.run(move |_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                exit_updater.apply_on_exit();
+                startup_log("VRCT-0 event loop ended");
+            }
+        }),
         Err(error) => {
             startup_log(&format!("VRCT-0 startup failed: {error}"));
             panic!("error while running tauri application: {error}");
