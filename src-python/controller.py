@@ -12,6 +12,7 @@ from model import model
 from utils import removeLog, printLog, errorLogging, errorLog, isConnectedNetwork, isValidIpAddress, isWildcardBindAddress, isAvailableWebSocketServer
 from errors import ErrorCode, VRCTError
 from models.transcription.transcription_openai_compatible import TRANSCRIPTION_MODEL_KEYWORDS, TRANSCRIPTION_API_ENGINES
+from models.transcription.transcription_sensevoice import SENSEVOICE_WEIGHT_TYPE
 from models.translation.translation_providers import TRANSLATION_PROVIDER_REGISTRY, CONNECTION_PROVIDER_REGISTRY
 from models.message_pipeline import MessageDirectionSpec, MIC_MESSAGE_SPEC, SPEAKER_MESSAGE_SPEC, CHAT_MESSAGE_SPEC, OCR_MESSAGE_SPEC
 from models.cuda_pack import RESULT_IN_USE as CUDA_PACK_RESULT_IN_USE
@@ -867,45 +868,18 @@ class Controller:
                 energy,
             )
 
-    class DownloadCTranslate2:
-        def __init__(self, run_mapping:dict,  weight_type:str, run:Callable[[int, str, Any], None]) -> None:
-            self.run_mapping = run_mapping
-            self.weight_type = weight_type
-            self.run = run
-            self._last_progress = -1.0
-            self._last_time = 0.0
+    class _WeightDownload:
+        """モデルの重みの取得の進み具合・完了・失敗を UI に知らせる。
 
-        def progressBar(self, progress) -> None:
-            if not _shouldEmitDownloadProgress(self, progress):
-                return
-            printLog("CTranslate2 Weight Download Progress", progress)
-            self.run(
-                200,
-                self.run_mapping["download_progress_ctranslate2_weight"],
-                {"weight_type": self.weight_type, "progress": progress},
-            )
+        `/run/download_progress_<endpoint>`、`/run/downloaded_<endpoint>`、
+        `/run/error_<endpoint>` を送る。エンジンごとの違い (確認の関数、完了時に
+        更新する設定、エラーコード) はサブクラスで与える。
+        """
 
-        def downloaded(self) -> None:
-            if model.checkTranslatorCTranslate2ModelWeight(self.weight_type) is True:
-                config.SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_DICT[self.weight_type] = True
+        _label = ""
+        _endpoint = ""
+        _error_code: ErrorCode
 
-                self.run(
-                    200,
-                    self.run_mapping["downloaded_ctranslate2_weight"],
-                    self.weight_type,
-                )
-            else:
-                error_response = VRCTError.create_error_response(
-                    ErrorCode.WEIGHT_CTRANSLATE2_DOWNLOAD,
-                    data=None
-                )
-                self.run(
-                    error_response["status"],
-                    self.run_mapping["error_ctranslate2_weight"],
-                    error_response["result"],
-                )
-
-    class DownloadWhisper:
         def __init__(self, run_mapping:dict, weight_type:str, run:Callable[[int, str, Any], None]) -> None:
             self.run_mapping = run_mapping
             self.weight_type = weight_type
@@ -913,35 +887,82 @@ class Controller:
             self._last_progress = -1.0
             self._last_time = 0.0
 
+        def _isDownloaded(self) -> bool:
+            raise NotImplementedError
+
+        def _markDownloaded(self) -> None:
+            raise NotImplementedError
+
         def progressBar(self, progress) -> None:
             if not _shouldEmitDownloadProgress(self, progress):
                 return
-            printLog("Whisper Weight Download Progress", progress)
+            printLog(f"{self._label} Weight Download Progress", progress)
             self.run(
                 200,
-                self.run_mapping["download_progress_whisper_weight"],
+                self.run_mapping[f"download_progress_{self._endpoint}"],
                 {"weight_type": self.weight_type, "progress": progress},
             )
 
-        def downloaded(self) -> None:
-            if model.checkTranscriptionWhisperModelWeight(self.weight_type) is True:
-                config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT[self.weight_type] = True
+        def _sendError(self, error_code: ErrorCode) -> None:
+            error_response = VRCTError.create_error_response(error_code, data=None)
+            self.run(
+                error_response["status"],
+                self.run_mapping[f"error_{self._endpoint}"],
+                error_response["result"],
+            )
 
-                self.run(
-                    200,
-                    self.run_mapping["downloaded_whisper_weight"],
-                    self.weight_type,
-                )
+        def downloaded(self) -> None:
+            if self._isDownloaded() is True:
+                self._markDownloaded()
+                self.run(200, self.run_mapping[f"downloaded_{self._endpoint}"], self.weight_type)
             else:
-                error_response = VRCTError.create_error_response(
-                    ErrorCode.WEIGHT_WHISPER_DOWNLOAD,
-                    data=None
-                )
-                self.run(
-                    error_response["status"],
-                    self.run_mapping["error_whisper_weight"],
-                    error_response["result"],
-                )
+                self._sendError(self._error_code)
+
+    class DownloadCTranslate2(_WeightDownload):
+        _label = "CTranslate2"
+        _endpoint = "ctranslate2_weight"
+        _error_code = ErrorCode.WEIGHT_CTRANSLATE2_DOWNLOAD
+
+        def _isDownloaded(self) -> bool:
+            return model.checkTranslatorCTranslate2ModelWeight(self.weight_type)
+
+        def _markDownloaded(self) -> None:
+            config.SELECTABLE_CTRANSLATE2_WEIGHT_TYPE_DICT[self.weight_type] = True
+
+    class DownloadWhisper(_WeightDownload):
+        _label = "Whisper"
+        _endpoint = "whisper_weight"
+        _error_code = ErrorCode.WEIGHT_WHISPER_DOWNLOAD
+
+        def _isDownloaded(self) -> bool:
+            return model.checkTranscriptionWhisperModelWeight(self.weight_type)
+
+        def _markDownloaded(self) -> None:
+            config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT[self.weight_type] = True
+
+    class DownloadSenseVoice(_WeightDownload):
+        _label = "SenseVoice"
+        _endpoint = "sensevoice_weight"
+        _error_code = ErrorCode.WEIGHT_SENSEVOICE_DOWNLOAD
+
+        def _isDownloaded(self) -> bool:
+            return model.checkSenseVoiceModelWeight()
+
+        def _markDownloaded(self) -> None:
+            # 重みは揃っても、sherpa_onnx が読み込めなければ (VC++ ランタイムが
+            # 無い、DLL が読めない等) エンジンとしては使えない。取得の失敗とは
+            # 別のエラーとして知らせ、取り直しをさせない。
+            available = model.loadSenseVoiceRuntime() is True
+            # Whisper と違い重みは1種類だけなので、この時点でエンジンとして
+            # 使えるかを決め、画面の選択肢にもすぐ反映する (再起動を待たない)。
+            config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS["SenseVoice"] = available
+            self.run(
+                200,
+                self.run_mapping["selectable_transcription_engines"],
+                Controller.getTranscriptionEngines()["result"],
+            )
+            if not available:
+                self._sendError(ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE)
 
     class DownloadSudachiDict:
         def __init__(self, run_mapping: dict, run: Callable[[int, str, Any], None]) -> None:
@@ -1440,6 +1461,12 @@ class Controller:
         return {"status":200, "result":config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT}
 
     @staticmethod
+    def getSelectableSenseVoiceWeightTypeDict(*args, **kwargs) -> dict:
+        # SenseVoice の重みは1種類だけ。エンジンとして使えるか (sherpa_onnx が
+        # 読み込めるか) とは別に、重みが揃っているかだけを返す。
+        return {"status":200, "result":{SENSEVOICE_WEIGHT_TYPE: model.checkSenseVoiceModelWeight() is True}}
+
+    @staticmethod
     def getSelectableSudachiDictTypeDict(*args, **kwargs) -> dict:
         return {"status":200, "result":config.SELECTABLE_SUDACHI_DICT_TYPE_DICT}
 
@@ -1564,6 +1591,7 @@ class Controller:
     def setSelectedYourLanguages(self, select:dict, *args, **kwargs) -> dict:
         config.SELECTED_YOUR_LANGUAGES = select
         self.updateTranslationEngineAndEngineList()
+        self.warnIfSenseVoiceCannotRecognizeYourLanguage()
         return {"status":200, "result":config.SELECTED_YOUR_LANGUAGES}
 
 
@@ -3687,6 +3715,23 @@ class Controller:
         model.downloadCTranslate2ModelTokenizer(weight_type)
         return {"status":200, "result":True}
 
+    def downloadSenseVoiceWeight(self, data:str=SENSEVOICE_WEIGHT_TYPE, asynchronous:bool=True, *args, **kwargs) -> dict:
+        download_sensevoice = self.DownloadSenseVoice(
+            self.run_mapping,
+            SENSEVOICE_WEIGHT_TYPE,
+            self.run
+        )
+        if asynchronous is True:
+            th_download = Thread(
+                target=model.downloadSenseVoiceModelWeight,
+                args=(download_sensevoice.progressBar, download_sensevoice.downloaded),
+            )
+            th_download.daemon = True
+            th_download.start()
+        else:
+            model.downloadSenseVoiceModelWeight(download_sensevoice.progressBar, download_sensevoice.downloaded)
+        return {"status":200, "result":True}
+
     def downloadWhisperWeight(self, data:str, asynchronous:bool=True, *args, **kwargs) -> dict:
         weight_type = str(data)
         download_whisper = self.DownloadWhisper(
@@ -3863,6 +3908,8 @@ class Controller:
                 started = model.startMicTranscript(self.micMessage)
                 if not started:
                     config.ENABLE_TRANSCRIPTION_SEND = False
+                else:
+                    self.warnIfSenseVoiceCannotRecognizeYourLanguage()
                 return started
             except Exception as e:
                 # VRAM不足エラーの検出
@@ -4180,6 +4227,13 @@ class Controller:
         UIの言語リストが追従するようにする。
         """
         previous_engine = config.SELECTED_TRANSCRIPTION_ENGINE
+        if requested_engine == "SenseVoice" and config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS.get("SenseVoice") is not True:
+            # 使えない SenseVoice を選ばれたら、黙って Whisper に切り替えず今の
+            # エンジンのままにする。重みがあるのに使えないのはランタイム
+            # (sherpa_onnx) の問題なので、それを知らせる。
+            if model.checkSenseVoiceModelWeight() is True:
+                self._sendTranscriptionEngineError(ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE)
+            requested_engine = None
         if requested_engine is not None:
             config.SELECTED_TRANSCRIPTION_ENGINE = requested_engine
 
@@ -4197,7 +4251,8 @@ class Controller:
                     config.SELECTED_TRANSCRIPTION_ENGINE = alternate if alternate in selected_engines else None
                 else:
                     config.SELECTED_TRANSCRIPTION_ENGINE = "Whisper"
-        elif current_engine in TRANSCRIPTION_API_ENGINES or current_engine == "Deepgram":
+        elif current_engine in TRANSCRIPTION_API_ENGINES or current_engine in ("Deepgram", "SenseVoice"):
+            # SenseVoice も重みが無い (未ダウンロード) 間は同じ扱い。
             # Groq/OpenAI/カスタムサーバー/Deepgramはキー無効化等で使えなく
             # なった場合のみ、ローカル Whisper (オフラインで最も安定) へ
             # フォールバックする。まだ有効なら維持する (この elif が無いと
@@ -4211,6 +4266,27 @@ class Controller:
         if config.SELECTED_TRANSCRIPTION_ENGINE != previous_engine:
             self.fallbackUnsupportedLanguagesForTranscriptionEngine(config.SELECTED_TRANSCRIPTION_ENGINE)
             self.run(200, self.run_mapping["selectable_language_list"], model.getListLanguageAndCountry())
+            self.warnIfSenseVoiceCannotRecognizeYourLanguage()
+
+    def _sendTranscriptionEngineError(self, error_code: ErrorCode) -> None:
+        response = VRCTError.create_error_response(error_code, data=None)
+        self.run(response["status"], self.run_mapping["error_transcription_engine"], response["result"])
+
+    def warnIfSenseVoiceCannotRecognizeYourLanguage(self) -> None:
+        """SenseVoice を使っていて、今のタブの「あなたの言語」が SenseVoice の
+        対応外 (フランス語等) なら知らせる。対応外の言語の発話は何も文字起こし
+        されないため (翻訳先の言語は書き換えない。SenseVoiceProvider 参照)。
+        エンジンを選んだとき・あなたの言語を変えたとき・マイクを開始したときに呼ぶ。"""
+        if config.SELECTED_TRANSCRIPTION_ENGINE != "SenseVoice":
+            return
+        your_languages = config.SELECTED_YOUR_LANGUAGES.get(config.SELECTED_TAB_NO, {})
+        for your_language in your_languages.values():
+            if your_language.get("enable") is not True:
+                continue
+            codes = model.getTranscriptionLanguageCodes(your_language["language"], your_language["country"])
+            if "SenseVoice" not in codes:
+                self._sendTranscriptionEngineError(ErrorCode.SENSEVOICE_LANGUAGE_UNSUPPORTED)
+                return
 
     def startCheckMicEnergy(self) -> None:
         with self.mic_lifecycle_lock:
@@ -5181,6 +5257,15 @@ class Controller:
                     case "Whisper":
                         # キャッシュされた結果を使用（重複チェックを回避）
                         status = self._whisper_available_cache
+                    case "SenseVoice":
+                        # ネットワーク不要。重みがダウンロード済みで sherpa_onnx が
+                        # 入っていれば使える (起動時に自動ダウンロードはせず、設定画面
+                        # から取得する)。使わない人の起動で DLL を読み込まないよう、
+                        # ここでは import せず有無だけを見る。
+                        status = (
+                            model.checkSenseVoiceModelWeight() is True
+                            and model.isSenseVoiceRuntimeInstalled() is True
+                        )
                     case "Groq_Whisper":
                         api_key = config.TRANSCRIPTION_AUTH_KEYS.get(engine)
                         if not api_key:

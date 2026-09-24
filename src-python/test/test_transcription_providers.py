@@ -29,6 +29,7 @@ from models.transcription.transcription_providers import (
     GoogleProvider,
     LocalWhisperProvider,
     OpenAICompatibleTranscriptionProvider,
+    SenseVoiceProvider,
     TranscriptionApiError,
 )
 
@@ -101,8 +102,63 @@ class TestGoogleProvider(unittest.TestCase):
 class TestLocalWhisperProvider(unittest.TestCase):
     def _make_audio_data(self) -> MagicMock:
         audio_data = MagicMock()
+        audio_data.sample_rate = 16000
         audio_data.get_raw_data.return_value = b"\x00\x00" * 8
         return audio_data
+
+    def test_resamples_native_rate_audio_to_16khz(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.transcribe.return_value = ([], SimpleNamespace(language="ja", language_probability=1.0))
+        provider = LocalWhisperProvider(whisper_model)
+
+        provider.transcribe(
+            _audio_data(1.0, sample_rate=48000), "Japanese", "Japan",
+            avg_logprob=-0.8, no_speech_prob=0.6, no_repeat_ngram_size=0, force_language=True,
+        )
+
+        args, _ = whisper_model.transcribe.call_args
+        self.assertEqual(args[0].size, 16000)
+
+    def test_choose_language_picks_the_most_likely_candidate(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.detect_language.return_value = (
+            "zh", 0.6, [("zh", 0.6), ("ja", 0.3), ("en", 0.1)],
+        )
+        provider = LocalWhisperProvider(whisper_model)
+
+        chosen = provider.choose_language(
+            self._make_audio_data(), ["English", "Japanese"], ["United States", "Japan"],
+        )
+
+        # 候補外の zh ではなく、候補の中で最も確からしい ja を選ぶ。
+        self.assertEqual(chosen, 1)
+
+    def test_choose_language_returns_none_when_detection_fails(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.detect_language.side_effect = RuntimeError("boom")
+        provider = LocalWhisperProvider(whisper_model)
+
+        with patch("models.transcription.transcription_providers.errorLogging"):
+            chosen = provider.choose_language(
+                self._make_audio_data(), ["English", "Japanese"], ["United States", "Japan"],
+            )
+
+        self.assertIsNone(chosen)
+
+    def test_reuses_prepared_audio_for_the_same_clip(self) -> None:
+        whisper_model = MagicMock()
+        whisper_model.detect_language.return_value = ("ja", 0.9, [("ja", 0.9)])
+        whisper_model.transcribe.return_value = ([], SimpleNamespace(language="ja", language_probability=1.0))
+        provider = LocalWhisperProvider(whisper_model)
+        audio_data = self._make_audio_data()
+
+        provider.choose_language(audio_data, ["Japanese", "English"], ["Japan", "United States"])
+        provider.transcribe(
+            audio_data, "Japanese", "Japan",
+            avg_logprob=-0.8, no_speech_prob=0.6, no_repeat_ngram_size=0, force_language=True,
+        )
+
+        audio_data.get_raw_data.assert_called_once()
 
     def test_filters_low_confidence_segments(self) -> None:
         whisper_model = MagicMock()
@@ -166,6 +222,132 @@ class TestLocalWhisperProvider(unittest.TestCase):
         )
 
         self.assertFalse(is_definitive)
+
+
+class TestSenseVoiceProvider(unittest.TestCase):
+    """認識器 (言語を自動判定するもの) と、発話の有無の判定 (Silero VAD) を
+    差し替えて検証する。"""
+
+    def setUp(self) -> None:
+        self.decoded = {"auto": ("こんにちは", "ja")}
+        self.recognizer = MagicMock()
+        self.recognizer.decode.side_effect = lambda audio, rate: self.decoded["auto"]
+        speech = patch.object(SenseVoiceProvider, "_hasSpeech", return_value=True)
+        self.has_speech = speech.start()
+        self.addCleanup(speech.stop)
+
+    def _transcribe(self, provider, audio_data, language, country, force_language=False, no_speech_prob=0.6):
+        return provider.transcribe(
+            audio_data, language, country,
+            avg_logprob=-0.8, no_speech_prob=no_speech_prob, no_repeat_ngram_size=0, force_language=force_language,
+        )
+
+    def test_returns_text_and_is_definitive_when_detected_language_matches(self) -> None:
+        provider = SenseVoiceProvider(self.recognizer)
+
+        result = self._transcribe(provider, _audio_data(1.0, 48000), "Japanese", "Japan")
+
+        self.assertEqual(result, ("こんにちは", 1.0, True))
+        audio, rate = self.recognizer.decode.call_args[0]
+        self.assertEqual(rate, 16000)
+        self.assertEqual(audio.size, 16000)  # 48kHz 1秒 → 16kHz 1秒
+
+    def test_decodes_once_across_candidate_languages(self) -> None:
+        self.decoded["auto"] = ("hello", "en")
+        provider = SenseVoiceProvider(self.recognizer)
+        audio_data = _audio_data(0.5)
+
+        first = self._transcribe(provider, audio_data, "Japanese", "Japan")
+        second = self._transcribe(provider, audio_data, "English", "United States")
+
+        self.assertEqual(first, ("", 0.0, False))  # 候補と違う言語の結果は採用しない
+        self.assertEqual(second, ("hello", 1.0, True))
+        self.recognizer.decode.assert_called_once()
+
+    def test_choose_language_returns_the_matching_candidate(self) -> None:
+        self.decoded["auto"] = ("안녕하세요", "ko")
+        provider = SenseVoiceProvider(self.recognizer)
+
+        chosen = provider.choose_language(
+            _audio_data(0.5), ["Japanese", "Korean"], ["Japan", "South Korea"], no_speech_prob=0.6,
+        )
+
+        self.assertEqual(chosen, 1)
+
+    def test_choose_language_returns_none_when_no_candidate_matches(self) -> None:
+        self.decoded["auto"] = ("你好", "zh")
+        provider = SenseVoiceProvider(self.recognizer)
+
+        chosen = provider.choose_language(
+            _audio_data(0.5), ["Japanese", "Korean"], ["Japan", "South Korea"], no_speech_prob=0.6,
+        )
+
+        self.assertIsNone(chosen)
+
+    def test_single_candidate_discards_a_result_detected_as_another_language(self) -> None:
+        """日本語だけの設定で、漢字の多い発言が zh と判定されても、中国語の
+        結果を「日本語」として返さない (言語を固定したモデルをもう1つ読み込んで
+        読み直すことはしない。約 240MB 増えるため)。"""
+        self.decoded["auto"] = ("天然记念物", "zh")
+        provider = SenseVoiceProvider(self.recognizer)
+
+        result = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan", force_language=True)
+
+        self.assertEqual(result, ("", 0.0, False))
+        self.recognizer.decode.assert_called_once()
+
+    def test_unsupported_language_returns_nothing_without_decoding(self) -> None:
+        provider = SenseVoiceProvider(self.recognizer)
+
+        result = self._transcribe(provider, _audio_data(0.5), "French", "France", force_language=True)
+
+        self.assertEqual(result, ("", 0.0, False))
+        self.recognizer.decode.assert_not_called()
+
+    def test_skips_decoding_when_there_is_no_speech(self) -> None:
+        self.has_speech.return_value = False
+        provider = SenseVoiceProvider(self.recognizer)
+
+        result = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan", force_language=True, no_speech_prob=0.7)
+
+        self.assertEqual(result, ("", 0.0, False))
+        self.recognizer.decode.assert_not_called()
+        self.assertEqual(self.has_speech.call_args[0][1], 0.7)
+
+    def test_drops_nospeech_results(self) -> None:
+        self.decoded["auto"] = ("嗯。", "nospeech")
+        provider = SenseVoiceProvider(self.recognizer)
+
+        result = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan", force_language=True)
+
+        self.assertEqual(result, ("", 0.0, False))
+
+    def test_removes_spaces_next_to_japanese_but_not_between_english_words(self) -> None:
+        self.decoded["auto"] = ("今日 は 3 時 に VRChat で 遊ぶ。 see you later", "ja")
+        provider = SenseVoiceProvider(self.recognizer)
+
+        text, _, _ = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan")
+
+        self.assertEqual(text, "今日は3時にVRChatで遊ぶ。see you later")
+
+    def test_keeps_spaces_in_korean(self) -> None:
+        self.decoded["auto"] = ("안녕 하세요 3 시", "ko")
+        provider = SenseVoiceProvider(self.recognizer)
+
+        text, _, _ = self._transcribe(provider, _audio_data(0.5), "Korean", "South Korea")
+
+        self.assertEqual(text, "안녕 하세요 3 시")
+
+
+class TestSenseVoiceSpeechCheck(unittest.TestCase):
+    """発話の有無の判定そのもの (Silero VAD を実際に動かす)。"""
+
+    def test_silence_and_noise_are_not_speech(self) -> None:
+        import numpy as np
+        provider = SenseVoiceProvider(MagicMock())
+        rng = np.random.default_rng(0)
+        self.assertFalse(provider._hasSpeech(np.zeros(32000, dtype=np.float32), 0.6))
+        self.assertFalse(provider._hasSpeech((0.05 * rng.standard_normal(32000)).astype(np.float32), 0.6))
 
 
 class TestOpenAICompatibleTranscriptionProvider(unittest.TestCase):

@@ -32,6 +32,13 @@ from models.translation.translation_languages import translation_lang
 from models.transcription.transcription_languages import transcription_lang
 from models.translation.translation_utils import checkCTranslate2Weight, downloadCTranslate2Weight, downloadCTranslate2Tokenizer, backwardCompatibleRenameWeightsDir
 from models.transcription.transcription_whisper import checkWhisperWeight, downloadWhisperWeight
+from models.transcription.transcription_sensevoice import (
+    checkSenseVoiceWeight,
+    downloadSenseVoiceWeight,
+    SenseVoiceRuntimeError,
+    isSenseVoiceRuntimeInstalled,
+    loadSenseVoiceRuntime,
+)
 from models.transcription.transcription_openai_compatible import checkTranscriptionApiKey, getAvailableTranscriptionModels
 from models.transcription.transcription_deepgram import (
     checkDeepgramApiKey,
@@ -115,6 +122,18 @@ _AUDIO_QUEUE_MAXSIZE = 20
 # 汎用の上書き機構として残しているが、model.py からは既定値 (7秒、
 # PuriPuly-heart 参考値) を上書きしない。
 
+
+
+def _closeTranscriber(transcriber) -> None:
+    """文字起こしが借りている共有リソース (SenseVoice の認識器) を返す。
+    停止の経路で呼ぶので、失敗しても停止は続ける。"""
+    close = getattr(transcriber, "close", None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception:
+        errorLogging()
 
 class _DiscardQueue(Queue):
     """Queue that silently drops everything put into it.
@@ -558,11 +577,14 @@ class _AudioDeviceSession:
                 try:
                     self._transcriber = self._create_transcriber()
                 except Exception as error:  # noqa: BLE001 - initialization failure
-                    start_failure = self._make_pipeline_failure(
-                        ErrorCode.TRANSCRIBER_INIT_ERROR,
-                        "asr",
-                        error,
+                    # SenseVoice のランタイム (sherpa_onnx) が読み込めないのは、
+                    # 一般的な初期化の失敗とは別に知らせる (直し方が違うため)。
+                    error_code = (
+                        ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE
+                        if isinstance(error, SenseVoiceRuntimeError)
+                        else ErrorCode.TRANSCRIBER_INIT_ERROR
                     )
+                    start_failure = self._make_pipeline_failure(error_code, "asr", error)
                     raise
         except Exception:
             # Recorder open/listener または Transcriber 初期化が失敗した場合も、
@@ -627,6 +649,7 @@ class _AudioDeviceSession:
                 # the new transcription pipeline fail with None.
                 if self._transcriber is transcriber:
                     self._transcriber = None
+                _closeTranscriber(transcriber)
                 # 明示 gc.collect() は呼ばない: ActiveEndpointTracker が別スレッド
                 # (CoInitialize 済み apartment) で保持している comtypes の COM
                 # ポインタが、この _print_transcript スレッド (CoInitialize
@@ -712,6 +735,7 @@ class _AudioDeviceSession:
                         self._audio_queue.get_nowait()
                     except Empty:
                         break
+            _closeTranscriber(self._transcriber)
             self._transcriber = None
             self._audio_queue = None
             self._active_device = None
@@ -1007,6 +1031,18 @@ class Model:
     def downloadWhisperModelWeight(self, weight_type, callback=None, end_callback=None):
         return downloadWhisperWeight(config.PATH_DATA, weight_type, callback, end_callback)
 
+    def checkSenseVoiceModelWeight(self) -> bool:
+        return checkSenseVoiceWeight(config.PATH_DATA)
+
+    def isSenseVoiceRuntimeInstalled(self) -> bool:
+        return isSenseVoiceRuntimeInstalled()
+
+    def loadSenseVoiceRuntime(self) -> bool:
+        return loadSenseVoiceRuntime() is not None
+
+    def downloadSenseVoiceModelWeight(self, callback=None, end_callback=None):
+        return downloadSenseVoiceWeight(config.PATH_DATA, callback, end_callback)
+
     def authenticationTranscriptionApiKey(self, api_key: str, base_url: str) -> bool:
         return checkTranscriptionApiKey(api_key, base_url)
 
@@ -1278,10 +1314,19 @@ class Model:
         languages = sorted(languages, key=lambda x: x['language'])
         return languages
 
+    def getTranscriptionLanguageCodes(self, language: str, country: str) -> dict:
+        """(Language, Country) に対するエンジンごとの言語コード。無ければ空。"""
+        return transcription_lang.get(language, {}).get(country, {})
+
     def isLanguageSupportedByTranscriptionEngine(self, engine: str, language: str, country: str) -> bool:
         """VRCT の (Language, Country) を、指定した文字起こしエンジンが
         対応しているかどうかを返す。
 
+        SenseVoice も常に True を返す。SenseVoice は5言語しか認識できないが、
+        ここで絞ると共通の言語一覧と全タブの翻訳先の言語まで書き換わる
+        (fallbackUnsupportedLanguagesForTranscriptionEngine)。翻訳先の言語は
+        スピーカーの文字起こしの候補にすぎないので、対応していない言語は
+        SenseVoiceProvider が候補から外す (何も返さない) だけにする。
         Google/Whisper/Groq_Whisper/OpenAI_Whisper/Custom_Whisper は
         transcription_lang の全エントリを網羅しているため常に True
         (Groq/OpenAI/カスタムサーバーはローカルWhisperと同じ言語コードを

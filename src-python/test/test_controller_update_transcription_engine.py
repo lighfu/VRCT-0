@@ -12,7 +12,9 @@
 一箇所に集約しているため、ここで検証する。
 """
 
+import copy
 import unittest
+from unittest.mock import patch
 
 from config import config
 from controller import Controller
@@ -25,6 +27,7 @@ class UpdateTranscriptionEngineApiEnginesTests(unittest.TestCase):
             "selectable_language_list": "selectable_language_list",
             "selected_your_languages": "selected_your_languages",
             "selected_target_languages": "selected_target_languages",
+            "error_transcription_engine": "error_transcription_engine",
         }
         self.calls = []
         self.controller.run = lambda status, endpoint, result: self.calls.append((status, endpoint, result))
@@ -69,6 +72,67 @@ class UpdateTranscriptionEngineApiEnginesTests(unittest.TestCase):
         self.assertEqual(config.SELECTED_TRANSCRIPTION_ENGINE, "Whisper")
         pushed_endpoints = [endpoint for _, endpoint, _ in self.calls]
         self.assertIn("selectable_language_list", pushed_endpoints)
+
+    def test_keeps_sensevoice_selected_while_its_weight_is_available(self) -> None:
+        config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {}
+        config._SELECTED_TRANSCRIPTION_ENGINE = "SenseVoice"
+        config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = {"Google": True, "Whisper": False, "SenseVoice": True}
+
+        self.controller.updateTranscriptionEngine()
+
+        self.assertEqual(config.SELECTED_TRANSCRIPTION_ENGINE, "SenseVoice")
+        self.assertEqual(self.calls, [])
+
+    def test_falls_back_to_whisper_when_sensevoice_weight_is_missing(self) -> None:
+        config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {}
+        config._SELECTED_TRANSCRIPTION_ENGINE = "SenseVoice"
+        config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = {"Google": True, "Whisper": False, "SenseVoice": False}
+
+        self.controller.updateTranscriptionEngine()
+
+        self.assertEqual(config.SELECTED_TRANSCRIPTION_ENGINE, "Whisper")
+
+    def test_selecting_unavailable_sensevoice_keeps_the_current_engine_and_reports_the_runtime(self) -> None:
+        """重みはあるのに sherpa_onnx が読めないとき、黙って Whisper に
+        切り替えず今のエンジンのままにし、ランタイムの問題を知らせる。"""
+        config._SELECTED_TRANSCRIPTION_ENGINE = "Google"
+        config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = {"Google": True, "Whisper": True, "SenseVoice": False}
+
+        with patch("controller.model") as mock_model:
+            mock_model.checkSenseVoiceModelWeight.return_value = True
+            self.controller.updateTranscriptionEngine(requested_engine="SenseVoice")
+
+        self.assertEqual(config.SELECTED_TRANSCRIPTION_ENGINE, "Google")
+        errors = [r["error_code"] for s, e, r in self.calls if e == "error_transcription_engine"]
+        self.assertEqual(errors, ["SENSEVOICE_RUNTIME_UNAVAILABLE"])
+
+    def test_warns_when_sensevoice_cannot_recognize_your_language(self) -> None:
+        config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {}
+        config._SELECTED_TRANSCRIPTION_ENGINE = "Google"
+        config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = {"Google": True, "Whisper": False, "SenseVoice": True}
+        your_languages = copy.deepcopy(config.SELECTED_YOUR_LANGUAGES)
+        your_languages[config.SELECTED_TAB_NO]["1"] = {"language": "French", "country": "France", "enable": True}
+        config.SELECTED_YOUR_LANGUAGES = your_languages
+
+        self.controller.updateTranscriptionEngine(requested_engine="SenseVoice")
+
+        self.assertEqual(config.SELECTED_TRANSCRIPTION_ENGINE, "SenseVoice")
+        # 翻訳の設定 (あなたの言語) は書き換えない
+        self.assertEqual(config.SELECTED_YOUR_LANGUAGES[config.SELECTED_TAB_NO]["1"]["language"], "French")
+        errors = [r["error_code"] for s, e, r in self.calls if e == "error_transcription_engine"]
+        self.assertEqual(errors, ["SENSEVOICE_LANGUAGE_UNSUPPORTED"])
+
+    def test_no_warning_for_a_supported_language(self) -> None:
+        config.SELECTABLE_WHISPER_WEIGHT_TYPE_DICT = {}
+        config._SELECTED_TRANSCRIPTION_ENGINE = "Google"
+        config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS = {"Google": True, "Whisper": False, "SenseVoice": True}
+        your_languages = copy.deepcopy(config.SELECTED_YOUR_LANGUAGES)
+        your_languages[config.SELECTED_TAB_NO]["1"] = {"language": "Japanese", "country": "Japan", "enable": True}
+        config.SELECTED_YOUR_LANGUAGES = your_languages
+
+        self.controller.updateTranscriptionEngine(requested_engine="SenseVoice")
+
+        self.assertEqual([e for _, e, _ in self.calls if e == "error_transcription_engine"], [])
 
     def test_google_still_falls_back_to_whisper_when_unavailable(self) -> None:
         # 既存挙動 (Whisper/Google 間のフォールバック) の回帰チェック。

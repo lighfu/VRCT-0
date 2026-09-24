@@ -119,7 +119,6 @@ export const STATIC_ROUTE_META_LIST = [
     { endpoint: "/set/data/hotkeys", ns: configs, hook_name: "useHotkeys", method_name: "setSuccessHotkeys" },
 
     // // Not Implemented.
-    { endpoint: "/get/data/selectable_transcription_engines", ns: null, hook_name: null, method_name: null }, // Not implemented on UI yet. (if ai_models has not been detected, this will be blank array[]. if the ai_models are ok but just network has not connected, it'l be only ["Whisper"])
     { endpoint: "/run/shutdown", ns: null, hook_name: null, method_name: null }, // Not implemented on UI.
     { endpoint: "/get/data/selectable_release_channels", ns: null, hook_name: null, method_name: null }, // Not implemented on UI yet; release_channel options are hardcoded in Updater.jsx for now.
 ];
@@ -187,6 +186,10 @@ export const useReceiveRoutes = () => {
                 break;
 
             case 400:
+                // 重みの取得の失敗は、画面の「取得中」を戻してから知らせる。
+                if (endpoint?.startsWith("/run/error_") && endpoint in routes) {
+                    routes[endpoint](result);
+                }
                 errorHandling_Backend({
                     error_code: parsed_data.result.error_code,
                     message: parsed_data.result.message,
@@ -312,6 +315,13 @@ const buildRouteMetaList = () => {
                 ns: namespace_module,
                 hook_name: hookName,
                 method_name: `downloaded${base}`,
+            });
+            // 失敗は status 400 で届く (下の errorHandling_Backend と併せて呼ぶ)。
+            generated.push({
+                endpoint: `/run/error_${ep}`,
+                ns: namespace_module,
+                hook_name: hookName,
+                method_name: `failedDownload${base}`,
             });
             generated.push({
                 endpoint: `/run/pending_${ep}`,

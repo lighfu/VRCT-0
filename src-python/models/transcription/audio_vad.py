@@ -48,6 +48,8 @@ from typing import Callable, Deque, Literal, Optional, Protocol
 
 import numpy as np
 
+from models.transcription.audio_resample import StreamingResampler
+
 TARGET_SAMPLE_RATE = 16000
 FRAME_SAMPLES = 512
 FRAME_DURATION_MS = FRAME_SAMPLES / TARGET_SAMPLE_RATE * 1000  # 32.0 ms
@@ -66,10 +68,12 @@ class Pcm16MonoNormalizer:
         self.sample_rate = sample_rate
         self.sample_width = sample_width
         self.channels = max(1, channels)
-        self._rate_state = None
+        # audioop.ratecv (ローパス無しの線形補間) だと 48kHz → 16kHz で 8kHz 以上が
+        # 折り返して認識精度を落とすため、帯域制限付きで落とす。
+        self._resampler = StreamingResampler(sample_rate, TARGET_SAMPLE_RATE)
 
     def reset(self) -> None:
-        self._rate_state = None
+        self._resampler.reset()
 
     def process(self, data: bytes) -> bytes:
         if not data:
@@ -84,18 +88,9 @@ class Pcm16MonoNormalizer:
         if self.channels > 1 and samples.size:
             frames = samples.reshape(-1, self.channels).astype(np.int32)
             samples = np.rint(frames.mean(axis=1)).clip(-32768, 32767).astype(np.int16)
-        data = samples.astype("<i2", copy=False).tobytes()
-
         if self.sample_rate != TARGET_SAMPLE_RATE:
-            data, self._rate_state = audioop.ratecv(
-                data,
-                2,
-                1,
-                self.sample_rate,
-                TARGET_SAMPLE_RATE,
-                self._rate_state,
-            )
-        return data
+            samples = np.rint(self._resampler.process(samples)).clip(-32768, 32767).astype(np.int16)
+        return samples.astype("<i2", copy=False).tobytes()
 
 
 class VadEngine(Protocol):

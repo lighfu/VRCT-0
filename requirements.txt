@@ -5,6 +5,12 @@
 # (models/cuda_pack.py) instead of a separate requirements file.
 faster-whisper==1.1.1
 ctranslate2==4.6.0
+# SenseVoice (local speech recognition, ja/en/zh/yue/ko). sherpa-onnx ships its
+# own onnxruntime.dll next to its .pyd; the onnxruntime Python package (used by
+# faster-whisper VAD and RapidOCR) links ORT statically into its .pyd and does
+# not load onnxruntime.dll, so the two do not collide.
+sherpa-onnx==1.13.8
+sherpa-onnx-core==1.13.8
 pillow == 10.0.0
 PyAudioWPatch == 0.2.12.6
 python-osc == 1.9.0

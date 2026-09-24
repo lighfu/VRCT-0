@@ -20,6 +20,9 @@ common_error:
     threshold_invalid_value: "You can set it with a value between {{min}} to {{max}}."
     failed_download_weight_ctranslate2: "CTranslate2 weight download error."
     failed_download_weight_whisper: "Whisper weight download error."
+    failed_download_weight_sensevoice: "SenseVoice model download error."
+    sensevoice_runtime_unavailable: "Could not load the SenseVoice engine (sherpa-onnx). Try reinstalling VRCT or installing the Microsoft Visual C++ Redistributable."
+    sensevoice_language_unsupported: "SenseVoice cannot recognize your selected language, so nothing will be transcribed. It only supports Japanese, English, Chinese, Cantonese and Korean."
     failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "Translation engine limit reached or temporarily restricted."
     deepl_auth_key_invalid_length: "DeepL API key length is not correct."
@@ -294,6 +297,9 @@ config_page:
         whisper_weight_type:
             label: "Whisper Model"
             desc: "Larger models have higher accuracy, but they also consume more CPU or GPU resources.\nEspecially for models larger than medium, it may be difficult or even impossible to use them depending on the performance of your CPU/GPU."
+        sensevoice_weight_type:
+            label: "SenseVoice Model"
+            desc: "A fast, lightweight on-device model. Runs fast even on the CPU, with accuracy close to Whisper large-v3-turbo. Recognizes only Japanese, English, Chinese, Cantonese and Korean; other languages are not transcribed. Download it to enable SenseVoice."
         transcription_compute_device:
             label: "Processing Device Used For AI transcription"
 

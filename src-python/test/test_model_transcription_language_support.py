@@ -33,6 +33,12 @@ class TestIsLanguageSupportedByTranscriptionEngine(unittest.TestCase):
             with self.subTest(engine=engine):
                 self.assertTrue(model.isLanguageSupportedByTranscriptionEngine(engine, "Korean", "South Korea"))
 
+    def test_sensevoice_does_not_filter_the_shared_language_list(self) -> None:
+        """SenseVoice を選んでも翻訳先の言語を書き換えない (未対応の言語は
+        SenseVoiceProvider が候補から外すだけ)。"""
+        self.assertTrue(model.isLanguageSupportedByTranscriptionEngine("SenseVoice", "Japanese", "Japan"))
+        self.assertTrue(model.isLanguageSupportedByTranscriptionEngine("SenseVoice", "French", "France"))
+
     def test_deepgram_matches_currently_selected_models_languages(self) -> None:
         self.assertTrue(model.isLanguageSupportedByTranscriptionEngine("Deepgram", "Japanese", "Japan"))
         self.assertFalse(model.isLanguageSupportedByTranscriptionEngine("Deepgram", "Korean", "South Korea"))

@@ -193,6 +193,17 @@ export const useSettingsLogics = (settingsArray, Category) => {
                     );
                 });
             };
+            // 取得に失敗したとき (/run/error_<endpoint>)。どれが失敗したかは
+            // 届かないので、取得中の表示をすべて戻してボタンを押し直せるようにする。
+            result[`failedDownload${base}`] = () => {
+                update((old_status) => {
+                    return old_status.data.map((item) =>
+                        item.is_pending
+                            ? { ...item, is_pending: false, progress: null }
+                            : item
+                    );
+                });
+            };
             result[`downloaded${base}`] = (id) => {
                 update((old_status) => {
                     return old_status.data.map((item) =>

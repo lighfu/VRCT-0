@@ -3,6 +3,7 @@ import { createAtomWithHook } from "@store";
 import {
     ctranslate2_weight_type_status,
     whisper_weight_type_status,
+    sensevoice_weight_type_status,
     sudachi_dict_type_status,
     ui_configs,
 } from "@ui_configs";
@@ -579,6 +580,25 @@ export const SETTINGS_ARRAY = [
         base_endpoint_name: "whisper_weight",
     },
     {
+        // 使えるエンジンの一覧 (重みがあり、ランタイムも読み込めるもの)。
+        // ダウンロードの完了などで変わると /run/selectable_transcription_engines で届く。
+        Category: "Transcription",
+        Base_Name: "SelectableTranscriptionEngines",
+        default_value: [],
+        ui_template_id: "list",
+        logics_template_id: "get_only",
+        base_endpoint_name: "selectable_transcription_engines",
+        add_endpoint_run_array: ["from_backend"],
+    },
+    {
+        Category: "Transcription",
+        Base_Name: "SenseVoiceWeightTypeStatus",
+        default_value: sensevoice_weight_type_status,
+        ui_template_id: "list",
+        logics_template_id: "weight_download_status",
+        base_endpoint_name: "sensevoice_weight",
+    },
+    {
         Category: "Transcription",
         Base_Name: "SelectedWhisperWeightType",
         default_value: "",
@@ -1029,12 +1049,14 @@ const buildCategoryApiFromSettings = (settings, settingsArray, Category, extraFu
             const pendingKey = `pending${base}`;
             const downloadedKey = `downloaded${base}`;
             const downloadKey = `download${base}`;
+            const failedDownloadKey = `failedDownload${base}`;
 
             if (typeof settings[updateDownloadProgressKey] === "function") api[updateDownloadProgressKey] = settings[updateDownloadProgressKey];
             if (typeof settings[updateDownloadedKey] === "function") api[updateDownloadedKey] = settings[updateDownloadedKey];
             if (typeof settings[pendingKey] === "function") api[pendingKey] = settings[pendingKey];
             if (typeof settings[downloadedKey] === "function") api[downloadedKey] = settings[downloadedKey];
             if (typeof settings[downloadKey] === "function") api[downloadKey] = settings[downloadKey];
+            if (typeof settings[failedDownloadKey] === "function") api[failedDownloadKey] = settings[failedDownloadKey];
 
             const updateFromBackendKey = `updateFromBackend${base}`;
             if (typeof settings[updateFromBackendKey] === "function") api[updateFromBackendKey] = settings[updateFromBackendKey];

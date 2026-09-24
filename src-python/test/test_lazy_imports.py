@@ -30,6 +30,7 @@ _SRC_PYTHON = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # 変更が要る (単純な import 移動を超える)。閾値未満なので対象外とした。
 _LAZY_MODULES = [
     "faster_whisper",
+    "sherpa_onnx",
     "translators",
     "google.genai",
     "openai",
