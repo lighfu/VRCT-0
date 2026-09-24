@@ -117,16 +117,20 @@ def requestRemoval(directory: Optional[str] = None) -> None:
 
 
 def _downloadWheel(wheel: Wheel, path: str, on_bytes: Callable[[int], None]) -> None:
-    response = requests_get(wheel.url, stream=True, timeout=_DOWNLOAD_TIMEOUT)
-    response.raise_for_status()
     digest = hashlib.sha256()
     received = 0
-    with open(path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=1024 * 2000):
-            f.write(chunk)
-            digest.update(chunk)
-            received += len(chunk)
-            on_bytes(received)
+    # 失敗しても接続を閉じる。固定した大きさより多く届いたら、ハッシュを見る前に止める
+    # (送り続けるサーバーでディスクを埋めないため)。
+    with requests_get(wheel.url, stream=True, timeout=_DOWNLOAD_TIMEOUT) as response:
+        response.raise_for_status()
+        with open(path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024 * 2000):
+                received += len(chunk)
+                if received > wheel.size:
+                    raise ValueError(f"{wheel.name}: more than {wheel.size} bytes")
+                f.write(chunk)
+                digest.update(chunk)
+                on_bytes(received)
     if digest.hexdigest() != wheel.sha256:
         raise ValueError(f"{wheel.name}: checksum mismatch")
 

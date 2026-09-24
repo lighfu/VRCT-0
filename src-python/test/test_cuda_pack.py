@@ -24,10 +24,11 @@ def _wheel_bytes(files: dict) -> bytes:
     return buffer.getvalue()
 
 
-def _response(data: bytes):
+def _response(data: bytes, chunks=None):
     response = MagicMock()
+    response.__enter__.return_value = response
     response.headers = {"content-length": str(len(data))}
-    response.iter_content.return_value = [data[:10], data[10:]]
+    response.iter_content.return_value = chunks if chunks is not None else [data[:10], data[10:]]
     response.raise_for_status.return_value = None
     return response
 
@@ -136,6 +137,44 @@ class DownloadTests(unittest.TestCase):
         ok, _, _, _ = self._download(wheels, get=get)
         self.assertFalse(ok)
         self.assertFalse(os.path.exists(os.path.join(self.directory, "bin")))
+
+
+class DownloadWheelTests(unittest.TestCase):
+    """1 つの wheel の取得 (_downloadWheel)。"""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.path = os.path.join(tmp.name, "cublas.whl")
+        self.wheel = _wheels()[0]
+
+    def test_the_response_is_closed_after_a_successful_download(self) -> None:
+        response = _response(CUBLAS)
+        with patch.object(cuda_pack, "requests_get", return_value=response):
+            cuda_pack._downloadWheel(self.wheel, self.path, lambda received: None)
+        response.__exit__.assert_called_once()
+        with open(self.path, "rb") as f:
+            self.assertEqual(f.read(), CUBLAS)
+
+    def test_the_response_is_closed_after_a_failed_download(self) -> None:
+        response = _response(CUBLAS)
+        response.iter_content.side_effect = ConnectionError("reset")
+        with patch.object(cuda_pack, "requests_get", return_value=response):
+            with self.assertRaises(ConnectionError):
+                cuda_pack._downloadWheel(self.wheel, self.path, lambda received: None)
+        response.__exit__.assert_called_once()
+
+    def test_more_bytes_than_the_pinned_size_stop_the_download(self) -> None:
+        # 送り続けるサーバーで、ハッシュを見る前にディスクを埋めないように。
+        endless = [CUBLAS] + [b"x" * 1000] * 1000
+        response = _response(CUBLAS, chunks=endless)
+        received = []
+        with patch.object(cuda_pack, "requests_get", return_value=response):
+            with self.assertRaises(ValueError):
+                cuda_pack._downloadWheel(self.wheel, self.path, received.append)
+        response.__exit__.assert_called_once()
+        self.assertLessEqual(os.path.getsize(self.path), self.wheel.size)
+        self.assertLessEqual(max(received), self.wheel.size)
 
 
 class StatusTests(unittest.TestCase):
