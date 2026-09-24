@@ -44,29 +44,23 @@ npm install
 
 ### 3. Python環境のセットアップ
 
-以下のコマンドで、CPU版とCUDA版の両方の仮想環境を作成します:
+以下のコマンドで、仮想環境を作成します:
 
 ```bash
 npm run setup-python
 ```
 
 このコマンドは以下の処理を実行します:
-- `.venv` (CPU版) の作成と依存関係のインストール
-- `.venv_cuda` (CUDA版) の作成と依存関係のインストール
+- `.venv` の作成と依存関係のインストール
 
-> **注意**: CUDA版を使用する場合は、CUDA 12.8対応のNVIDIA GPUドライバーが必要です。
-> CUDA Toolkit のインストールは不要です。ctranslate2 が使う cuBLAS / cuDNN は
-> `requirements_cuda.txt` の `nvidia-*-cu12` wheel で入り、ビルド時に同梱されます。
+> **注意**: GPU はアプリの設定から GPU 部品を導入して使います（ダウンロード約 1.3 GB、
+> `<データの置き場所>\cuda\bin`）。開発中も同じで、`.venv_cuda` は要りません。
 
 ## ビルドの種類
 
-VRCTでは、以下の2種類のビルドが可能です:
-
-### CPU版
-標準的なCPUで動作するバージョン。GPUは不要。
-
-### CUDA版
-NVIDIA GPUを活用した高速処理版。CUDA対応GPUが必要。
+VRCTのビルドは1種類のみです。GPU 対応も含めて同じビルドで動作し、GPU
+使用時に必要な cuBLAS / cuDNN はアプリの設定から導入する GPU 部品として
+実行時に取得します。
 
 ## 開発ビルド
 
@@ -85,14 +79,6 @@ npm run dev
 4. Pythonバックエンドのビルド (`build-python`)
 5. ViteとTauriの開発サーバー起動
 
-### CUDA版の開発ビルド
-
-```bash
-npm run dev-cuda
-```
-
-CPU版と同様ですが、CUDA対応のPythonバックエンドをビルドします。
-
 ### UIのみの開発
 
 バックエンドのビルドをスキップして、UIのみを開発する場合:
@@ -108,14 +94,10 @@ Python を直接 sidecar として起動する高速ループです。Python コ
 修正した検証も、プロセス再起動だけで反映されます（数分 → 数秒）。
 
 ```bash
-# 標準環境: .venv/Scripts/python.exe
 npm run dev-fast
-
-# CUDA環境: .venv_cuda/Scripts/python.exe
-npm run dev-cuda-fast
 ```
 
-どちらのコマンドも以下を実行します:
+以下を実行します:
 
 1. 実行中のプロセスを終了 (`task-kill`)
 2. dev 用 sidecar ラッパー（`utils/dev_sidecar/`, Rust 製の薄いバイナリ）を
@@ -124,9 +106,7 @@ npm run dev-cuda-fast
 
 前提:
 
-- 選択した仮想環境と依存関係が準備済みであること
-  - `dev-fast`: `.venv/Scripts/python.exe`
-  - `dev-cuda-fast`: `.venv_cuda/Scripts/python.exe`（`.venv` は不要）
+- `.venv/Scripts/python.exe` と依存関係が準備済みであること
 - Rust ツールチェーン (`cargo`) が使えること（既に Tauri で必要）
 
 各コマンドが `VRCT_DEV_VENV` を設定し、Tauri 経由で dev 用 sidecar に
@@ -193,8 +173,6 @@ npm run update-version
 
 ### Pythonバックエンドのビルド
 
-#### CPU版
-
 ```bash
 npm run build-python
 ```
@@ -203,18 +181,6 @@ npm run build-python
 
 - `.venv` 環境をアクティベート
 - PyInstallerで `spec/backend.spec` を使用してビルド
-- 出力先: `src-tauri/bin/`
-
-#### CUDA版
-
-```bash
-npm run build-python-cuda
-```
-
-実行内容:
-
-- `.venv_cuda` 環境をアクティベート
-- PyInstallerで `spec/backend_cuda.spec` を使用してビルド
 - 出力先: `src-tauri/bin/`
 
 ### フロントエンドのビルド
@@ -265,7 +231,7 @@ npm run clean-soft
 
 ### PyInstaller のオプション環境変数
 
-`build-python` / `build-python-cuda` は以下の環境変数で挙動を切り替えられます:
+`build-python` は以下の環境変数で挙動を切り替えられます:
 
 - `VRCT_PYINSTALLER_CLEAN=1` — PyInstaller に `--clean` を渡し、
   Analysis キャッシュを破棄してからビルド（依存追加時・リリース前確認用）。
@@ -288,13 +254,11 @@ VRCTに関連する実行中のプロセスを終了します。
 ```
 VRCT/
 ├── bat/                    # バッチスクリプト
-│   ├── build.bat          # CPU版Pythonビルド
-│   ├── build_cuda.bat     # CUDA版Pythonビルド
+│   ├── build.bat          # Pythonビルド
 │   ├── install.bat        # Python環境セットアップ
 │   └── sidecar_dev.bat    # dev-fast用sidecarラッパービルド
 ├── spec/                   # PyInstallerスペックファイル
-│   ├── backend.spec       # CPU版ビルド設定
-│   └── backend_cuda.spec  # CUDA版ビルド設定
+│   └── backend.spec       # ビルド設定
 ├── src-python/            # Pythonバックエンドソースコード
 ├── src-tauri/             # Tauriアプリケーション設定
 │   ├── bin/              # ビルド済みPythonバイナリ（生成）
@@ -307,8 +271,7 @@ VRCT/
 │   ├── update_version.py # バージョン更新スクリプト
 │   └── pack_release.py  # Velopack パッケージング
 ├── package.json          # Node.js設定とバージョン管理
-├── requirements.txt      # Python依存関係（CPU版）
-└── requirements_cuda.txt # Python依存関係（CUDA版。requirements.txt + CUDAライブラリ）
+└── requirements.txt      # Python依存関係
 ```
 
 ## トラブルシューティング
@@ -338,13 +301,13 @@ npm install
 npm run build
 ```
 
-### CUDA版が動作しない
+### GPUが動作しない
 
 - NVIDIA GPUドライバーが最新か確認（CUDA Toolkit のインストールは不要）
-- `requirements_cuda.txt` の依存関係が正しくインストールされているか確認
-- `.venv_cuda/Lib/site-packages/nvidia/{cublas,cudnn}/bin/` にDLLがあるか確認。
-  ctranslate2 はGPU実行時にここの `cublas64_12.dll` / `cudnn64_9.dll` を
-  実行時ロードする。無ければGPUは計算デバイス一覧に出ない
+- アプリの設定から GPU 部品（約 1.3 GB）を導入し、再起動したか確認
+- `<データの置き場所>\cuda\bin\` にDLLがあるか確認。ctranslate2 はGPU実行時に
+  ここの `cublas64_12.dll` / `cudnn64_9.dll` を実行時ロードする。無ければ
+  GPUは計算デバイス一覧に出ない
 
 ### プロセスが残っている
 
@@ -358,10 +321,9 @@ npm run task-kill
 
 ### PyInstallerスペックファイル
 
-- `spec/backend.spec` - CPU版の設定
-- `spec/backend_cuda.spec` - CUDA版の設定
+- `spec/backend.spec` - ビルド設定
 
-これらのファイルでは、以下を設定しています:
+このファイルでは、以下を設定しています:
 - エントリーポイント: `src-python/mainloop.py`
 - データファイル（フォント、プロンプト、言語ファイル等）のパス
 - 依存ライブラリのパス

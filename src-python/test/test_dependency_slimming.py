@@ -91,7 +91,7 @@ class TransformersRemovedTests(unittest.TestCase):
         # in .venv/.venv_cuda (it is, via requirements-dev.txt, for the
         # tokenizer parity test), regardless of --clean. Excluding it in the
         # spec is the only reliable way to keep it out of release builds.
-        for spec_filename in ("backend.spec", "backend_cuda.spec"):
+        for spec_filename in ("backend.spec",):
             with self.subTest(spec=spec_filename):
                 self.assertIn("transformers", _specExcludes(spec_filename))
 
@@ -108,7 +108,7 @@ class SudachiDictionaryTests(unittest.TestCase):
         # in the build venv, regardless of `excludes=`. Both specs must
         # filter it out of a.datas/a.binaries after Analysis() as a second
         # line of defense against a stale/dirty .venv.
-        for spec_filename in ("backend.spec", "backend_cuda.spec"):
+        for spec_filename in ("backend.spec",):
             with self.subTest(spec=spec_filename):
                 spec_path = os.path.join(_REPO_ROOT, "spec", spec_filename)
                 with open(spec_path, encoding="utf-8") as f:

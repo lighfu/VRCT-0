@@ -6,7 +6,6 @@
   "scripts": {
     "setup-python": "bat\\install.bat",
     "build-python": "bat\\build.bat",
-    "build-python-cuda": "bat\\build_cuda.bat",
     "sidecar-dev": "bat\\sidecar_dev.bat",
     "vite": "vite",
     "vite-build": "vite build",
@@ -18,9 +17,7 @@
     "clean-soft": "python utils\\clean.py --soft",
     "update-version": "python utils\\update_version.py",
     "dev": "npm run task-kill && npm run clean && npm run update-version && npm run build-python && npm run dev-ui",
-    "dev-cuda": "npm run task-kill && npm run clean && npm run update-version && npm run build-python-cuda && npm run dev-ui",
     "dev-fast": "set \"VRCT_DEV_VENV=.venv\" && npm run task-kill && npm run sidecar-dev && npm run dev-ui",
-    "dev-cuda-fast": "set \"VRCT_DEV_VENV=.venv_cuda\" && npm run task-kill && npm run sidecar-dev && npm run dev-ui",
     "dev-ui": "npm run task-kill && npm-run-all --parallel vite tauri-dev",
     "analyze-error": "node utils/analyze_ui_error.js",
     "build": "npm run task-kill && npm run clean && npm run update-version && npm run build-python && npm run vite-build && npm run tauri build -- --no-bundle",
