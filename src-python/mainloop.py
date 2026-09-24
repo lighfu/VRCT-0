@@ -147,6 +147,35 @@ controller = Controller()
 controller.setRunMapping(run_mapping)
 controller.setRun(run)
 
+# /run/shutdown (画面が閉じる・起動し直す前に送る) のあと、サイドカーが自分で終わるまでの秒数。
+# 画面は /run/shutdown を送って 2 秒後に閉じるので、普通は Tauri (tauri-plugin-shell) が
+# そこでサイドカーを止め、この時計は鳴らない。親が止めなかったときの保険: watchdog は
+# controller.shutdown() が止めるので、ここで終わらないと誰にも止められず、RAM と (GPU を
+# 使っていれば) VRAM と GPU 部品の DLL を掴んだまま残る (2026-09-24 の実機確認で起きた)。
+# 止める処理 (設定の保存を含む) が終わってから数えるので、保存するものは失わない。
+_SHUTDOWN_SELF_EXIT_DELAY_SEC = 3
+
+
+def _startExitTimer(seconds: float, exit_code: int) -> Timer:
+    timer = Timer(seconds, os._exit, args=(exit_code,))
+    timer.daemon = True
+    timer.start()
+    return timer
+
+
+def shutdownThenExit(*args, **kwargs) -> dict:
+    """/run/shutdown。止める処理を済ませ、_SHUTDOWN_SELF_EXIT_DELAY_SEC 秒後にプロセスを終える。
+
+    止める処理が詰まっても _WATCHDOG_GRACE_PERIOD_SEC 秒で必ず終わる (escalateShutdown と同じ考え)。
+    """
+    hard_deadline = _startExitTimer(_WATCHDOG_GRACE_PERIOD_SEC, 1)
+    try:
+        return controller.shutdown(*args, **kwargs)
+    finally:
+        hard_deadline.cancel()
+        _startExitTimer(_SHUTDOWN_SELF_EXIT_DELAY_SEC, 0)
+
+
 mapping = {
     # Main Window
     "/set/enable/translation": {"status": False, "variable":controller.setEnableTranslation},
@@ -227,7 +256,7 @@ mapping = {
     "/get/data/telemetry" : {"status": True, "variable":controller.getTelemetry},
     "/set/enable/telemetry" : {"status": True, "variable":controller.setEnableTelemetry},
     "/set/disable/telemetry" : {"status": True, "variable":controller.setDisableTelemetry},
-    "/run/shutdown": {"status": True, "variable":controller.shutdown},
+    "/run/shutdown": {"status": True, "variable":shutdownThenExit},
 
     "/run/swap_your_language_and_target_language": {"status": True, "variable":controller.swapYourLanguageAndTargetLanguage},
 
