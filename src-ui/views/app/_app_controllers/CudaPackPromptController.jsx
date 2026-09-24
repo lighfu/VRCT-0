@@ -7,18 +7,21 @@ import { useStore_OpenedQuickSetting } from "@store";
 export const CudaPackPromptController = () => {
     const { currentCudaPack, markCudaPackPrompted } = useCudaPack();
     const { currentIsBackendReady } = useIsBackendReady();
-    const { updateOpenedQuickSetting } = useStore_OpenedQuickSetting();
+    const { currentOpenedQuickSetting, updateOpenedQuickSetting } = useStore_OpenedQuickSetting();
     const is_done = useRef(false);
 
     useEffect(() => {
         if (is_done.current) return;
         if (currentIsBackendReady.data !== true) return;
+        // ほかのクイック設定 (アップデートや overlay など) が開いていたら、それを追い出さない。
+        // 閉じられて次にこのエフェクトが走ったときにまた試す。
+        if (currentOpenedQuickSetting.data !== "") return;
         const { status, prompted } = currentCudaPack.data;
         if (status !== "not_installed" || prompted !== false) return;
         is_done.current = true;
         markCudaPackPrompted();
         updateOpenedQuickSetting("cuda_pack_prompt");
-    }, [currentIsBackendReady.data, currentCudaPack.data]);
+    }, [currentIsBackendReady.data, currentCudaPack.data, currentOpenedQuickSetting.data]);
 
     return null;
 };
