@@ -452,10 +452,14 @@ beta.5→6 で、×ボタンで閉じて旧版が終わった直後（Update.exe
 - `%LocalAppData%\velopack\velopack_VRCT-0.log`: Update.exe（差分の組み立て・入れ替え・起動・削除）と、導入先の直下の `VRCT-0.exe` のログ。
   削除しても残る（確認のあと手で消した）。入れ替えの失敗はここにだけ記録される。`%TEMP%` にはログは無かった。
 - `%TEMP%\velopack_VRCT-0`: Velopack の一時フォルダ。削除のときに消える。
-- `%LOCALAPPDATA%\com.lighfu.vrct0\.cookies`: **不具合（未修正）**。tauri-plugin-http（既定で `cookies` 機能が入る）は起動時に
+- `%LOCALAPPDATA%\com.lighfu.vrct0\.cookies`: **不具合（あとで修正。下の「修正後の再確認」）**。tauri-plugin-http（既定で `cookies` 機能が入る）は起動時に
   `app_cache_dir()`（Windows では `%LOCALAPPDATA%\com.lighfu.vrct0`）の `.cookies` を開き、アプリを閉じるたびに書く。
   入れた版でも `data\` ではなくここに書き、削除しても残る。この PC では開発版が作ったフォルダが先にあったため、
   中身が空から `[]` に変わったこと、更新時刻がアプリを閉じた時刻（12:41:59）、アクセス時刻が起動した時刻（12:48:15）になったことで見つけた。
+- `%USERPROFILE%\.cache\huggingface\xet`: 最終レビューで、hf_xet が使われると `hf_hub_download(cache_dir=...)` を渡しても
+  Xet のチャンクキャッシュがここに書かれると指摘された（この PC の中身は開発版での取得のもの）。修正後の再確認で、配る版の
+  サイドカーは hf_xet を使わず（配布情報の dist-info を同梱していないため）、ここには書かないことが分かった。念のため `HF_HOME` を
+  `data\huggingface` に向けた。
 
 ### 確かめられなかったこと
 
@@ -466,3 +470,46 @@ beta.5→6 で、×ボタンで閉じて旧版が終わった直後（Update.exe
 - ダウンロード中のスリープやネットワークの切り替え。
 - UI サイズの変更（スライダーを UI オートメーションで動かせなかったので、別の設定で代えた）。
 - 強制終了のあとに残ったサイドカーが、入れ替えが無いときにいつまで動くか。
+
+### 修正後の再確認（最終レビューの修正のあと、2026-09-24）
+
+最終レビューの指摘（tauri-plugin-http の `.cookies`、Hugging Face のキャッシュ、入れてある上からの Setup で `data\` が消えること）を
+直した版（`2e9f93ff`。`3.5.1-beta.1`）で、同じ PC で確かめ直した。更新用の `3.5.1-beta.2` は前と同じく目印のファイルを足して
+`vpk pack` し直した。操作はすべて UI オートメーションで、Setup のダイアログのボタンは `TDM_CLICK_BUTTON` のメッセージで押した
+（マウスとキーボードは使っていない）。
+
+**直す前の Setup の動き**（Task 6 と 7 で作った版で確認）: 入れてある上から Setup を実行すると、版に応じて「修復」（同じ版）・
+「更新」（新しい版）・「ダウングレード」（古い版）のダイアログが出る。どれを押しても Setup は導入先を丸ごと
+`%LocalAppData%\VRCT-0.<英数字16文字>` に退避して入れ直し、終わると退避したフォルダを消すので、3 通りとも `data\` の目印のファイル・
+設定（`SEND_MESSAGE_BUTTON_TYPE`）・モデル（780 MB）が消えた。退避したフォルダは、導入のフック（`--veloapp-install`）が
+終わってアプリが起動するまで `data\` ごと残っていた（Setup のログの順序も同じ）。
+
+**直したあと**:
+
+| 確かめたこと | 結果 |
+|---|---|
+| Setup で入れる（`--silent`） | 5.7 秒。導入のフックは退避したフォルダが無いので何もせず、`data\` も作らない |
+| 初回起動と翻訳 | 起動から 5 秒で画面、0.5 秒後に更新の通知。翻訳をオンにして送ると、NLLB のトークナイザー（22 MB）を `data\weights\...\tokenizer` に取り、「Good morning. This is a test.」。`data\huggingface` はできない（下の「空のプロフィール」）。`data\nvidia\ComputeCache` ができる |
+| アプリ内の更新（beta.1→2、今すぐ再起動） | 差分（約 1 MB）→ 準備完了まで 28 秒、再起動から 11 秒で新版。目印・設定・モデルは残った。準備完了の間は「更新を確認」が押せず（`IsEnabled=False`）、「リリースチャンネル」の見出しは 1 つだけ |
+| 同じ版の Setup（「修復」、アプリが動いたまま） | Setup がアプリを止めて入れ直し、ダイアログを含めて 7.6 秒で終わった。目印・設定・モデル（779.6 MB）が残り、起動ログに「Reinstall: kept the data folder from …\VRCT-0.q1EqKzGbpO5ONfiB」。フックは 0.46 秒 |
+| 古い版の Setup（beta.2 の上に beta.1、「ダウングレード」） | 7.9 秒。目印・設定・モデルが残った。フックは 0.41 秒 |
+| 新しい版の Setup（beta.1 の上に beta.2、「更新」） | 15.3 秒。目印・設定・モデルが残った。フックは 0.78 秒 |
+| 退避したフォルダ | どの場合も Setup が終わるときに消え、`%LocalAppData%\VRCT-0.*` は残らなかった |
+| 動いたままの削除 | Update.exe が本体とサイドカーを止め、フック（0.75 秒）のあとで削除。最後の「アンインストール完了」は OK を押すまで閉じず（45 秒待った）、押して 3 秒後に `%LocalAppData%\VRCT-0` が消えた |
+| Setup が消し損ねた退避フォルダ | `%LocalAppData%\VRCT-0.ZzStaleLeftover0`（中に `data\config.json`）を作ってから削除すると、削除の直前のフックが消した |
+| `%LOCALAPPDATA%\com.lighfu.vrct0` | 確認のあいだ（14:29〜14:36）、`.cookies` の更新時刻もアクセス時刻も 13:39:39（直す前の版を閉じた時刻）のまま |
+| `%USERPROFILE%\.cache`・`%APPDATA%`・`%LOCALAPPDATA%` の直下 | 確認の前後で VRCT-0 のものは増えも変わりもしなかった（変わったのはデスクトップの更新時刻と、ほかのアプリのフォルダだけ） |
+| 元の VRCT（`%LOCALAPPDATA%\VRCT`） | 5,811 項目の一覧のハッシュが確認の前後で同じ |
+
+**空のユーザープロフィール**: この PC の既存のキャッシュに隠れないよう、配るサイドカーを `USERPROFILE`・`HOME`・`APPDATA`・
+`LOCALAPPDATA`・`TEMP` を空のフォルダに向けて起動し、トークナイザーを除いたモデルを置いた `data\` で翻訳を 1 通送った。
+
+- `HF_HOME` を渡さない場合（直す前と同じ）: プロフィールの下にできたのは `AppData\Roaming\NVIDIA\ComputeCache`（空）だけ。
+  `.cache\huggingface` はできなかった。配るサイドカーは hf_xet の配布情報（dist-info）を同梱していないので、huggingface_hub は
+  hf_xet を使えないと判断し、普通の HTTP でトークナイザーを取る（レビューで見つかった Xet のキャッシュは開発版での取得のもの）。
+- `HF_HOME` と `CUDA_CACHE_PATH` を渡す場合（直したあとの入れた版と同じ）: プロフィールの下には何もできなかった。
+  ComputeCache は `data\nvidia\ComputeCache` にできた。
+
+**OCR のモデル**: rapidocr が同梱していないモデル（韓国語の rec と PP-OCRv5 の det、約 18 MB）を開発用の環境で取らせると、
+渡した置き場所（入れた版では `data\weights\rapidocr`）に入り、同梱の cls はパッケージの中のものをそのまま使った。
+配るパッケージの `rapidocr\models` は wheel のモデル 3 つだけになり、full.nupkg は 374.1 MiB から 319.3 MiB に、Setup は 381.3 MiB から 326.5 MiB になった。
