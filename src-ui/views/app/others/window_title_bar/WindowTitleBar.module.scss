@@ -22,11 +22,16 @@
     justify-content: center;
     align-items: center;
 }
-.title_svg {
-    color: var(--dark_800_color);
-    width: 4rem;
-    height: 100%;
-
+.title_logo {
+    background-color: var(--dark_800_color);
+    width: 4.5rem;
+    height: 1.5rem;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: left center;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: left center;
 }
 
 .window_control_wrapper {

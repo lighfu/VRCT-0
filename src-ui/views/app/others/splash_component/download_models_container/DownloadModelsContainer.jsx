@@ -1,5 +1,5 @@
 import styles from "./DownloadModelsContainer.module.scss";
-import vrct_logo_for_dark_mode from "@images/vrct_logo_for_dark_mode.png";
+import vrct0_logo_wide from "@images/vrct0_logo_wide_for_dark.png";
 import vrct_now_downloading from "@images/VRCT_now_downloading.png";
 
 import {
@@ -27,7 +27,7 @@ export const DownloadModelsContainer = () => {
                 ))}
             </div>
             <div className={styles.labels_wrapper}>
-                <img src={vrct_logo_for_dark_mode} className={styles.logo_img}/>
+                <img src={vrct0_logo_wide} className={styles.logo_img} alt="VRCT-0 logo"/>
                 <img src={vrct_now_downloading} className={styles.vrct_now_downloading_img}/>
             </div>
         </div>

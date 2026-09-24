@@ -1,9 +1,9 @@
 <div align="center">
 
 <picture>
-    <source srcset="/docs/img/vrct_logo_white.png" media="(prefers-color-scheme: dark)" width="50%">
-    <source srcset="/docs/img/vrct_logo_black.png" media="(prefers-color-scheme: light)" width="50%">
-    <img src="/docs/img/vrct_logo.png" alt="VRCT Logo" width="50%">
+    <source srcset="/docs/img/vrct0_logo_for_dark.png" media="(prefers-color-scheme: dark)" width="30%">
+    <source srcset="/docs/img/vrct0_logo.png" media="(prefers-color-scheme: light)" width="30%">
+    <img src="/docs/img/vrct0_logo.png" alt="VRCT-0 Logo" width="30%">
 </picture>
 
 <br>

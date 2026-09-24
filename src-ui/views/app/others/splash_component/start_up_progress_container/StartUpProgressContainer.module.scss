@@ -9,9 +9,17 @@
     overflow: hidden;
 }
 
+.logo_img {
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 36%;
+}
+
 .progress_bar_wrapper {
     position: absolute;
-    top: 48%;
+    top: 60%;
     left: 50%;
     transform: translate(-50%, -50%);
     display: flex;
@@ -85,7 +93,7 @@
 
 .vrct_starting_up_img {
     position: absolute;
-    top: 68%;
+    top: 73%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 100px;

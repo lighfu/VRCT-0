@@ -1,19 +1,21 @@
 .container {
-    height: var(--main_page_topbar_height);
+    min-height: var(--main_page_topbar_height);
+    padding: 1.2rem 0 0.8rem;
     display: flex;
     justify-content: center;
     align-items: center;
     flex-shrink: 0;
 }
 
+// 縦長のロゴなので、欄をトップバーより高くする
 .logo {
-    width: 12rem;
-    height: auto;
+    height: 7.2rem;
+    width: auto;
     margin: auto;
 }
 
-.logo_chato {
-    width: 2rem;
+.logo_icon {
+    width: 2.4rem;
     height: auto;
     margin: auto;
 }

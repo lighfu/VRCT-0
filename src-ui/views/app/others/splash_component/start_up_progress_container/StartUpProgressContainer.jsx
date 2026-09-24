@@ -5,6 +5,7 @@ import { useInitProgress } from "@logics_common";
 import chat_white_square from "@images/chato_white_square.png";
 import vrct_explanation from "@images/vrchat_chatbox_trasnlator_transcription.png";
 import vrct_starting_up from "@images/vrct_starting_up.png";
+import vrct0_logo from "@images/vrct0_logo_stacked_for_dark.png";
 
 export const StartUpProgressContainer = () => {
     const { currentInitProgress } = useInitProgress();
@@ -12,6 +13,7 @@ export const StartUpProgressContainer = () => {
     const progress = currentInitProgress.data;
     return (
         <div className={styles.container}>
+            <img src={vrct0_logo} className={styles.logo_img} alt="VRCT-0 logo" />
             <div className={styles.progress_bar_wrapper}>
                 {[...Array(4)].map((_, index) => (
                     <div
