@@ -513,3 +513,149 @@ beta.5→6 で、×ボタンで閉じて旧版が終わった直後（Update.exe
 **OCR のモデル**: rapidocr が同梱していないモデル（韓国語の rec と PP-OCRv5 の det、約 18 MB）を開発用の環境で取らせると、
 渡した置き場所（入れた版では `data\weights\rapidocr`）に入り、同梱の cls はパッケージの中のものをそのまま使った。
 配るパッケージの `rapidocr\models` は wheel のモデル 3 つだけになり、full.nupkg は 374.1 MiB から 319.3 MiB に、Setup は 381.3 MiB から 326.5 MiB になった。
+
+## 追記（GPU 部品の後入れ）: 手元の PC での確認（2026-09-24）
+
+`feat/cuda-pack`（`9d83a613`）を消さない手順（`clean.py --soft` → `build-python` → `vite-build` → `tauri build --no-bundle` →
+`pack_release.py`）で `3.5.1-beta.1` にして Setup で入れ、GPU 部品（cuBLAS / cuDNN の wheel）を本物の PyPI
+（`files.pythonhosted.org`）から取った。公開はしていない。この PC は Windows 11、RTX 3070（VRAM 8 GB）、
+NVIDIA のドライバー 581.94（CUDA 13.0）。画面の操作はすべて UI オートメーション（Invoke・SetValue・SelectionItem・ScrollIntoView）で、
+マウスとキーボードは使っていない。更新用の `3.5.1-beta.2` は前の追記と同じく、目印のファイルを足して `vpk pack` し直した。
+
+### 大きさ
+
+| もの | 大きさ |
+|---|---|
+| `nvidia_cublas_cu12-12.8.4.1-py3-none-win_amd64.whl` | 567,544,208 バイト（固定した値と一致） |
+| `nvidia_cudnn_cu12-9.7.1.26-py3-none-win_amd64.whl` | 715,962,100 バイト（固定した値と一致） |
+| 取得の合計 | 1,283,506,308 バイト（1.28 GB） |
+| 展開後の `data\cuda\bin`（DLL 11 個） | 1,852,176,720 バイト（1,766.4 MiB） |
+| そのうち大きいもの | `cublasLt64_12.dll` 674,667,520、`cudnn_engines_precompiled64_9.dll` 528,766,000、`cudnn_adv64_9.dll` 326,072,352 |
+| `data\cuda\pack.json` | 309 バイト（`{"pack_id": "cu12.8-cudnn9.7", "files": [11 個]}`） |
+| この版の `VRCT-0-win-Setup.exe` / `full.nupkg` | 342,327,706 / 334,795,674 バイト（GPU 部品は入っていない） |
+
+### 初回の問いかけと導入
+
+- Setup を開いてから 12 秒でアプリが起動した。初回は既定のモデル（Whisper base と NLLB-600M）を取るので、初期化が終わるまで 60 秒。
+  終わった直後に「GPU で翻訳と文字起こしを速くする部品を導入しますか？」が出た（ボタンは「導入する」「今はしない」）。
+  出た時点で `/run/mark_cuda_pack_prompted` が送られ、`config.json` の `CUDA_PACK_PROMPTED` が true になった。
+- 「導入する」を押すと問いかけが閉じ、設定の「翻訳」の GPU 部品欄に「ダウンロード中… N%」と進み具合の棒が出た
+  （表示は 5% から 100% まで 1〜3% 刻みで変わった。サイドカーからの進み具合の通知は 163 回）。終わると欄が「再起動して GPU を使う」に替わった。
+- 取得の途中、`data\cuda\download\` の wheel はファイルを閉じるまで大きさ 0 に見え、閉じたときに固定した大きさになった。
+  展開のあいだは `bin.tmp\` に DLL が 1 つずつ増え、最後に `bin\` と `pack.json` ができて `download\`・`bin.tmp\` が消えた。
+
+| 回 | 取得（押してから 100% まで） | 展開・置き換え | 合計 | 結果 |
+|---|---|---|---|---|
+| 1 回目（初回の問いかけから） | 95.8 秒（13.4 MB/s） | 30.4 秒 | 126.1 秒 | 導入済み（再起動待ち） |
+| 2 回目（削除のあと。下の不具合のため失敗） | 54.4 秒 | 13.3 秒 | 67.8 秒 | `CUDA_PACK_DOWNLOAD` |
+| 3 回目（途中で止めたあと。更新と同時の再起動の前） | 54.5 秒（23.6 MB/s） | 12.7 秒 | 67.2 秒 | 導入済み（再起動待ち） |
+
+- 問いかけは 2 回目以降の起動では出なかった。削除のあと（状態 `not_installed`、`prompted: true`）と、途中で止めたあとの 2 回の起動で確かめた。
+
+### 再起動して GPU を使う
+
+- 押してから 2.1 秒で新しいアプリのプロセス、3.0 秒で新しいサイドカー、6.6 秒で初期化が終わった（旧アプリは 2.5 秒で終了）。
+- `config.json` の翻訳と文字起こしのデバイスが `{"device": "cuda", "device_index": 0, "device_name": "NVIDIA GeForce RTX 3070", ...}`、
+  計算の種類が `auto` になり、`CUDA_PACK_SELECT_GPU_ON_NEXT_START` は false に戻った。起動時の状態は `installed`、`compute_mode` は `cuda`。
+  設定のデバイス欄は「NVIDIA GeForce RTX 3070」「自動」、GPU 部品欄は「削除」、左下の版の表示に「CUDA」が付いた。
+- サイドカーが読み込んだ DLL（`(Get-Process -Id <サイドカー>).Modules`）: `data\cuda\bin\cublas64_12.dll`、`data\cuda\bin\cublasLt64_12.dll`、
+  `nvcuda.dll`。`cudnn64_9.dll` は CPU のときから CTranslate2 に同梱のもの（`current\_internal\ctranslate2\`）が読まれていて、
+  `data\cuda\bin` の cuDNN はこの確認のあいだ一度も読まれなかった（NLLB の翻訳は cuDNN を使わず、文字起こしは声を入れていないため）。
+- サイドカーの専用 GPU メモリ（Windows のパフォーマンス カウンター「GPU Process Memory」）は、翻訳とマイク入力のオン・オフのあとで 875 MB。
+- NVIDIA の ComputeCache は `data\` の中に書かれ、`%APPDATA%\NVIDIA\ComputeCache`（518 項目）は確認の前後で変わらなかった。
+
+### 翻訳の速さ（CPU と GPU）
+
+CTranslate2（NLLB-200-distilled-600M int8）、日本語→英語、計算の種類は自動。同じ 3 文をチャット欄から送り、サイドカーの
+`process.log` の `[latency][chat] translate=…ms` を読んだ。
+
+| 状態 | 文 1 | 文 2 | 文 3 |
+|---|---|---|---|
+| CPU（1 回目の導入のあと、再起動の前） | 456 ms | 567 ms | 590 ms |
+| CPU（3 回目の導入のあと、再起動の前） | 412 ms | 530 ms | 458 ms |
+| GPU（「再起動して GPU を使う」のあと） | 241 ms | 127 ms | 129 ms |
+| GPU（更新と同時の再起動のあと、beta.2） | 232 ms | 124 ms | 115 ms |
+
+文 1「こんにちは、今日はいい天気ですね。」、文 2「明日の夜、一緒にワールドを回りませんか？」、文 3「この翻訳がどれくらい速いか確かめています。」。
+文 2・3 では GPU が約 4.3 倍速い（CPU 458〜590 ms、GPU 115〜129 ms）。GPU の文 1 は起動後の最初の翻訳で、準備の分だけ遅い。
+
+### 文字起こし
+
+- 文字起こしのデバイス欄と GPU 部品欄は、音声認識エンジンが Whisper のときだけ出る（既定のエンジンは Google）。
+  Whisper に切り替えると、デバイスは「NVIDIA GeForce RTX 3070」「自動」、GPU 部品欄は「削除」だった。
+- マイク入力をオンにすると、サイドカーは Whisper base をデバイス `cuda` で作る。エラーは出ず（`error.log` に記録なし）、2 回目にオンにしたとき専用 GPU メモリが 875 MB から 939 MB に増えた。
+  マイク（既定の Virtual Desktop Audio）に声が入らないので、実際の文字起こし（cuDNN を使う推論）は確かめていない。確認のあと Google に戻した。
+
+### 削除（不具合あり）
+
+「削除」→「次の起動で削除します。」と「再起動」→「再起動」で、`remove_pending` が置かれ、押してから 6.6 秒で初期化が終わった。
+デバイスは CPU に戻り、GPU 部品欄は「導入する」、起動時の状態は `not_installed` になった。ところが **`data\cuda\bin` に
+`cublas64_12.dll` と `cublasLt64_12.dll`（合わせて 788,383,744 バイト）が残った**（`remove_pending` と `pack.json` と残りの DLL は消えた）。
+再起動の前のサイドカーが終わらずに残り、この 2 つを読み込んだままだったため（下の「見つかった不具合」）。
+
+この状態でもう一度「導入する」を押すと、1.28 GB を落として展開したあと、古い `bin\` を消すところ
+（`models\cuda_pack.py` 210 行の `shutil.rmtree(final_bin)`）で `PermissionError: [WinError 5] アクセスが拒否されました。: '...\cuda\bin\cublas64_12.dll'`
+になり、「GPU 部品を導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。」が出た。
+失敗の片付けは働き、`download\` と `bin.tmp\` は消え、アプリは CPU のまま動き続けた。残ったサイドカーを止めると、次の導入は成功した。
+
+### 準備済みの更新があるときの再起動
+
+手元の更新元に `3.5.1-beta.2` を足し、「更新を確認」→「更新」で準備完了にした（差分、約 1 MB、25.4 秒）。
+その状態で GPU 部品欄の「再起動して GPU を使う」を押した。
+
+- 2.4 秒で旧サイドカーが終わり、2.7 秒で Update.exe（`apply --package ...beta.2-full.nupkg --waitPid <旧アプリ>`）が始まり、
+  7.6 秒で新しいアプリ（親は Update.exe）、9 秒で新しいサイドカー、11.8 秒で初期化が終わった。
+- `current\sq.version` は `3.5.1-beta.2`、目印のファイルもあり、`VRCT_UPDATE_FEED_DIR` も引き継がれた。
+  デバイスは GPU（自動）、状態は `installed`、サイドカーは `data\cuda\bin` の cuBLAS を読み込み、翻訳は GPU の速さだった（上の表）。
+  更新と部品の読み込みが 1 回の再起動で済んだ。旧サイドカーは残らなかった。
+- `startup.log` では、この道は「Restart requested from the UI」のあとに「VRCT-0 event loop ended」が出る（普通に閉じたときと同じ）。
+
+### 途中で止めた場合
+
+取得中（5% を過ぎたところ）にサイドカーのプロセスを止め、×ボタンで閉じてから起動し直した。
+
+- 残ったもの: `download\nvidia_cublas_cu12-...whl`（途中の 84,340,953 バイト）、空の `bin.tmp\`、上の不具合で残っていた `bin\` の 2 つの DLL。
+  起動し直すと状態は `not_installed` で、残ったものはそのままだった。
+- 次の「導入する」で、始めに `download\` と `bin.tmp\` が作り直され（途中の wheel は 1.5 秒以内に新しいファイルに替わった）、
+  成功したあとは `download\`・`bin.tmp\` が消え、`bin\` は 11 個の新しい DLL に置き換わった。
+- サイドカーが止まっているあいだ、GPU 部品欄は「ダウンロード中… 6%」のままだった（サイドカーが落ちたときに画面が何も知らせないのは、ほかの機能と同じ）。
+
+### アプリの削除
+
+- ×ボタンで閉じると 2.3 秒でアプリとサイドカーが終わった（`startup.log` に「VRCT-0 event loop ended」）。
+- `Update.exe --uninstall` の前の導入先は 1,960 ファイル、3,821,227,283 バイト（`data\cuda` を含む）。
+  削除は 3.2 秒で「アンインストール完了」になり、OK を押すと `%LocalAppData%\VRCT-0` は部品ごと消えた。
+  退避フォルダ・アンインストールの登録・ショートカットも残らなかった。
+- 元の VRCT（`%LOCALAPPDATA%\VRCT`、5,811 項目）の一覧と更新時刻、`%USERPROFILE%\.cache\huggingface`（21 項目）、
+  `%APPDATA%\NVIDIA\ComputeCache` は、確認の前後で同じだった。`%LocalAppData%\velopack\velopack.log` には Setup のログが追記され、
+  `velopack_VRCT-0.log` は確認のあと手で消した。
+- 確認のあいだに起動したプロセスは、確認の終わりには 1 つも残っていなかった（残ったサイドカーは確認の途中で止めた）。
+
+### 見つかった不具合
+
+**画面からの再起動（準備済みの更新が無いとき）で、前のサイドカーが終わらずに残る（未修正）**
+
+- 起きること: 「再起動して GPU を使う」または「再起動」のたびに、前のサイドカーが親の無いまま動き続ける
+  （1 つあたり RAM 約 880 MB。GPU を使っていたものは VRAM も持ったまま）。この確認では、2 回目の再起動のあと 3 つのサイドカーが動いていた。
+  見張り役（watchdog）は `/run/shutdown` で止められているので、自分では終わらない（親が終わってから、止めるまで 10 分と 2.5 分動き続けた）。
+  標準出力の書き込みに失敗して `error.log` に `OSError: [Errno 22] Invalid argument`（`utils.py` の `_writeStdoutLine`）を残す。
+- 削除への影響: GPU を使っていたサイドカーが `data\cuda\bin` の cuBLAS を読んだまま残るので、次の起動の
+  `processPendingCudaPackRemoval()`（`shutil.rmtree(..., ignore_errors=True)`）が 2 つの DLL を消せず、印（`remove_pending`・`pack.json`）だけが消える。
+  そのあとの導入は、落とし終えてから `PermissionError` で失敗する（上の「削除」）。残ったサイドカーは止めるまで残る（更新の入れ替えとアプリの削除では Update.exe が導入先のプロセスを止める）。
+- 原因: `src-tauri/src/restart.rs` の `app_restart` は `async` の付かない Tauri のコマンドなので、メインスレッドで動く。
+  Tauri 2.5.1 の `AppHandle::restart()` は、メインスレッドから呼ばれると `RunEvent::ExitRequested` / `RunEvent::Exit` を出さずに
+  `cleanup_before_exit()` と `process::restart()`（新しいプロセスを起動して `exit`）をする（`tauri-2.5.1/src/app.rs` 542〜566 行）。
+  tauri-plugin-shell 2.2.1 はサイドカーの子プロセスを `RunEvent::Exit` でだけ止める（`tauri-plugin-shell-2.2.1/src/lib.rs` 132〜142 行）。
+  サイドカーの `/run/shutdown`（`Controller.shutdown`）は機能と watchdog を止めるだけでプロセスを終わらせない（普通に閉じるときは
+  shell プラグインが止める前提）。そのため再起動では誰もサイドカーを止めない。証拠として、`startup.log` では
+  この道の「Restart requested from the UI」のあとに「VRCT-0 event loop ended」が出ず、すぐ次の「VRCT-0 startup began」になる。
+  準備済みの更新があるときの道（`app.exit(0)`）と×ボタンでは出て、サイドカーも 2.4 秒以内に終わった。
+- 直し方の候補（この確認では直していない）: `app_restart` を `async fn` にするか `request_restart()` を使って `RunEvent::Exit` を通す、
+  または再起動の前に画面からサイドカーを止める。あわせて、削除が DLL を消せなかったときに印を消さない、失敗の文言を原因に合わせる、なども考えられる。
+
+### 確かめられなかったこと
+
+- 文字起こしの GPU での推論（声を入れられない。Whisper のモデルを GPU に作るところまで）と、cuDNN の DLL の読み込み。
+- GPU が無い PC（欄を出さない）と、ドライバーが古い PC（`driver_too_old`）の表示。
+- 通信の失敗・SHA-256 の不一致・空き容量の不足での失敗（自動テストの範囲。実機ではファイルのロックによる失敗で、片付けと再試行を確かめた）。
+- GitHub Releases からの更新と、公開の更新元での GPU 部品と更新の組み合わせ。
