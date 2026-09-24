@@ -88,7 +88,7 @@ class TransformersRemovedTests(unittest.TestCase):
         # ctranslate2.converters optionally imports transformers (try/except
         # ImportError); PyInstaller's modulegraph follows that import and
         # bundles transformers (~37MB) whenever it happens to be installed
-        # in .venv/.venv_cuda (it is, via requirements-dev.txt, for the
+        # in .venv (it is, via requirements-dev.txt, for the
         # tokenizer parity test), regardless of --clean. Excluding it in the
         # spec is the only reliable way to keep it out of release builds.
         for spec_filename in ("backend.spec",):

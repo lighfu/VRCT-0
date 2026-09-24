@@ -7,7 +7,8 @@
 // is dropped into that slot and launches the venv Python interpreter
 // against src-python/mainloop.py directly, so a Python edit only costs a
 // process restart.
-// VRCT_DEV_VENV selects .venv (default) or .venv_cuda at runtime.
+// VRCT_DEV_VENV may only be .venv (the default). There is no CUDA venv any
+// more: the GPU runs on the GPU parts installed from the app (<data>\cuda\bin).
 //
 // Behaviour parity with the frozen backend:
 //   - stdin/stdout/stderr are inherited so the Tauri <-> sidecar JSON
@@ -30,9 +31,8 @@ use std::process::{Command, Stdio};
 fn main() {
     let venv = match env::var("VRCT_DEV_VENV").as_deref() {
         Ok(".venv") | Err(env::VarError::NotPresent) => ".venv",
-        Ok(".venv_cuda") => ".venv_cuda",
         _ => {
-            eprintln!("dev-sidecar: VRCT_DEV_VENV must be .venv or .venv_cuda");
+            eprintln!("dev-sidecar: VRCT_DEV_VENV must be .venv (install the GPU parts from the app to use the GPU)");
             std::process::exit(127);
         }
     };
@@ -55,8 +55,8 @@ fn main() {
     //   <root>/src-tauri/target/debug/VRCT-sidecar-<triple>.exe   (tauri dev copies it)
     //   <root>/src-tauri/target/release/VRCT-sidecar-<triple>.exe
     // Walk upward until we find a directory that looks like the project root
-    // (contains src-python/mainloop.py). Check the selected venv separately
-    // so CUDA-only checkouts work and missing interpreters get a clear error.
+    // (contains src-python/mainloop.py). Check the venv separately so a
+    // missing interpreter gets a clear error.
     let root = match find_project_root(&self_exe) {
         Some(p) => p,
         None => {

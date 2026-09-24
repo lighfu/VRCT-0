@@ -19,3 +19,13 @@ class NoCudaBuildTests(unittest.TestCase):
 
     def test_install_bat_does_not_create_the_cuda_venv(self) -> None:
         self.assertNotIn(".venv_cuda", (ROOT / "bat" / "install.bat").read_text(encoding="utf-8"))
+
+    def test_dev_sidecar_does_not_offer_the_cuda_venv(self) -> None:
+        source = (ROOT / "utils" / "dev_sidecar" / "src" / "main.rs").read_text(encoding="utf-8")
+        self.assertNotIn(".venv_cuda", source)
+
+    def test_nothing_points_at_the_removed_cuda_requirements(self) -> None:
+        for relative in ("requirements.txt", "requirements-dev.txt", "requirements-yolo-train.txt"):
+            path = ROOT / relative
+            if path.exists():
+                self.assertNotIn("requirements_cuda.txt", path.read_text(encoding="utf-8"), relative)
