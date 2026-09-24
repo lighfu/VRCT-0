@@ -17,6 +17,7 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
@@ -94,6 +95,8 @@ struct Inner {
     state: Mutex<UpdateState>,
     emitter: Mutex<Option<Emitter>>,
     check_timeout: Duration,
+    /// 真なら、このプロセスの終わりに apply_on_exit が何もしない (画面からの普通の再起動)。
+    skip_apply_on_exit: AtomicBool,
 }
 
 /// 別のスレッドが持ったまま落ちても (毒が回っても) 使い続ける。更新の状態が固まらないように。
@@ -128,6 +131,7 @@ impl Updater {
                 state: Mutex::new(initial),
                 emitter: Mutex::new(None),
                 check_timeout,
+                skip_apply_on_exit: AtomicBool::new(false),
             }),
         }
     }
@@ -253,8 +257,18 @@ impl Updater {
         .is_some()
     }
 
+    /// このプロセスの終わりでは入れ替えを頼まないようにする。更新役を通さずに起動し直すとき
+    /// (restart::app_restart の普通の道) に使う。確かめたあとで準備ができた版をここで入れ替えると、
+    /// 起動し直した新しいアプリと Velopack の入れ替えがぶつかるため。その版は次の起動の確認でまた見つかる。
+    pub fn skip_apply_on_exit(&self) {
+        self.inner.skip_apply_on_exit.store(true, Ordering::SeqCst);
+    }
+
     /// アプリを閉じるときに呼ぶ。落とし終えた版があれば入れ替えを頼む。
     pub fn apply_on_exit(&self) {
+        if self.inner.skip_apply_on_exit.load(Ordering::SeqCst) {
+            return;
+        }
         if let UpdateState::Ready { version, restart_requested } = self.state() {
             if let Err(message) = self.inner.backend.apply_after_exit(&version, restart_requested) {
                 crate::startup_log(&format!("Applying the update failed: {message}"));
@@ -746,6 +760,17 @@ mod tests {
         updater.download();
         updater.apply_on_exit();
         assert_eq!(*backend.applied.lock().unwrap(), vec![("3.6.0".to_string(), false)]);
+    }
+
+    #[test]
+    fn skipped_apply_on_exit_does_nothing_even_when_ready() {
+        let (updater, backend, _) = updater_with(FakeBackend::new());
+        updater.check("stable", false);
+        updater.skip_apply_on_exit();
+        updater.download();
+        assert_eq!(updater.state(), UpdateState::Ready { version: "3.6.0".into(), restart_requested: false });
+        updater.apply_on_exit();
+        assert!(backend.applied.lock().unwrap().is_empty());
     }
 
     #[test]
