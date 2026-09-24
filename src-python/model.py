@@ -47,7 +47,7 @@ from models.watchdog.watchdog import Watchdog
 from models.websocket.websocket_server import WebSocketServer
 from models.obs.obs_browser_source_server import ObsBrowserSourceServer
 from models.clipboard.clipboard import Clipboard
-from models.ocr import OcrPipeline
+from models.ocr import OcrPipeline, ocr_engine_rapidocr
 from models.ocr.ocr_languages import SELECTABLE_LANGUAGES as OCR_SELECTABLE_LANGUAGES, isSupported as isSupportedOcrLanguage
 from models.telemetry import Telemetry
 from utils import errorLogging, errorLog, setupLogger, printLog
@@ -1837,6 +1837,8 @@ class Model:
             printLog(f"OCR: source language {source_language!r} is not selected or not supported, refusing to start")
             return False
 
+        # 同梱していない OCR のモデルは、更新で消えない PATH_DATA に取ってくる (ocr_engine_rapidocr 参照)。
+        ocr_engine_rapidocr.setModelDirectory(os_path.join(config.PATH_DATA, "weights", "rapidocr"))
         try:
             self.ocr_pipeline = OcrPipeline(
                 callback=fnc,
