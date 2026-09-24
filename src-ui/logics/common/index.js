@@ -1,5 +1,5 @@
 export { useSoftwareVersion } from "./useSoftwareVersion";
-export { useAppUpdate } from "./useAppUpdate";
+export { useAppUpdate, useAppUpdateStateListener } from "./useAppUpdate";
 export { useComputeMode } from "./useComputeMode";
 export { useInitProgress } from "./useInitProgress";
 export { useIsBackendReady } from "./useIsBackendReady";

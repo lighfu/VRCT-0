@@ -10,6 +10,7 @@ import { ContactsContainer } from "./contacts_container/ContactsContainer";
 import {
     useWindow,
     useAppUpdate,
+    useAppUpdateStateListener,
     useSoftwareVersion,
     useCopyToClipboard,
 } from "@logics_common";
@@ -98,7 +99,12 @@ const SafeActionButtons = () => {
 const ActionButtons = () => {
     const { currentAppUpdate, downloadAppUpdate, restartToApplyUpdate } = useAppUpdate();
     const { asyncCloseApp } = useWindow();
-    const status = currentAppUpdate?.data?.status;
+    // エラー画面では AppUpdateController が外れて状態が届かなくなるので、ここで受け取る。
+    // 受け取らないと「更新」を押しても表示が「ダウンロード中」から先に進まない。
+    useAppUpdateStateListener();
+    const update = currentAppUpdate?.data;
+    // ダウンロードに失敗したときも、ここから再試行できるようにする。
+    const status = update?.status === "failed" && update?.stage === "download" ? "download_failed" : update?.status;
     const is_busy_ref = useRef(false);
     const [is_busy, setIsBusy] = useState(false);
 
@@ -107,7 +113,7 @@ const ActionButtons = () => {
         is_busy_ref.current = true;
         setIsBusy(true);
         try {
-            if (status === "available") {
+            if (status === "available" || status === "download_failed") {
                 await downloadAppUpdate();
             } else if (status === "ready" && (await restartToApplyUpdate())) {
                 await asyncCloseApp();
@@ -125,6 +131,7 @@ const ActionButtons = () => {
         available: "Update Available — Update Now",
         downloading: "Downloading update...",
         ready: "Restart to Update",
+        download_failed: "Update Failed — Retry",
     };
 
     return (

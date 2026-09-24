@@ -76,7 +76,6 @@ update_modal:
     refresh_button: "更新を確認"
     channel_label: "リリースチャンネル"
     channel_desc: "Beta版は新機能を先取りできますが、動作が不安定な場合があります。"
-    current_version: "今の版: {{version}}"
     checking: "新しい版を確かめています…"
     available: "新しい版 {{version}} が出ています（約 {{size}}）"
     available_downgrade: "安定版の最新 {{version}} に切り替えられます（約 {{size}}）"

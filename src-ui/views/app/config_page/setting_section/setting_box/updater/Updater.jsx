@@ -28,6 +28,8 @@ export const Updater = () => {
     const channel = currentReleaseChannel.data ?? "stable";
     const update = currentAppUpdate.data ?? { status: "idle" };
     const is_busy = update.status === "checking" || update.status === "downloading";
+    // 準備ができたあとは Rust の更新役が確認を受け付けないので、ボタンも押せなくする。
+    const is_check_disabled = is_busy || update.status === "ready";
     // Rust の更新役は checking / downloading / ready の間はチャンネル変更を無視するので、
     // その間はチャンネル選択も操作できないようにする。
     const is_channel_locked = update.status === "checking" || update.status === "downloading" || update.status === "ready";
@@ -40,7 +42,7 @@ export const Updater = () => {
     }, [currentReleaseChannel.data, currentReleaseChannel.state]);
 
     const onClickCheck = () => {
-        if (is_busy) return;
+        if (is_check_disabled) return;
         checkAppUpdate(channel, true);
     };
 
@@ -85,9 +87,10 @@ export const Updater = () => {
             </div>
 
             <div className={styles.subsection_head}>
-                <SectionLabelComponent label={t("update_modal.channel_label")} />
+                {/* 「リリースチャンネル」の見出しは下の行にあるので、ここは空けてボタンを右に寄せる。 */}
+                <span />
                 {update.status !== "not_installed" && (
-                    <button className={styles.refresh_button} onClick={onClickCheck} disabled={is_busy}>
+                    <button className={styles.refresh_button} onClick={onClickCheck} disabled={is_check_disabled}>
                         <RefreshSvg className={styles.refresh_svg} />
                         <span>{t("update_modal.refresh_button")}</span>
                     </button>

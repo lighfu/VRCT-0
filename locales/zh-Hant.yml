@@ -76,7 +76,6 @@ update_modal:
     refresh_button: "檢查更新"
     channel_label: "發布頻道"
     channel_desc: "測試版可搶先體驗新功能，但可能不穩定。"
-    current_version: "Current version: {{version}}"
     checking: "Checking for a new version..."
     available: "Version {{version}} is available (about {{size}})"
     available_downgrade: "You can switch to the latest stable version {{version}} (about {{size}})"

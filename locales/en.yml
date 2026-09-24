@@ -76,7 +76,6 @@ update_modal:
     refresh_button: "Check for Updates"
     channel_label: "Release channel"
     channel_desc: "Beta gives you early access but may be less stable."
-    current_version: "Current version: {{version}}"
     checking: "Checking for a new version..."
     available: "Version {{version}} is available (about {{size}})"
     available_downgrade: "You can switch to the latest stable version {{version}} (about {{size}})"

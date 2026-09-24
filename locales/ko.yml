@@ -76,7 +76,6 @@ update_modal:
     refresh_button: "업데이트 확인"
     channel_label: "릴리스 채널"
     channel_desc: "베타판은 새로운 기능을 먼저 사용할 수 있지만 불안정할 수 있습니다."
-    current_version: "Current version: {{version}}"
     checking: "Checking for a new version..."
     available: "Version {{version}} is available (about {{size}})"
     available_downgrade: "You can switch to the latest stable version {{version}} (about {{size}})"

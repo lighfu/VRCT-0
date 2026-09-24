@@ -104,7 +104,9 @@ const SoftwareUpdateAvailableButton = () => {
     const { updateOpenedQuickSetting } = useStore_OpenedQuickSetting();
 
     const status = currentAppUpdate.data?.status;
-    if (!["available", "downloading", "ready"].includes(status)) return null;
+    // ダウンロードに失敗したときも出す (再試行ボタンは更新の画面にある)。
+    const is_download_failed = status === "failed" && currentAppUpdate.data?.stage === "download";
+    if (!["available", "downloading", "ready"].includes(status) && !is_download_failed) return null;
 
     return (
         <button className={styles.software_update_button} onClick={() => updateOpenedQuickSetting("update_software")}>
