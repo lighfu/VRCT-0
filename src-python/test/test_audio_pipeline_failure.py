@@ -113,6 +113,23 @@ class TestAudioPipelineFailure(unittest.TestCase):
         self.assertEqual(received[0]["source"], "mic")
         self.assertFalse(received[0]["recoverable"])
         recorder.stop.assert_called_once_with(wait_for_stop=True)
+
+    def test_sensevoice_runtime_failure_is_reported_with_its_own_code(self) -> None:
+        """sherpa_onnx が読み込めないのは一般的な初期化の失敗とは直し方が違う。"""
+        from models.transcription.transcription_sensevoice import SenseVoiceRuntimeError
+        recorder = _FakeRecorder()
+        received = []
+        session = MicSession()
+        session.transcript_fnc = received.append
+
+        with patch.object(session, "_create_recorder", return_value=recorder), patch.object(
+            session, "_create_transcriber", side_effect=SenseVoiceRuntimeError("sherpa_onnx could not be loaded")
+        ):
+            with self.assertRaises(SenseVoiceRuntimeError):
+                session.reconfigure(transcript=True, device=DEVICE)
+
+        self.assertEqual(received[0]["error_code"], ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE.value)
+        self.assertEqual(received[0]["stage"], "asr")
         self.assertEqual(session.features, set())
         self.assertIsNone(session._recorder)
 

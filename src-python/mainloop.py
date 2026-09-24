@@ -84,6 +84,8 @@ run_mapping = {
     "download_progress_sensevoice_weight":"/run/download_progress_sensevoice_weight",
     "downloaded_sensevoice_weight":"/run/downloaded_sensevoice_weight",
     "error_sensevoice_weight":"/run/error_sensevoice_weight",
+    "selectable_transcription_engines":"/run/selectable_transcription_engines",
+    "error_transcription_engine":"/run/error_transcription_engine",
     "download_progress_sudachi_dict":"/run/download_progress_sudachi_dict",
     "downloaded_sudachi_dict":"/run/downloaded_sudachi_dict",
     "error_sudachi_dict":"/run/error_sudachi_dict",

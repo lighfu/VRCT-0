@@ -22,6 +22,7 @@ common_error:
     failed_download_weight_whisper: "Whisper 模型下载失败。"
     failed_download_weight_sensevoice: "SenseVoice 模型下载失败。"
     sensevoice_runtime_unavailable: "无法加载 SenseVoice 引擎 (sherpa-onnx)。请尝试重新安装 VRCT，或安装 Microsoft Visual C++ 可再发行组件包。"
+    sensevoice_language_unsupported: "SenseVoice 无法识别所选语言，因此不会进行转写。SenseVoice 仅支持日语、英语、中文、粤语、韩语。"
     failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "已达到翻译引擎使用限制或临时受到使用限制。"
     deepl_auth_key_invalid_length: "API 密钥字符数错误。"

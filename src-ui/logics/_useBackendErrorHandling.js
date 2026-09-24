@@ -22,7 +22,7 @@ import { ui_configs } from "./ui_configs";
 
 export const _useBackendErrorHandling = () => {
     const { t } = useI18n();
-    const { showNotification_Error } = useNotificationStatus();
+    const { showNotification_Error, showNotification_Warning } = useNotificationStatus();
 
     const {
         updateMicRecordTimeout,
@@ -151,6 +151,9 @@ export const _useBackendErrorHandling = () => {
                 return;
             case "SENSEVOICE_RUNTIME_UNAVAILABLE":
                 showNotification_Error(t("common_error.sensevoice_runtime_unavailable"), { category_id: error_code });
+                return;
+            case "SENSEVOICE_LANGUAGE_UNSUPPORTED":
+                showNotification_Warning(t("common_error.sensevoice_language_unsupported"), { category_id: error_code, hide_duration: 10000 });
                 return;
             case "WEIGHT_SUDACHI_DICT_DOWNLOAD":
                 showNotification_Error(t("common_error.failed_download_sudachi_dict"), { category_id: error_code });

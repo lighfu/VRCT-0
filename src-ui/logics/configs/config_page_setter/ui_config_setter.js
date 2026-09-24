@@ -580,6 +580,17 @@ export const SETTINGS_ARRAY = [
         base_endpoint_name: "whisper_weight",
     },
     {
+        // 使えるエンジンの一覧 (重みがあり、ランタイムも読み込めるもの)。
+        // ダウンロードの完了などで変わると /run/selectable_transcription_engines で届く。
+        Category: "Transcription",
+        Base_Name: "SelectableTranscriptionEngines",
+        default_value: [],
+        ui_template_id: "list",
+        logics_template_id: "get_only",
+        base_endpoint_name: "selectable_transcription_engines",
+        add_endpoint_run_array: ["from_backend"],
+    },
+    {
         Category: "Transcription",
         Base_Name: "SenseVoiceWeightTypeStatus",
         default_value: sensevoice_weight_type_status,

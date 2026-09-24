@@ -225,9 +225,11 @@ const TranscriptionEngine_Box = () => {
     const {
         currentSelectedTranscriptionEngine,
         setSelectedTranscriptionEngine,
-        currentSenseVoiceWeightTypeStatus,
+        currentSelectableTranscriptionEngines,
     } = useTranscription();
-    const is_sensevoice_downloaded = currentSenseVoiceWeightTypeStatus.data.some(item => item.is_downloaded);
+    // 重みがあっても sherpa-onnx が読み込めなければ使えないので、重みの有無では
+    // なくエンジンが使えるかで決める。
+    const is_sensevoice_available = currentSelectableTranscriptionEngines.data.includes("SenseVoice");
 
     return (
         <RadioButtonContainer
@@ -237,7 +239,7 @@ const TranscriptionEngine_Box = () => {
             options={[
                 { id: "Google", label: "Google" },
                 { id: "Whisper", label: "Whisper" },
-                { id: "SenseVoice", label: "SenseVoice", disabled: !is_sensevoice_downloaded },
+                { id: "SenseVoice", label: "SenseVoice", disabled: !is_sensevoice_available },
             ]}
             checked_variable={currentSelectedTranscriptionEngine}
         />

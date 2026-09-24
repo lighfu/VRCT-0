@@ -22,6 +22,7 @@ common_error:
     failed_download_weight_whisper: "Whisper モデルのダウンロードに失敗しました。"
     failed_download_weight_sensevoice: "SenseVoice モデルのダウンロードに失敗しました。"
     sensevoice_runtime_unavailable: "SenseVoice のエンジン (sherpa-onnx) を読み込めませんでした。VRCT の再インストールか、Microsoft Visual C++ 再頒布可能パッケージのインストールを試してください。"
+    sensevoice_language_unsupported: "選んでいる言語は SenseVoice では認識できないため、文字起こしされません。SenseVoice が対応しているのは日本語・英語・中国語・広東語・韓国語だけです。"
     failed_download_sudachi_dict: "読みがな用の辞書のダウンロードに失敗しました。"
     translation_limit: "翻訳エンジンの使用制限に達したか、一時的に利用制限がかけられています。"
     deepl_auth_key_invalid_length: "APIキーの文字数が間違っています。"

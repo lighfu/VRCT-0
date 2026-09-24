@@ -92,6 +92,7 @@ class ErrorCode(str, Enum):
     WEIGHT_WHISPER_DOWNLOAD = "WEIGHT_WHISPER_DOWNLOAD"
     WEIGHT_SENSEVOICE_DOWNLOAD = "WEIGHT_SENSEVOICE_DOWNLOAD"
     SENSEVOICE_RUNTIME_UNAVAILABLE = "SENSEVOICE_RUNTIME_UNAVAILABLE"
+    SENSEVOICE_LANGUAGE_UNSUPPORTED = "SENSEVOICE_LANGUAGE_UNSUPPORTED"
     WEIGHT_SUDACHI_DICT_DOWNLOAD = "WEIGHT_SUDACHI_DICT_DOWNLOAD"
 
     # ============================================================================
@@ -420,8 +421,14 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
     },
     ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE: {
         "category": ErrorCategory.WEIGHT,
-        "message": "SenseVoice runtime (sherpa-onnx) could not be loaded",
+        "message": "SenseVoice could not start because its runtime (sherpa-onnx) failed to load. Reinstall VRCT or install the Microsoft Visual C++ Redistributable.",
         "severity": "error",
+        "user_action_required": True,
+    },
+    ErrorCode.SENSEVOICE_LANGUAGE_UNSUPPORTED: {
+        "category": ErrorCategory.WEIGHT,
+        "message": "SenseVoice cannot recognize the selected language (it supports Japanese, English, Chinese, Cantonese and Korean)",
+        "severity": "warning",
         "user_action_required": True,
     },
     ErrorCode.WEIGHT_SUDACHI_DICT_DOWNLOAD: {"category": ErrorCategory.WEIGHT, "message": "Sudachi full dictionary download error", "severity": "error", "user_action_required": True},

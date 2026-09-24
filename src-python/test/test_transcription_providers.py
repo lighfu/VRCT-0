@@ -225,23 +225,13 @@ class TestLocalWhisperProvider(unittest.TestCase):
 
 
 class TestSenseVoiceProvider(unittest.TestCase):
-    """SenseVoice は推論器をモジュールで共有するので、getSenseVoiceRecognizer と
-    発話の有無の判定 (Silero VAD) を差し替えて検証する。"""
+    """認識器 (言語を自動判定するもの) と、発話の有無の判定 (Silero VAD) を
+    差し替えて検証する。"""
 
     def setUp(self) -> None:
-        self.recognizers = {}
         self.decoded = {"auto": ("こんにちは", "ja")}
-
-        def _get(root, language="auto"):
-            if language not in self.recognizers:
-                recognizer = MagicMock()
-                recognizer.decode.side_effect = lambda audio, rate, language=language: self.decoded[language]
-                self.recognizers[language] = recognizer
-            return self.recognizers[language]
-
-        patcher = patch("models.transcription.transcription_providers.getSenseVoiceRecognizer", side_effect=_get)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.recognizer = MagicMock()
+        self.recognizer.decode.side_effect = lambda audio, rate: self.decoded["auto"]
         speech = patch.object(SenseVoiceProvider, "_hasSpeech", return_value=True)
         self.has_speech = speech.start()
         self.addCleanup(speech.stop)
@@ -253,18 +243,18 @@ class TestSenseVoiceProvider(unittest.TestCase):
         )
 
     def test_returns_text_and_is_definitive_when_detected_language_matches(self) -> None:
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         result = self._transcribe(provider, _audio_data(1.0, 48000), "Japanese", "Japan")
 
         self.assertEqual(result, ("こんにちは", 1.0, True))
-        audio, rate = self.recognizers["auto"].decode.call_args[0]
+        audio, rate = self.recognizer.decode.call_args[0]
         self.assertEqual(rate, 16000)
         self.assertEqual(audio.size, 16000)  # 48kHz 1秒 → 16kHz 1秒
 
     def test_decodes_once_across_candidate_languages(self) -> None:
         self.decoded["auto"] = ("hello", "en")
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
         audio_data = _audio_data(0.5)
 
         first = self._transcribe(provider, audio_data, "Japanese", "Japan")
@@ -272,11 +262,11 @@ class TestSenseVoiceProvider(unittest.TestCase):
 
         self.assertEqual(first, ("", 0.0, False))  # 候補と違う言語の結果は採用しない
         self.assertEqual(second, ("hello", 1.0, True))
-        self.recognizers["auto"].decode.assert_called_once()
+        self.recognizer.decode.assert_called_once()
 
     def test_choose_language_returns_the_matching_candidate(self) -> None:
         self.decoded["auto"] = ("안녕하세요", "ko")
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         chosen = provider.choose_language(
             _audio_data(0.5), ["Japanese", "Korean"], ["Japan", "South Korea"], no_speech_prob=0.6,
@@ -286,7 +276,7 @@ class TestSenseVoiceProvider(unittest.TestCase):
 
     def test_choose_language_returns_none_when_no_candidate_matches(self) -> None:
         self.decoded["auto"] = ("你好", "zh")
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         chosen = provider.choose_language(
             _audio_data(0.5), ["Japanese", "Korean"], ["Japan", "South Korea"], no_speech_prob=0.6,
@@ -294,38 +284,39 @@ class TestSenseVoiceProvider(unittest.TestCase):
 
         self.assertIsNone(chosen)
 
-    def test_single_candidate_is_reread_with_a_recognizer_fixed_to_that_language(self) -> None:
-        """日本語だけの設定で、漢字の多い発言が zh と判定されたら、中国語の
-        結果を「日本語」として返さず、日本語に固定したもので読み直す。"""
+    def test_single_candidate_discards_a_result_detected_as_another_language(self) -> None:
+        """日本語だけの設定で、漢字の多い発言が zh と判定されても、中国語の
+        結果を「日本語」として返さない (言語を固定したモデルをもう1つ読み込んで
+        読み直すことはしない。約 240MB 増えるため)。"""
         self.decoded["auto"] = ("天然记念物", "zh")
-        self.decoded["ja"] = ("天然記念物", "ja")
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         result = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan", force_language=True)
 
-        self.assertEqual(result, ("天然記念物", 1.0, True))
+        self.assertEqual(result, ("", 0.0, False))
+        self.recognizer.decode.assert_called_once()
 
     def test_unsupported_language_returns_nothing_without_decoding(self) -> None:
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         result = self._transcribe(provider, _audio_data(0.5), "French", "France", force_language=True)
 
         self.assertEqual(result, ("", 0.0, False))
-        self.assertEqual(self.recognizers, {})
+        self.recognizer.decode.assert_not_called()
 
     def test_skips_decoding_when_there_is_no_speech(self) -> None:
         self.has_speech.return_value = False
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         result = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan", force_language=True, no_speech_prob=0.7)
 
         self.assertEqual(result, ("", 0.0, False))
-        self.assertEqual(self.recognizers, {})
+        self.recognizer.decode.assert_not_called()
         self.assertEqual(self.has_speech.call_args[0][1], 0.7)
 
     def test_drops_nospeech_results(self) -> None:
         self.decoded["auto"] = ("嗯。", "nospeech")
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         result = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan", force_language=True)
 
@@ -333,7 +324,7 @@ class TestSenseVoiceProvider(unittest.TestCase):
 
     def test_removes_spaces_next_to_japanese_but_not_between_english_words(self) -> None:
         self.decoded["auto"] = ("今日 は 3 時 に VRChat で 遊ぶ。 see you later", "ja")
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         text, _, _ = self._transcribe(provider, _audio_data(0.5), "Japanese", "Japan")
 
@@ -341,7 +332,7 @@ class TestSenseVoiceProvider(unittest.TestCase):
 
     def test_keeps_spaces_in_korean(self) -> None:
         self.decoded["auto"] = ("안녕 하세요 3 시", "ko")
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(self.recognizer)
 
         text, _, _ = self._transcribe(provider, _audio_data(0.5), "Korean", "South Korea")
 
@@ -353,7 +344,7 @@ class TestSenseVoiceSpeechCheck(unittest.TestCase):
 
     def test_silence_and_noise_are_not_speech(self) -> None:
         import numpy as np
-        provider = SenseVoiceProvider("root")
+        provider = SenseVoiceProvider(MagicMock())
         rng = np.random.default_rng(0)
         self.assertFalse(provider._hasSpeech(np.zeros(32000, dtype=np.float32), 0.6))
         self.assertFalse(provider._hasSpeech((0.05 * rng.standard_normal(32000)).astype(np.float32), 0.6))

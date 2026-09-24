@@ -39,6 +39,10 @@ _FILES: Dict[str, Tuple[int, str]] = {
 sherpa_onnx = None  # 使うときに loadSenseVoiceRuntime() が読み込む (起動時間の短縮)
 
 
+class SenseVoiceRuntimeError(RuntimeError):
+    """sherpa_onnx を読み込めない (VC++ ランタイムが無い、DLL が読めない等)。"""
+
+
 def isSenseVoiceRuntimeInstalled() -> bool:
     """sherpa_onnx が入っているか。import はしない (起動時に DLL を読み込まない)。"""
     return importlib.util.find_spec("sherpa_onnx") is not None
@@ -96,6 +100,10 @@ def _downloadVerified(directory: str, filename: str, callback: Optional[Callable
     import huggingface_hub
     size, sha256 = _FILES[filename]
     file_path = os_path.join(directory, filename)
+    # 前回の取得で照合済みのファイルは取り直さない (tokens.txt だけ失敗した
+    # ときに、モデル本体の 239MB を落とし直さないように)。
+    if os_path.isfile(file_path) and os_path.getsize(file_path) == size and _sha256(file_path) == sha256:
+        return True
     tmp_path = file_path + ".tmp"
     url = huggingface_hub.hf_hub_url(SENSEVOICE_REPO_ID, filename, revision=SENSEVOICE_REVISION)
     try:
@@ -154,40 +162,63 @@ class SenseVoiceRecognizer:
         return result.text or "", (result.lang or "").strip("<|>")
 
 
-# (重みのディレクトリ, 言語) -> SenseVoiceRecognizer
-_recognizers: Dict[Tuple[str, str], SenseVoiceRecognizer] = {}
+# 重みのディレクトリ -> [SenseVoiceRecognizer, 使っている AudioTranscriber の数]
+_recognizers: Dict[str, list] = {}
 _recognizers_lock = Lock()
+# 読み込み (数秒) の間も _recognizers_lock を持たないよう、読み込みは別の
+# ロックで1つずつ行う。
+_load_lock = Lock()
 
 
-def getSenseVoiceRecognizer(root: str, language: str = "auto") -> SenseVoiceRecognizer:
-    """言語ごとに1つだけ読み込み、以後は同じものを返す。
+def _loadRecognizer(directory: str) -> SenseVoiceRecognizer:
+    module = loadSenseVoiceRuntime()
+    if module is None:
+        raise SenseVoiceRuntimeError("sherpa_onnx could not be loaded")
+    try:
+        recognizer = module.OfflineRecognizer.from_sense_voice(
+            model=os_path.join(directory, _MODEL_FILE),
+            tokens=os_path.join(directory, _TOKENS_FILE),
+            # マイクとスピーカーで1つを共有し推論は順番に行うので、同時に動く
+            # のはいつも1つ。Whisper の1モデル分と同じ数を使う。
+            num_threads=transcriptionCpuThreads(),
+            language="auto",
+            use_itn=True,
+        )
+    except Exception:
+        errorLogging()
+        raise
+    return SenseVoiceRecognizer(recognizer)
 
-    language="auto" は言語を自動判定する。sherpa-onnx は言語をモデルの
-    読み込み時に固定する (発話ごとには変えられない) ため、候補が1言語の
-    ときに判定が外れた場合だけ、その言語に固定したものを別に読み込む
-    (SenseVoiceProvider 参照)。
+
+def acquireSenseVoiceRecognizer(root: str) -> SenseVoiceRecognizer:
+    """言語を自動判定する認識器を返し、使っている数を1つ増やす。
+
+    マイクとスピーカーで同じものを共有し、読み込みは最初の1回だけ。使い
+    終わったら releaseSenseVoiceRecognizer で返す (0 になったら解放する)。
+    言語を固定した認識器は作らない (候補が1言語でも、判定が外れた結果は
+    捨てる。SenseVoiceProvider 参照)。1つで約 240MB あるため。
     """
     directory = _weightDir(root)
-    key = (directory, language)
+    with _load_lock:
+        with _recognizers_lock:
+            entry = _recognizers.get(directory)
+            if entry is not None:
+                entry[1] += 1
+                return entry[0]
+        recognizer = _loadRecognizer(directory)
+        with _recognizers_lock:
+            _recognizers[directory] = [recognizer, 1]
+        return recognizer
+
+
+def releaseSenseVoiceRecognizer(root: str) -> None:
+    """acquireSenseVoiceRecognizer で得たものを返す。誰も使わなくなったら
+    解放する (ほかのエンジンに切り替えたあとまでメモリに残さない)。"""
+    directory = _weightDir(root)
     with _recognizers_lock:
-        cached = _recognizers.get(key)
-        if cached is not None:
-            return cached
-        module = loadSenseVoiceRuntime()
-        if module is None:
-            raise RuntimeError("sherpa_onnx could not be loaded")
-        try:
-            recognizer = module.OfflineRecognizer.from_sense_voice(
-                model=os_path.join(directory, _MODEL_FILE),
-                tokens=os_path.join(directory, _TOKENS_FILE),
-                # マイクとスピーカーで共有するので、1モデル分の2倍を上限に使う。
-                num_threads=min(transcriptionCpuThreads() * 2, 8),
-                language=language,
-                use_itn=True,
-            )
-        except Exception:
-            errorLogging()
-            raise
-        wrapped = SenseVoiceRecognizer(recognizer)
-        _recognizers[key] = wrapped
-        return wrapped
+        entry = _recognizers.get(directory)
+        if entry is None:
+            return
+        entry[1] -= 1
+        if entry[1] <= 0:
+            del _recognizers[directory]

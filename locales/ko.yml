@@ -22,6 +22,7 @@ common_error:
     failed_download_weight_whisper: "Whisper 모델 다운로드에 실패했습니다."
     failed_download_weight_sensevoice: "SenseVoice 모델 다운로드에 실패했습니다."
     sensevoice_runtime_unavailable: "SenseVoice 엔진(sherpa-onnx)을 불러오지 못했습니다. VRCT를 다시 설치하거나 Microsoft Visual C++ 재배포 가능 패키지를 설치해 보세요."
+    sensevoice_language_unsupported: "선택한 언어는 SenseVoice가 인식할 수 없어 받아쓰기가 되지 않습니다. SenseVoice는 일본어·영어·중국어·광둥어·한국어만 지원합니다."
     failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "번역 엔진 사용 제한에 도달했거나 일시적으로 이용 제한이 걸렸습니다."
     deepl_auth_key_invalid_length: "DeepL API 키의 문자 수가 잘못되었습니다."

@@ -189,9 +189,10 @@ def transcriptionCpuThreads() -> int:
 
     VRChat 等のゲームと同時に動かすため、物理コアから 2 つ残した数を上限の
     目安にする。マイクとスピーカーはそれぞれモデルを持って同時に推論する
-    ことがあるので、その半分を1モデル分とする (2〜8)。
-    例: 4〜6 コアで 2、8 コアで 3、10 コアで 4、16 コアで 7。
-    物理コア数が分からなければ従来通り 4。
+    ことがあるので、その半分を1モデル分とする。ただし従来の 4 を下回らせない
+    (マイクだけ使う人がコアの少ない PC で遅くならないように)。上限は 8。
+    例: 10 コアまで 4、12 コアで 5、16 コアで 7、20 コア以上で 8。
+    物理コア数が分からなければ 4。
     """
     try:
         import psutil
@@ -201,7 +202,7 @@ def transcriptionCpuThreads() -> int:
     if physical <= 0:
         return 4
     budget = max(2, physical - 2)
-    return max(2, min(budget // 2, 8))
+    return max(4, min(budget // 2, 8))
 
 def getWhisperModel(
     root: str,

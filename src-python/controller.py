@@ -952,11 +952,16 @@ class Controller:
             # 重みは揃っても、sherpa_onnx が読み込めなければ (VC++ ランタイムが
             # 無い、DLL が読めない等) エンジンとしては使えない。取得の失敗とは
             # 別のエラーとして知らせ、取り直しをさせない。
-            if model.loadSenseVoiceRuntime() is True:
-                # Whisper と違い重みは1種類だけなので、この時点でエンジンとして
-                # 使える状態にする (再起動を待たない)。
-                config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS["SenseVoice"] = True
-            else:
+            available = model.loadSenseVoiceRuntime() is True
+            # Whisper と違い重みは1種類だけなので、この時点でエンジンとして
+            # 使えるかを決め、画面の選択肢にもすぐ反映する (再起動を待たない)。
+            config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS["SenseVoice"] = available
+            self.run(
+                200,
+                self.run_mapping["selectable_transcription_engines"],
+                Controller.getTranscriptionEngines()["result"],
+            )
+            if not available:
                 self._sendError(ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE)
 
     class DownloadSudachiDict:
@@ -1586,6 +1591,7 @@ class Controller:
     def setSelectedYourLanguages(self, select:dict, *args, **kwargs) -> dict:
         config.SELECTED_YOUR_LANGUAGES = select
         self.updateTranslationEngineAndEngineList()
+        self.warnIfSenseVoiceCannotRecognizeYourLanguage()
         return {"status":200, "result":config.SELECTED_YOUR_LANGUAGES}
 
 
@@ -3902,6 +3908,8 @@ class Controller:
                 started = model.startMicTranscript(self.micMessage)
                 if not started:
                     config.ENABLE_TRANSCRIPTION_SEND = False
+                else:
+                    self.warnIfSenseVoiceCannotRecognizeYourLanguage()
                 return started
             except Exception as e:
                 # VRAM不足エラーの検出
@@ -4219,6 +4227,13 @@ class Controller:
         UIの言語リストが追従するようにする。
         """
         previous_engine = config.SELECTED_TRANSCRIPTION_ENGINE
+        if requested_engine == "SenseVoice" and config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS.get("SenseVoice") is not True:
+            # 使えない SenseVoice を選ばれたら、黙って Whisper に切り替えず今の
+            # エンジンのままにする。重みがあるのに使えないのはランタイム
+            # (sherpa_onnx) の問題なので、それを知らせる。
+            if model.checkSenseVoiceModelWeight() is True:
+                self._sendTranscriptionEngineError(ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE)
+            requested_engine = None
         if requested_engine is not None:
             config.SELECTED_TRANSCRIPTION_ENGINE = requested_engine
 
@@ -4251,6 +4266,27 @@ class Controller:
         if config.SELECTED_TRANSCRIPTION_ENGINE != previous_engine:
             self.fallbackUnsupportedLanguagesForTranscriptionEngine(config.SELECTED_TRANSCRIPTION_ENGINE)
             self.run(200, self.run_mapping["selectable_language_list"], model.getListLanguageAndCountry())
+            self.warnIfSenseVoiceCannotRecognizeYourLanguage()
+
+    def _sendTranscriptionEngineError(self, error_code: ErrorCode) -> None:
+        response = VRCTError.create_error_response(error_code, data=None)
+        self.run(response["status"], self.run_mapping["error_transcription_engine"], response["result"])
+
+    def warnIfSenseVoiceCannotRecognizeYourLanguage(self) -> None:
+        """SenseVoice を使っていて、今のタブの「あなたの言語」が SenseVoice の
+        対応外 (フランス語等) なら知らせる。対応外の言語の発話は何も文字起こし
+        されないため (翻訳先の言語は書き換えない。SenseVoiceProvider 参照)。
+        エンジンを選んだとき・あなたの言語を変えたとき・マイクを開始したときに呼ぶ。"""
+        if config.SELECTED_TRANSCRIPTION_ENGINE != "SenseVoice":
+            return
+        your_languages = config.SELECTED_YOUR_LANGUAGES.get(config.SELECTED_TAB_NO, {})
+        for your_language in your_languages.values():
+            if your_language.get("enable") is not True:
+                continue
+            codes = model.getTranscriptionLanguageCodes(your_language["language"], your_language["country"])
+            if "SenseVoice" not in codes:
+                self._sendTranscriptionEngineError(ErrorCode.SENSEVOICE_LANGUAGE_UNSUPPORTED)
+                return
 
     def startCheckMicEnergy(self) -> None:
         with self.mic_lifecycle_lock:

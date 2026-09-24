@@ -135,28 +135,66 @@ class TestSenseVoiceRecognizerSharing(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def test_one_recognizer_per_language_is_shared(self) -> None:
+    def test_mic_and_speaker_share_one_auto_recognizer_and_it_is_freed_after_both_return_it(self) -> None:
         runtime = MagicMock()
         with patch.object(sv, "loadSenseVoiceRuntime", return_value=runtime):
-            first = sv.getSenseVoiceRecognizer("root")
-            second = sv.getSenseVoiceRecognizer("root")
-            fixed = sv.getSenseVoiceRecognizer("root", "ja")
+            mic = sv.acquireSenseVoiceRecognizer("root")
+            speaker = sv.acquireSenseVoiceRecognizer("root")
 
-        self.assertIs(first, second)
-        self.assertIsNot(first, fixed)
-        self.assertEqual(runtime.OfflineRecognizer.from_sense_voice.call_count, 2)
-        languages = [c.kwargs["language"] for c in runtime.OfflineRecognizer.from_sense_voice.call_args_list]
-        self.assertEqual(languages, ["auto", "ja"])
+        self.assertIs(mic, speaker)
+        runtime.OfflineRecognizer.from_sense_voice.assert_called_once()
+        self.assertEqual(runtime.OfflineRecognizer.from_sense_voice.call_args.kwargs["language"], "auto")
 
-    def test_raises_when_the_runtime_cannot_be_loaded(self) -> None:
+        sv.releaseSenseVoiceRecognizer("root")
+        self.assertEqual(len(sv._recognizers), 1)  # スピーカーがまだ使っている
+        sv.releaseSenseVoiceRecognizer("root")
+        self.assertEqual(sv._recognizers, {})  # ほかのエンジンに戻したら残さない
+        sv.releaseSenseVoiceRecognizer("root")  # 余分に返しても壊れない
+
+    def test_raises_a_runtime_error_when_sherpa_onnx_cannot_be_loaded(self) -> None:
         with patch.object(sv, "loadSenseVoiceRuntime", return_value=None):
-            with self.assertRaises(RuntimeError):
-                sv.getSenseVoiceRecognizer("root")
+            with self.assertRaises(sv.SenseVoiceRuntimeError):
+                sv.acquireSenseVoiceRecognizer("root")
+        self.assertEqual(sv._recognizers, {})
 
     def test_decode_strips_the_language_tag(self) -> None:
         recognizer = MagicMock()
         recognizer.create_stream.return_value.result = MagicMock(text="hi", lang="<|en|>")
         self.assertEqual(sv.SenseVoiceRecognizer(recognizer).decode(MagicMock(), 16000), ("hi", "en"))
+
+
+class TestAudioTranscriberReleasesSenseVoice(unittest.TestCase):
+    def test_close_returns_the_shared_recognizer_once(self) -> None:
+        from models.transcription import transcription_transcriber as tt
+
+        class _Source:
+            SAMPLE_RATE = 16000
+            SAMPLE_WIDTH = 2
+            channels = 1
+
+        with patch.object(tt, "checkSenseVoiceWeight", return_value=True), \
+                patch.object(tt, "acquireSenseVoiceRecognizer", return_value=MagicMock()) as acquire, \
+                patch.object(tt, "releaseSenseVoiceRecognizer") as release:
+            transcriber = tt.AudioTranscriber(False, _Source(), 3, 10, "SenseVoice", root="root")
+            transcriber.close()
+            transcriber.close()
+
+        acquire.assert_called_once_with("root")
+        release.assert_called_once_with("root")
+        self.assertIsNone(transcriber._resolve_provider())
+
+
+class TestDownloadSkipsVerifiedFiles(unittest.TestCase):
+    def test_only_the_missing_file_is_downloaded_again(self) -> None:
+        root = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        fake = _FakeFiles(self, {"model.int8.onnx": b"model-bytes", "tokens.txt": b"tokens"})
+        with patch.object(sv, "downloadFile", side_effect=fake.serve({"tokens.txt": None})):
+            self.assertFalse(sv.downloadSenseVoiceWeight(root))
+        with patch.object(sv, "downloadFile", side_effect=fake.serve()) as download:
+            self.assertTrue(sv.downloadSenseVoiceWeight(root))
+        fetched = [os.path.basename(c.args[1]) for c in download.call_args_list]
+        self.assertEqual(fetched, ["tokens.txt.tmp"])
 
 
 class TestControllerSenseVoiceDownload(unittest.TestCase):
@@ -178,6 +216,7 @@ class TestControllerSenseVoiceDownload(unittest.TestCase):
             "download_progress_sensevoice_weight": "/run/download_progress_sensevoice_weight",
             "downloaded_sensevoice_weight": "/run/downloaded_sensevoice_weight",
             "error_sensevoice_weight": "/run/error_sensevoice_weight",
+            "selectable_transcription_engines": "/run/selectable_transcription_engines",
         }
         download = Controller.DownloadSenseVoice(run_mapping, "sensevoice-small", lambda *a: calls.append(a))
         with patch("controller.model") as mock_model:
@@ -189,8 +228,12 @@ class TestControllerSenseVoiceDownload(unittest.TestCase):
     def test_success_enables_the_engine(self) -> None:
         calls = self._download(True)
 
-        self.assertEqual(calls, [(200, "/run/downloaded_sensevoice_weight", "sensevoice-small")])
+        self.assertEqual(calls[-1], (200, "/run/downloaded_sensevoice_weight", "sensevoice-small"))
         self.assertTrue(self.config.SELECTABLE_TRANSCRIPTION_ENGINE_STATUS["SenseVoice"])
+        # 画面のエンジンの選択肢にもすぐ反映する
+        engines = [c for c in calls if c[1] == "/run/selectable_transcription_engines"]
+        self.assertEqual(len(engines), 1)
+        self.assertIn("SenseVoice", engines[0][2])
 
     def test_failure_reports_a_download_error(self) -> None:
         calls = self._download(False)

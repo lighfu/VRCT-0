@@ -27,7 +27,6 @@ from speech_recognition import AudioData, Recognizer, UnknownValueError
 
 from errors import ErrorCode
 from models.transcription.audio_resample import WHISPER_SAMPLE_RATE, resample_pcm16_to_float32
-from models.transcription.transcription_sensevoice import getSenseVoiceRecognizer
 from models.transcription.transcription_deepgram import resolveDeepgramLanguageCode
 from models.transcription.transcription_languages import transcription_lang
 from utils import errorLogging
@@ -251,10 +250,11 @@ class SenseVoiceProvider:
 
     - 言語を自動判定する認識器 (マイクとスピーカーで共有) で1回だけ推論し、
       候補言語ごとの呼び出しではその結果を使い回す。
-    - 判定された言語が候補に無ければ採用しない。候補が1言語 (force_language)
-      なら、その言語に固定した認識器で読み直す (sherpa-onnx は発話ごとに言語を
-      変えられないため、固定したものを別に読み込む。初回だけ読み込みが走る)。
-      候補が複数なら、どれを読み直すべきか分からないので捨てる。
+    - 判定された言語が候補に無ければ、候補が1言語 (force_language) でも採用
+      しない。sherpa-onnx は発話ごとに言語を変えられないため、読み直すには
+      言語を固定した認識器 (約 240MB) を別に読み込む必要があり、軽さを優先して
+      捨てる。Common Voice 日本語 60文では自動判定は全文で ja と当たり、
+      日本語に固定したときとの CER の差も 0.3 ポイントだった。
     - SenseVoice は無音や雑音にも "그." のような短い文と普通の言語タグを返し、
       信頼度も返さない。そこで推論の前に Silero VAD で発話があるかを確かめ、
       無ければ推論しない。VAD のしきい値は no_speech_prob の設定から決める
@@ -265,8 +265,8 @@ class SenseVoiceProvider:
 
     chooses_language = True
 
-    def __init__(self, root: str) -> None:
-        self._root = root
+    def __init__(self, recognizer) -> None:
+        self._recognizer = recognizer
         self._audio = _PreparedAudio()
         self._decoded_for: Optional[AudioData] = None
         self._decoded: Tuple[str, str] = ("", "")
@@ -290,8 +290,7 @@ class SenseVoiceProvider:
         audio = self._audio.get(audio_data)
         text, detected = "", ""
         if audio.size > 0 and self._hasSpeech(audio, no_speech_prob):
-            recognizer = getSenseVoiceRecognizer(self._root)
-            text, detected = recognizer.decode(audio, WHISPER_SAMPLE_RATE)
+            text, detected = self._recognizer.decode(audio, WHISPER_SAMPLE_RATE)
             if detected == "nospeech":
                 text, detected = "", ""
             text = self._cleanText(text, detected)
@@ -331,14 +330,7 @@ class SenseVoiceProvider:
         text, detected = self._decode(audio_data, no_speech_prob)
         if not text:
             return "", 0.0, False
-        if detected == code:
-            return text, 1.0, True
-        if not force_language:
-            return "", 0.0, False
-        recognizer = getSenseVoiceRecognizer(self._root, code)
-        text, _ = recognizer.decode(self._audio.get(audio_data), WHISPER_SAMPLE_RATE)
-        text = self._cleanText(text, code)
-        if not text:
+        if detected != code:
             return "", 0.0, False
         return text, 1.0, True
 

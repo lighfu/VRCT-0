@@ -33,7 +33,11 @@ from speech_recognition.exceptions import UnknownValueError
 from datetime import datetime, timedelta
 from pyaudiowpatch import get_sample_size, paInt16
 from .transcription_whisper import getWhisperModel, checkWhisperWeight
-from .transcription_sensevoice import checkSenseVoiceWeight, getSenseVoiceRecognizer
+from .transcription_sensevoice import (
+    acquireSenseVoiceRecognizer,
+    checkSenseVoiceWeight,
+    releaseSenseVoiceRecognizer,
+)
 from .transcription_providers import (
     GoogleProvider,
     LocalWhisperProvider,
@@ -152,7 +156,8 @@ class AudioTranscriber:
         self.transcription_engine = "Google"
         self.whisper_model = None
         self.whisper_weight_type = whisper_weight_type
-        self.sensevoice_root: Optional[str] = None
+        self.sensevoice_recognizer = None
+        self._sensevoice_root: Optional[str] = None
         self._api_provider: Optional[OpenAICompatibleTranscriptionProvider] = None
         self.audio_sources: Dict[str, Any] = {
             "sample_rate": source.SAMPLE_RATE,
@@ -170,10 +175,9 @@ class AudioTranscriber:
             )
             self.transcription_engine = "Whisper"
         elif transcription_engine == "SenseVoice" and checkSenseVoiceWeight(root) is True:
-            # 自動判定の認識器を先に読み込んでおく (マイクとスピーカーで共有、
-            # 最初の発話で読み込み待ちにならないように)。
-            getSenseVoiceRecognizer(root)
-            self.sensevoice_root = root
+            # マイクとスピーカーで共有する認識器を借りる (close() で返す)。
+            self.sensevoice_recognizer = acquireSenseVoiceRecognizer(root)
+            self._sensevoice_root = root
             self.transcription_engine = "SenseVoice"
         elif transcription_engine in _API_TRANSCRIPTION_ENGINES:
             self.transcription_engine = transcription_engine
@@ -199,6 +203,14 @@ class AudioTranscriber:
                 errorLogging()
                 raise
 
+    def close(self) -> None:
+        """借りている共有リソース (SenseVoice の認識器) を返す。何度呼んでもよい。
+        セッションの停止や、使い終わった文字起こしスレッドの終了時に呼ばれる。"""
+        if self._sensevoice_root is not None:
+            releaseSenseVoiceRecognizer(self._sensevoice_root)
+            self._sensevoice_root = None
+            self.sensevoice_recognizer = None
+
     def _resolve_provider(self):
         """`self.transcription_engine`/`self.whisper_model` の"現在の"値を見て
         対応するプロバイダを返す。既存テストが構築後に直接
@@ -211,9 +223,9 @@ class AudioTranscriber:
                 return None
             return LocalWhisperProvider(self.whisper_model)
         if self.transcription_engine == "SenseVoice":
-            if self.sensevoice_root is None:
+            if self.sensevoice_recognizer is None:
                 return None
-            return SenseVoiceProvider(self.sensevoice_root)
+            return SenseVoiceProvider(self.sensevoice_recognizer)
         if self.transcription_engine in _CLOUD_TRANSCRIPTION_ENGINES:
             return self._api_provider
         return GoogleProvider(self.audio_recognizer)
