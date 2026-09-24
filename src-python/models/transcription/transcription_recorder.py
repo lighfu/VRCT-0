@@ -18,13 +18,15 @@ in tests.
 - PyAudio 操作は全て `pyaudio_op_lock` の下で行い、WASAPI ロック競合を防ぐ。
 """
 
+import functools
 import threading
 from typing import Any, Callable, Optional
+import numpy as np
 from speech_recognition import AudioSource, Recognizer, Microphone
 from datetime import datetime
 from errors import AudioPipelineFailure, ERROR_METADATA, ErrorCode
 from utils import errorLogging, printLog, putDroppingOldestOnFull
-from device_manager import pyaudio_op_lock
+from device_manager import paWASAPI, pyaudio_op_lock
 from models.transcription.audio_vad import FRAME_DURATION_MS, VadRecognizerAdapter, VadSegmenter
 
 # 直前に同じ物理デバイスを force-stop した直後は、WASAPI 側の解放が
@@ -78,6 +80,96 @@ class _ErrorReportingSegmenter:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._segmenter, name)
+
+
+def _downmixToMono(pcm_bytes: bytes, channels: int) -> bytes:
+    """インターリーブされた 16bit PCM の各フレームを、チャンネルの平均でモノラルにする。
+
+    末尾の欠けたフレームは捨てる。既定の MME でマイクを 1ch で開いたときと
+    同じく平均を取る (左だけに入った音は半分の大きさになる。2026-09-25 に
+    Virtual Audio Cable で確認)。
+    """
+    if channels <= 1:
+        return pcm_bytes
+    usable = len(pcm_bytes) - len(pcm_bytes) % (2 * channels)
+    if usable == 0:
+        return b""
+    frames = np.frombuffer(pcm_bytes, dtype="<i2", count=usable // 2).reshape(-1, channels)
+    return (frames.astype(np.int32).sum(axis=1) // channels).astype("<i2").tobytes()
+
+
+class _DownmixedStream:
+    """多チャンネルで開いた MicrophoneStream を、1ch のストリームに見せる。
+
+    read(size) は size フレーム分を読み、モノラルにして返す (長さは 1ch で
+    size フレーム読んだときと同じ)。停止処理が使う .pyaudio_stream などは
+    元のストリームのものをそのまま見せる。
+    """
+
+    def __init__(self, stream: Any, channels: int) -> None:
+        self._stream = stream
+        self._channels = channels
+
+    def read(self, size: int) -> bytes:
+        return _downmixToMono(self._stream.read(size), self._channels)
+
+    def close(self) -> None:
+        self._stream.close()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._stream, name)
+
+
+class _DownmixedMicrophone(Microphone):
+    """本来のチャンネル数で開き、読み出しでモノラルにするマイク。
+
+    speech_recognition の Microphone はマイクを常に channels=1 で開く。
+    PyAudioWPatch の WASAPI (共有モード) は、ミックス形式が 2ch 以上の
+    デバイスを 1ch・ブロッキング読みで開くと、壊れたサンプルを返す
+    (2026-09-25、Virtual Audio Cable に 440 Hz を流すと 240 Hz に化け、
+    1.8 秒で不連続点が約 265。本来のチャンネル数で開けば 440 Hz のまま)。
+    後段 (エネルギー判定・VAD・文字起こし) は 1ch の前提なので、
+    channels は 1 のままにする。
+    """
+
+    def __init__(self, native_channels: int, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.native_channels = native_channels
+
+    def __enter__(self) -> "_DownmixedMicrophone":
+        assert self.stream is None, "This audio source is already inside a context manager"
+        self.audio = self.pyaudio_module.PyAudio()
+        try:
+            self.stream = _DownmixedStream(
+                Microphone.MicrophoneStream(
+                    self.audio.open(
+                        input_device_index=self.device_index,
+                        channels=self.native_channels,
+                        format=self.format,
+                        rate=self.SAMPLE_RATE,
+                        frames_per_buffer=self.CHUNK,
+                        input=True,
+                    )
+                ),
+                self.native_channels,
+            )
+        except Exception:
+            # Microphone.__enter__ と同じく、開けなければ stream は None の
+            # まま返す (_validate_audio_source が OSError にする)。
+            self.audio.terminate()
+        return self
+
+
+def _micMicrophoneFactory(device: dict) -> Optional[Callable[..., Any]]:
+    """WASAPI で 2ch 以上のマイクなら _DownmixedMicrophone を作る関数を返す。
+
+    それ以外 (MME・DirectSound や 1ch のマイク) は None を返し、今までどおり
+    Microphone で開く。
+    """
+    channels = int(device.get("maxInputChannels", 1))
+    if paWASAPI is None or device.get("hostApiType") != paWASAPI or channels <= 1:
+        return None
+    return functools.partial(_DownmixedMicrophone, native_channels=channels)
 
 
 def _validate_audio_source(source: Any) -> Any:
@@ -141,7 +233,11 @@ class _LockedAudioSource(AudioSource):
         return getattr(self._source, name)
 
 
-def _open_with_fallback(fallback_kwargs: dict[str, Any], **device_kwargs: Any) -> Any:
+def _open_with_fallback(
+    fallback_kwargs: dict[str, Any],
+    microphone_factory: Optional[Callable[..., Any]] = None,
+    **device_kwargs: Any,
+) -> Any:
     # speech_recognition の Microphone.__init__ 自体が、コンストラクタ内で
     # 独自に PyAudio() を new し get_device_count()/get_device_info_by_index()
     # 等のデバイス列挙を行ってから terminate() する。この呼び出しが
@@ -151,9 +247,11 @@ def _open_with_fallback(fallback_kwargs: dict[str, Any], **device_kwargs: Any) -
     # 有効化した際にハングを確認済み)。
     # そのため Microphone(...) の生成から _validate_audio_source による
     # open/close 疎通確認まで、一貫して同じ pyaudio_op_lock 区間で行う。
+    # microphone_factory は選んだデバイスの開き方を変えるときに渡す
+    # (_micMicrophoneFactory)。既定のデバイスへのフォールバックは Microphone のまま。
     with pyaudio_op_lock:
         try:
-            return _validate_audio_source(Microphone(**device_kwargs))
+            return _validate_audio_source((microphone_factory or Microphone)(**device_kwargs))
         except Exception:
             try:
                 return _validate_audio_source(Microphone(**fallback_kwargs))
@@ -163,7 +261,11 @@ def _open_with_fallback(fallback_kwargs: dict[str, Any], **device_kwargs: Any) -
                 ) from fallback_error
 
 
-def _create_microphone(fallback_kwargs: dict[str, Any], **device_kwargs: Any) -> Any:
+def _create_microphone(
+    fallback_kwargs: dict[str, Any],
+    microphone_factory: Optional[Callable[..., Any]] = None,
+    **device_kwargs: Any,
+) -> Any:
     result: dict[str, Any] = {}
     done = threading.Event()
     cancelled = threading.Event()
@@ -185,7 +287,7 @@ def _create_microphone(fallback_kwargs: dict[str, Any], **device_kwargs: Any) ->
 
     def _run() -> None:
         try:
-            source = _open_with_fallback(fallback_kwargs, **device_kwargs)
+            source = _open_with_fallback(fallback_kwargs, microphone_factory, **device_kwargs)
             with state_lock:
                 if cancelled.is_set():
                     late_source = source
@@ -612,6 +714,7 @@ class SelectedMicEnergyAndAudioRecorder(BaseEnergyAndAudioRecorder):
     ) -> None:
         source = _create_microphone(
             {},
+            microphone_factory=_micMicrophoneFactory(device),
             device_index=int(device.get("index", -1)),
             sample_rate=int(device.get("defaultSampleRate", 16000)),
         )
@@ -655,6 +758,7 @@ class SelectedMicVadRecorder(BaseVadAndAudioRecorder):
     def __init__(self, device: dict, record_timeout: int = 5) -> None:
         source = _create_microphone(
             {},
+            microphone_factory=_micMicrophoneFactory(device),
             device_index=int(device.get("index", -1)),
             sample_rate=int(device.get("defaultSampleRate", 16000)),
         )

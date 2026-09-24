@@ -46,6 +46,16 @@ _PAUSE_BARRIER_TIMEOUT_SEC = 5.0
 pyaudio_op_lock: Lock = Lock()
 
 
+def _micDeviceWithHostApiType(device: Dict[str, Any], host: Dict[str, Any]) -> Dict[str, Any]:
+    """マイクのデバイス情報に、属するホスト API の種類 (paWASAPI など) を足す。
+
+    WASAPI で 2ch 以上のマイクは開き方を変える必要があり
+    (transcription_recorder._micMicrophoneFactory)、録音側で PyAudio を
+    もう一度初期化せずに判断できるよう、一覧を作るときに記録しておく。
+    """
+    return {**device, "hostApiType": host.get("type")}
+
+
 @dataclass(frozen=True)
 class _DeviceSnapshot:
     """mic/speakerのデバイス一覧4フィールドをまとめて原子的にスワップする
@@ -295,7 +305,9 @@ class DeviceManager:
                     for device_index in range(device_count):
                         device = p.get_device_info_by_host_api_device_index(host_index, device_index)
                         if device.get("maxInputChannels", 0) > 0 and not device.get("isLoopbackDevice", True):
-                            buffer_mic_devices.setdefault(host["name"], []).append(device)
+                            buffer_mic_devices.setdefault(host["name"], []).append(
+                                _micDeviceWithHostApiType(device, host)
+                            )
                 if not buffer_mic_devices:
                     buffer_mic_devices = {"NoHost": [{"index": -1, "name": "NoDevice"}]}
 
