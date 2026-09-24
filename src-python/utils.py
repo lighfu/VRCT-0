@@ -11,6 +11,7 @@ import sys
 import traceback
 import logging
 import threading
+import time
 from logging.handlers import RotatingFileHandler
 
 import requests
@@ -66,20 +67,46 @@ def installedCudaPackId(directory: Optional[str] = None) -> Optional[str]:
 
 
 def externalCudaLibraryDir() -> Optional[str]:
-    """読み込む GPU 部品の bin (版の印が今のものと一致するときだけ)。"""
+    """読み込む GPU 部品の bin (版の印が今のものと一致し、削除を頼まれていないときだけ)。"""
     directory = cudaPackDirectory()
+    if os.path.isfile(os.path.join(directory, CUDA_PACK_REMOVE_MARKER)):
+        return None
     if installedCudaPackId(directory) != CUDA_PACK_ID:
         return None
     return os.path.join(directory, "bin")
 
 
+# 削除の予約を片付けるとき、bin を消し直す回数と間隔。前のサイドカーが止められた直後は
+# DLL がまだ放されていないことがあるので、少し待って試し直す。
+_CUDA_PACK_REMOVAL_ATTEMPTS = 5
+_CUDA_PACK_REMOVAL_RETRY_SEC = 0.5
+
+
 def processPendingCudaPackRemoval() -> bool:
-    """削除を頼まれていた GPU 部品を消す。DLL を読み込む前 (import 時) に呼ぶ。"""
+    """削除を頼まれていた GPU 部品を消す。DLL を読み込む前 (import 時) に呼ぶ。
+
+    pack.json を先に消し、bin が消えてから印 (remove_pending) を消す。bin を消しきれない
+    (前のサイドカーが DLL を読んだまま残っているなど) ときは印を残すので、状態は
+    remove_pending のまま、残った DLL は読み込まず、次の起動でもう一度消す。
+    """
     directory = cudaPackDirectory()
     if not os.path.isfile(os.path.join(directory, CUDA_PACK_REMOVE_MARKER)):
         return False
+    try:
+        os.remove(os.path.join(directory, CUDA_PACK_MANIFEST))
+    except OSError:
+        pass
+    bin_dir = os.path.join(directory, "bin")
+    for attempt in range(_CUDA_PACK_REMOVAL_ATTEMPTS):
+        if attempt > 0:
+            time.sleep(_CUDA_PACK_REMOVAL_RETRY_SEC)
+        shutil.rmtree(bin_dir, ignore_errors=True)
+        if not os.path.exists(bin_dir):
+            break
+    else:
+        return False
     shutil.rmtree(directory, ignore_errors=True)
-    return not os.path.exists(os.path.join(directory, "bin"))
+    return True
 
 
 def cudaPackLoaded() -> bool:

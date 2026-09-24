@@ -104,6 +104,79 @@ class PendingRemovalTests(unittest.TestCase):
                 self.assertFalse(utils.processPendingCudaPackRemoval())
                 self.assertTrue(os.path.isdir(bin_dir))
 
+    @unittest.skipUnless(os.name == "nt", "an open file blocks deletion only on Windows")
+    def test_bin_that_cannot_be_deleted_keeps_the_marker_for_the_next_start(self) -> None:
+        # 前のサイドカーが DLL を読んだまま残っている状態を、開いたままのファイルで作る。
+        with tempfile.TemporaryDirectory() as data_dir:
+            bin_dir = _install_pack(data_dir)
+            directory = os.path.join(data_dir, "cuda")
+            marker = os.path.join(directory, utils.CUDA_PACK_REMOVE_MARKER)
+            open(marker, "w").close()
+            locked = open(os.path.join(bin_dir, "cublas64_12.dll"), "wb")
+            real_rmtree = utils.shutil.rmtree
+            bin_attempts = []
+
+            def rmtree(path, *args, **kwargs):
+                if os.path.normcase(path) == os.path.normcase(bin_dir):
+                    bin_attempts.append(path)
+                return real_rmtree(path, *args, **kwargs)
+
+            try:
+                with patch.dict(os.environ, _env_with_data_dir(data_dir), clear=True), \
+                        patch.object(utils.shutil, "rmtree", side_effect=rmtree), \
+                        patch.object(utils, "_CUDA_PACK_REMOVAL_RETRY_SEC", 0):
+                    self.assertFalse(utils.processPendingCudaPackRemoval())
+                    self.assertTrue(os.path.isfile(marker))
+                    self.assertFalse(os.path.exists(os.path.join(directory, utils.CUDA_PACK_MANIFEST)))
+                    # 残った DLL は読み込まない。
+                    self.assertIsNone(utils.externalCudaLibraryDir())
+                self.assertEqual(len(bin_attempts), utils._CUDA_PACK_REMOVAL_ATTEMPTS)
+            finally:
+                locked.close()
+            # 次の起動では消える。
+            with patch.dict(os.environ, _env_with_data_dir(data_dir), clear=True):
+                self.assertTrue(utils.processPendingCudaPackRemoval())
+                self.assertFalse(os.path.exists(directory))
+
+    def test_removal_retries_until_the_bin_is_gone(self) -> None:
+        with tempfile.TemporaryDirectory() as data_dir:
+            bin_dir = _install_pack(data_dir)
+            directory = os.path.join(data_dir, "cuda")
+            open(os.path.join(directory, utils.CUDA_PACK_REMOVE_MARKER), "w").close()
+            real_rmtree = utils.shutil.rmtree
+            bin_attempts = []
+
+            def rmtree(path, *args, **kwargs):
+                # 止められた直後のサイドカーの DLL が、2 回目まで消せない状態。
+                if os.path.normcase(path) == os.path.normcase(bin_dir):
+                    bin_attempts.append(path)
+                    if len(bin_attempts) < 3:
+                        return None
+                return real_rmtree(path, *args, **kwargs)
+
+            with patch.dict(os.environ, _env_with_data_dir(data_dir), clear=True), \
+                    patch.object(utils.shutil, "rmtree", side_effect=rmtree), \
+                    patch.object(utils, "_CUDA_PACK_REMOVAL_RETRY_SEC", 0):
+                self.assertTrue(utils.processPendingCudaPackRemoval())
+            self.assertEqual(len(bin_attempts), 3)
+            self.assertFalse(os.path.exists(directory))
+
+    def test_retries_wait_between_attempts(self) -> None:
+        # 前のサイドカーが止められてから DLL を放すまでの間を待つ (合わせて 2 秒ほど)。
+        self.assertGreaterEqual(
+            (utils._CUDA_PACK_REMOVAL_ATTEMPTS - 1) * utils._CUDA_PACK_REMOVAL_RETRY_SEC, 1.5
+        )
+
+    def test_pack_marked_for_removal_is_never_registered(self) -> None:
+        # 削除が途中で失敗して pack.json が残っても、印があるうちは読み込まない。
+        with tempfile.TemporaryDirectory() as data_dir:
+            _install_pack(data_dir)
+            open(os.path.join(data_dir, "cuda", utils.CUDA_PACK_REMOVE_MARKER), "w").close()
+            with patch.dict(os.environ, _env_with_data_dir(data_dir), clear=True), \
+                    patch.dict(sys.modules, {"nvidia": None}):
+                self.assertIsNone(utils.externalCudaLibraryDir())
+                self.assertEqual(utils._cudaLibraryDirs(), [])
+
 
 class RegisterTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "nt", "DLL search path registration is Windows-only")
