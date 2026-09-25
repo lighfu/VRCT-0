@@ -25,6 +25,7 @@ serde_json = "=1.0.140"
 tauri-plugin-shell = "2.2.1"
 font-kit = "=0.14.2"
 velopack = "=1.2.158"
+tauri-plugin-single-instance = "=2.2.4"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "=2.2.0"

@@ -57,7 +57,17 @@ pub fn run() {
     }
     let updater = updater::Updater::new(Arc::new(updater::VelopackBackend::new(updater::REPO_URL)));
     let exit_updater = updater.clone();
-    let result = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // 二重起動を止める (GPU 高速化パックの取得中に 2 つ目を起動すると、取得途中のファイルを消すため)。
+    // 2 つ目はサイドカーを起動する前に終わり、起動済みの窓を前に出す。終了のとき (RunEvent::Exit) に
+    // 目印を外すので、画面からの再起動と更新のあとの起動は止めない。ほかのプラグインより先に入れる。
+    // 開発版 (tauri dev) は入れた版と同時に動かせるよう、配る版だけで止める。
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        startup_log("Another launch was redirected to the running window");
+        focus_main_window(app);
+    }));
+    let result = builder
         .manage(updater)
         .setup(move |app| {
             let window_config = app
@@ -117,6 +127,18 @@ pub fn run() {
     }
 }
 
+
+#[cfg_attr(debug_assertions, allow(dead_code))]
+fn focus_main_window(app: &tauri::AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let _ = window.unminimize();
+    let _ = window.show();
+    if let Err(error) = window.set_focus() {
+        startup_log(&format!("Main window focus failed: {error}"));
+    }
+}
 
 use font_kit::{source::SystemSource};
 use std::collections::HashSet;
