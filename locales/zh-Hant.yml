@@ -286,7 +286,7 @@ config_page:
             copied: "已複製"
         delete:
             label: "刪除主題"
-            desc: "刪除此主題並回到標準主題。"
+            desc: "刪除此主題並回到預設主題（{{name}}）。"
             button: "刪除此主題"
             confirm: "再按一次即刪除"
 

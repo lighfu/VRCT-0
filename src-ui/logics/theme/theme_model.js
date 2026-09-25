@@ -110,7 +110,7 @@ export const normalizeUiTheme = (raw) => {
 export const findTheme = (ui_theme, id) =>
     PRESETS.find((theme) => theme.id === id)
     ?? ui_theme.custom_themes.find((theme) => theme.id === id)
-    ?? PRESETS[0];
+    ?? PRESETS.find((theme) => theme.id === DEFAULT_THEME_ID);
 
 export const selectedTheme = (ui_theme) => findTheme(ui_theme, ui_theme.selected_id);
 

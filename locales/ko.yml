@@ -286,7 +286,7 @@ config_page:
             copied: "복사했습니다"
         delete:
             label: "테마 삭제"
-            desc: "이 테마를 삭제하고 표준 테마로 돌아갑니다."
+            desc: "이 테마를 삭제하고 기본 테마({{name}})로 돌아갑니다."
             button: "이 테마 삭제"
             confirm: "한 번 더 누르면 삭제됩니다"
 

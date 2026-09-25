@@ -1,6 +1,8 @@
 .container {
     width: 100%;
     height: 100%;
+    // 半透明のテーマ (既定のガラスなど) でも文字が読めるよう、パネルと同じ濃さで塗る。
+    background-color: var(--panel_888_color);
     overflow: hidden;
     position: relative;
 }

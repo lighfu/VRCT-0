@@ -286,7 +286,7 @@ config_page:
             copied: "Copied"
         delete:
             label: "Delete theme"
-            desc: "Delete this theme and go back to the standard theme."
+            desc: "Delete this theme and go back to the default theme ({{name}})."
             button: "Delete this theme"
             confirm: "Press again to delete"
 

@@ -10,6 +10,7 @@ import {
     STATUS_VARIABLES,
 } from "@logics/theme/palette.js";
 import {
+    PRESETS,
     encodeShareCode,
     gradientCss,
     DEFAULT_GRADIENT,
@@ -18,9 +19,11 @@ import {
     MAX_THEME_NAME_LENGTH,
 } from "@logics/theme/theme_model.js";
 import { THEME_IMAGE_ACCEPT } from "@logics/theme/theme_image.js";
+import { DEFAULT_THEME_ID } from "@logics/theme/presets.js";
 import { SectionLabelComponent, SettingRow } from "../_components";
 import { SliderContainer, RadioButtonContainer } from "../_templates/Templates";
 import { ThemeColorPicker } from "./ThemeColorPicker";
+import { useThemeName } from "./useThemeName";
 import styles from "./Theme.module.scss";
 
 const PERCENT_MARKS = [0, 25, 50, 75, 100];
@@ -360,7 +363,9 @@ const ShareRow = ({ theme }) => {
 const DeleteRow = ({ theme }) => {
     const { t } = useI18n();
     const { deleteCustomTheme } = useUiTheme();
+    const themeName = useThemeName();
     const [is_confirming, setIsConfirming] = useState(false);
+    const default_theme_name = themeName(PRESETS.find((preset) => preset.id === DEFAULT_THEME_ID));
 
     // 押し間違いで消えないよう 2 回押しで消す。しばらく押さなければ元に戻る。
     useEffect(() => {
@@ -370,7 +375,7 @@ const DeleteRow = ({ theme }) => {
     }, [is_confirming]);
 
     return (
-        <SettingRow label={t("config_page.theme.delete.label")} desc={t("config_page.theme.delete.desc")}>
+        <SettingRow label={t("config_page.theme.delete.label")} desc={t("config_page.theme.delete.desc", { name: default_theme_name })}>
             <button
                 type="button"
                 className={clsx(styles.button_danger, { [styles.is_confirming]: is_confirming })}

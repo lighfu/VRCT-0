@@ -1209,7 +1209,7 @@ class Config:
         self._SEND_MESSAGE_BUTTON_TYPE = "show"
         self._SHOW_RESEND_BUTTON = False
         self._FONT_FAMILY = "Yu Gothic UI"
-        self._UI_THEME = {"selected_id": "preset_standard", "custom_themes": []}
+        self._UI_THEME = {"selected_id": "preset_glass", "custom_themes": []}
         self._UI_LANGUAGE = osUiLanguage()
         self._MAIN_WINDOW_GEOMETRY = {
             "x_pos": 0,

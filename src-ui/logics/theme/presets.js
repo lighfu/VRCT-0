@@ -3,7 +3,9 @@
 
 import { DEFAULT_BASE } from "./palette.js";
 
-export const DEFAULT_THEME_ID = "preset_standard";
+// 初めて起動したときと、選んでいた自分のテーマを消したときのテーマ。
+// config.py の UI_THEME の既定値と合わせる。
+export const DEFAULT_THEME_ID = "preset_glass";
 
 const preset = (key, theme) => ({ id: `preset_${key}`, key, name: "", overrides: {}, ...theme });
 

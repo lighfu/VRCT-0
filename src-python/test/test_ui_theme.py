@@ -7,8 +7,10 @@ config.UI_THEME が形と大きさだけを見ること、背景画像が data U
 
 import base64
 import os
+import re
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from config import config, _ui_theme_validator, UI_THEME_MAX_CUSTOM_THEMES
@@ -56,6 +58,18 @@ class TestUiThemeValidator(unittest.TestCase):
     def test_rejects_huge_payload(self) -> None:
         themes = [{"id": "custom_a", "name": "x" * (600 * 1024)}]
         self.assertIsNone(_ui_theme_validator({"selected_id": "preset_standard", "custom_themes": themes}, None))
+
+
+class TestUiThemeDefault(unittest.TestCase):
+    def test_config_default_matches_ui_default(self) -> None:
+        """初めて起動したときのテーマ (config の既定値) が UI の既定と同じであること。"""
+        root = Path(__file__).resolve().parents[2]
+        presets = (root / "src-ui" / "logics" / "theme" / "presets.js").read_text(encoding="utf-8")
+        ui_default = re.search(r'DEFAULT_THEME_ID = "([^"]+)"', presets).group(1)
+        config_source = (root / "src-python" / "config.py").read_text(encoding="utf-8")
+        config_default = re.search(r'self\._UI_THEME = \{"selected_id": "([^"]+)"', config_source).group(1)
+        self.assertEqual(ui_default, "preset_glass")
+        self.assertEqual(config_default, ui_default)
 
 
 class TestSetUiTheme(unittest.TestCase):
