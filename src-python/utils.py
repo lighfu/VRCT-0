@@ -769,13 +769,29 @@ def _maskSensitiveData(data: Any) -> Any:
     return data
 
 
+# テーマの背景画像のような data URL は数百 KB になるので、ログには頭と長さだけを残す。
+_LOG_DATA_URL_KEEP_CHARS = 48
+
+
+def _abbreviateDataUrls(data: Any) -> Any:
+    if isinstance(data, str):
+        if data.startswith("data:") and len(data) > _LOG_DATA_URL_KEEP_CHARS:
+            return f"{data[:_LOG_DATA_URL_KEEP_CHARS]}...({len(data)} chars)"
+        return data
+    if isinstance(data, dict):
+        return {key: _abbreviateDataUrls(value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [_abbreviateDataUrls(item) for item in data]
+    return data
+
+
 def printLog(log: str, data: Any = None) -> None:
     """Log and print a structured process log message."""
     global process_logger
     if process_logger is None:
         process_logger = setupLogger("process", "process.log", logging.INFO)
 
-    logged_data = _maskSensitiveValue(data) if _isSensitiveEndpoint(log) else data
+    logged_data = _maskSensitiveValue(data) if _isSensitiveEndpoint(log) else _abbreviateDataUrls(data)
     response = {
         "status": 348,
         "log": log,
@@ -807,7 +823,7 @@ def printResponse(status: int, endpoint: str, result: Any = None) -> None:
     if _isSensitiveEndpoint(endpoint):
         logged_result = _maskSensitiveValue(result)
     else:
-        logged_result = _maskSensitiveData(result)
+        logged_result = _abbreviateDataUrls(_maskSensitiveData(result))
     logged_response = {**response, "result": logged_result}
     process_logger.info(logged_response)  # Log the (possibly masked) response, never the raw secret
 

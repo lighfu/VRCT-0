@@ -1,0 +1,189 @@
+.gallery {
+    padding: 2rem 2rem 2.4rem;
+    border-bottom: 0.1rem solid var(--dark_800_color);
+}
+
+.card_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 0.8rem;
+}
+
+.empty_text {
+    font-size: 1.4rem;
+    font-weight: 300;
+    color: var(--dark_500_color);
+}
+
+// Templates.module.scss の行と同じ見た目。
+.row {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2rem;
+    gap: 2rem;
+    border-bottom: 0.1rem solid var(--dark_800_color);
+
+    &.column {
+        flex-direction: column;
+        align-items: start;
+    }
+}
+
+.row_controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.2rem;
+}
+
+.button,
+.button_secondary,
+.button_danger {
+    flex-shrink: 0;
+    padding: 0.8rem 1.6rem;
+    border-radius: 0.4rem;
+    font-size: 1.4rem;
+    color: var(--dark_basic_text_color);
+    cursor: pointer;
+    transition: background-color 0.15s ease-out;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+}
+
+.button {
+    background-color: var(--primary_600_color);
+
+    &:hover:not(:disabled) {
+        background-color: var(--primary_500_color);
+    }
+
+    &:active:not(:disabled) {
+        background-color: var(--primary_700_color);
+    }
+}
+
+.button_secondary {
+    background-color: var(--dark_750_color);
+
+    &:hover {
+        background-color: var(--dark_700_color);
+    }
+
+    &:active {
+        background-color: var(--dark_800_color);
+    }
+}
+
+.button_danger {
+    background-color: var(--dark_750_color);
+
+    &:hover,
+    &.is_confirming {
+        background-color: var(--error_bc_color);
+    }
+
+    &:active {
+        background-color: var(--error_bc_active_color);
+    }
+}
+
+.text_input {
+    width: 26rem;
+    max-width: 100%;
+    padding: 0.8rem 1rem;
+    font-size: 1.4rem;
+    font-family: inherit;
+    color: var(--dark_basic_text_color);
+    background-color: var(--dark_875_color);
+    border: 0.1rem solid var(--dark_750_color);
+    border-radius: 0.4rem;
+    user-select: text;
+
+    &::placeholder {
+        color: var(--dark_600_color);
+    }
+
+    &:focus {
+        outline: none;
+        border-color: var(--primary_400_color);
+    }
+}
+
+.swatch_row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+}
+
+.gradient_preview {
+    width: 12rem;
+    height: 3.6rem;
+    border-radius: 0.8rem;
+    border: 0.1rem solid var(--dark_750_color);
+    background:
+        var(--gradient),
+        repeating-conic-gradient(#9a9a9a 0 25%, #dcdcdc 0 50%) 0 0 / 0.8rem 0.8rem;
+}
+
+.image_thumb {
+    width: 12rem;
+    aspect-ratio: 16 / 10;
+    border-radius: 0.6rem;
+    border: 0.1rem solid var(--dark_750_color);
+    background-size: cover;
+    background-position: center;
+}
+
+.status_text {
+    font-size: 1.4rem;
+    color: var(--dark_500_color);
+}
+
+.file_input {
+    display: none;
+}
+
+.editor {
+    padding-top: 3.2rem;
+}
+
+.editor_label {
+    padding: 0 2rem;
+}
+
+.details {
+    display: flex;
+    flex-direction: column;
+    gap: 2.4rem;
+    padding: 2rem;
+    border-bottom: 0.1rem solid var(--dark_800_color);
+}
+
+.detail_group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.detail_group_label {
+    font-size: 1.5rem;
+}
+
+.detail_group_desc {
+    font-size: 1.3rem;
+    font-weight: 300;
+    color: var(--dark_500_color);
+}
+
+.detail_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(5.6rem, 1fr));
+    gap: 1.2rem 0.8rem;
+    padding-top: 0.4rem;
+}

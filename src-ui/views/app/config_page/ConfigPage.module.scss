@@ -5,6 +5,22 @@
     top: 0;
     left: 0;
     overflow: hidden;
+    // 閉じているあいだは隠す。メイン画面の地を透明にするテーマで、下に重なった
+    // 設定画面が透けて見えないように。メイン画面が上へ抜ける 0.5 秒を待ってから隠す。
+    transition: visibility 0s linear 0s;
+    &.is_hidden {
+        visibility: hidden;
+        transition: visibility 0s linear 0.5s;
+    }
+}
+
+// 半透明のテーマでは、メイン画面が動くあいだに透けて見えないよう、設定画面も薄く出し入れする。
+:global(:root[data-translucent]) .page {
+    transition: visibility 0s linear 0s, opacity 0.5s ease;
+    &.is_hidden {
+        opacity: 0;
+        transition: visibility 0s linear 0.5s, opacity 0.5s ease;
+    }
 }
 
 .container {
@@ -12,13 +28,15 @@
     height: 100%;
     display: flex;
     flex-direction: row;
-    background-color: var(--dark_900_color);
+    background-color: var(--page_900_color);
     overflow: hidden;
     position: relative;
 }
 
 .content_wrapper {
     flex: 1;
+    // 半透明のテーマでも、上端の「戻る」や設定の文字が背景に埋もれないようにパネルとして塗る。
+    background-color: var(--panel_900_color);
     height: 100%;
     display: flex;
     flex-direction: column;

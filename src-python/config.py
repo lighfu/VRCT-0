@@ -3,6 +3,7 @@ import copy
 from os import path as os_path, makedirs as os_makedirs, replace as os_replace, fsync as os_fsync
 from json import load as json_load
 from json import dump as json_dump
+from json import dumps as json_dumps
 from secrets import token_urlsafe as secrets_token_urlsafe
 import threading
 from typing import Optional, Dict, Any
@@ -468,6 +469,28 @@ def _main_window_geometry_validator(val, inst):
             new[key] = inst.MAIN_WINDOW_GEOMETRY[key]
     return new
 
+# テーマ (設定の「テーマ」タブ)。色や背景の中身は UI (src-ui/logics/theme) が
+# 検査して直すので、ここでは形と大きさだけを見る。共有の文字列から取り込んだ
+# テーマも入るため、極端に大きな値で config.json が膨らまないようにする。
+UI_THEME_MAX_CUSTOM_THEMES = 50
+_UI_THEME_MAX_JSON_CHARS = 512 * 1024
+
+def _ui_theme_validator(val, inst):
+    if not isinstance(val, dict):
+        return None
+    selected_id = val.get("selected_id")
+    custom_themes = val.get("custom_themes")
+    if not isinstance(selected_id, str) or not (0 < len(selected_id) <= 64):
+        return None
+    if not isinstance(custom_themes, list) or len(custom_themes) > UI_THEME_MAX_CUSTOM_THEMES:
+        return None
+    if not all(isinstance(theme, dict) for theme in custom_themes):
+        return None
+    new = {"selected_id": selected_id, "custom_themes": custom_themes}
+    if len(json_dumps(new, ensure_ascii=False)) > _UI_THEME_MAX_JSON_CHARS:
+        return None
+    return new
+
 def _selected_transcription_compute_type_validator(val, inst):
     if not isinstance(val, str):
         return None
@@ -857,6 +880,7 @@ class Config:
     SEND_MESSAGE_BUTTON_TYPE = ManagedProperty('SEND_MESSAGE_BUTTON_TYPE', type_=str, allowed=lambda v, inst: v in inst.SEND_MESSAGE_BUTTON_TYPE_LIST)
     SHOW_RESEND_BUTTON = ManagedProperty('SHOW_RESEND_BUTTON', type_=bool)
     FONT_FAMILY = ManagedProperty('FONT_FAMILY', type_=str)
+    UI_THEME = ValidatedProperty('UI_THEME', _ui_theme_validator)
     UI_LANGUAGE = ManagedProperty('UI_LANGUAGE', type_=str, allowed=lambda v, inst: v in inst.SELECTABLE_UI_LANGUAGE_LIST)
     MAIN_WINDOW_GEOMETRY = ValidatedProperty('MAIN_WINDOW_GEOMETRY', _main_window_geometry_validator, immediate_save=True)
 
@@ -1187,6 +1211,7 @@ class Config:
         self._SEND_MESSAGE_BUTTON_TYPE = "show"
         self._SHOW_RESEND_BUTTON = False
         self._FONT_FAMILY = "Yu Gothic UI"
+        self._UI_THEME = {"selected_id": "preset_standard", "custom_themes": []}
         self._UI_LANGUAGE = osUiLanguage()
         self._MAIN_WINDOW_GEOMETRY = {
             "x_pos": 0,

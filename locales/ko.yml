@@ -41,6 +41,8 @@ common_error:
     failed_download_cuda_pack: "Could not install the GPU acceleration pack. Check your connection and free disk space (about 3.1 GB needed), then try again."
     cuda_pack_in_use: "The GPU acceleration pack is in use and can't be replaced. Restart the app and try again."
     cuda_pack_not_loaded: "Could not load the GPU acceleration pack. The app runs on the CPU."
+    theme_image_save_failed: "배경 이미지를 저장하지 못했습니다."
+    theme_image_load_failed: "배경 이미지를 불러오지 못했습니다. 배경을 단색으로 표시합니다."
 
 common_warning:
     unable_to_use_osc_query: "OSC IP 주소 설정으로 인해 OSC 데이터 수신이 불가능하므로, 아래 기능이 자동으로 비활성화되었습니다."
@@ -142,6 +144,7 @@ config_page:
     side_menu_labels:
         device: "장치"
         appearance: "모양"
+        theme: "테마"
         translation: "번역"
         transcription: "음성인식"
         others: "기타"
@@ -191,6 +194,100 @@ config_page:
             label: "폰트"
         ui_language:
             label: "UI 언어"
+
+    theme:
+        presets_label: "기본 제공 테마"
+        custom_label: "내 테마"
+        custom_empty: "아직 없습니다. 기본 제공 테마를 바탕으로 만들거나, 공유된 테마를 불러오세요."
+        untitled: "이름 없는 테마"
+        copy_name: "{{name}} 사본"
+        imported_name: "불러온 테마"
+        limit_reached: "내 테마는 {{max}}개까지 만들 수 있습니다. 쓰지 않는 테마를 삭제하세요."
+        edit_label: "테마 편집"
+        presets:
+            standard: "표준"
+            night_sky: "밤하늘"
+            sakura: "벚꽃"
+            amber: "호박색"
+            lavender: "라벤더"
+            high_contrast: "고대비"
+            light: "라이트"
+            light_sakura: "라이트 벚꽃"
+            aurora: "오로라"
+            glass: "유리"
+        make_from_preset:
+            label: "내 테마 만들기"
+            desc: "기본 제공 테마는 편집할 수 없습니다. 선택한 테마를 바탕으로 내 테마를 만들면 색과 배경을 바꿀 수 있습니다."
+            button: "이 테마로 만들기"
+        import:
+            label: "공유된 테마 불러오기"
+            desc: "공유 코드를 붙여 넣고 [불러오기]를 누르면 내 테마에 추가됩니다."
+            placeholder: "VRCT0-THEME:1:..."
+            button: "불러오기"
+            imported: "테마를 불러왔습니다."
+            invalid: "테마 코드로 읽을 수 없습니다. 복사한 코드를 끝까지 붙여 넣으세요."
+        name:
+            label: "이름"
+        base_colors:
+            label: "기본 색"
+            desc: "명암은 자동으로 만들어집니다. 배경을 밝은 색으로 하면 밝은 테마가 됩니다."
+            accent: "강조"
+            background: "배경"
+            text: "글자"
+            sent: "전송"
+            received: "수신"
+        backdrop:
+            label: "배경"
+            desc: "화면 뒤에 까는 것입니다. 패널 불투명도를 낮추면 패널 너머로 보입니다."
+            solid: "단색"
+            gradient: "그라데이션"
+            image: "이미지"
+        gradient:
+            colors: "그라데이션 색"
+            colors_desc: "방향을 따라 1번부터 차례로 색이 바뀝니다. 색마다 불투명도도 고를 수 있습니다."
+            add_color: "색 추가"
+            remove_color: "색 줄이기"
+            angle: "그라데이션 방향"
+        image:
+            label: "배경 이미지"
+            desc: "화면에 맞는 크기로 줄여서 저장합니다."
+            none: "선택한 이미지가 없습니다."
+            choose: "이미지 선택"
+            change: "이미지 바꾸기"
+            strength: "이미지 진하기"
+            blur: "이미지 흐림"
+            read_failed: "이미지를 읽지 못했습니다. PNG, JPEG, WebP 등의 이미지를 선택하세요."
+        backdrop_opacity:
+            label: "배경 불투명도"
+            desc: "낮추면 배경째로 비쳐서 바탕 화면이 보입니다."
+        panel_opacity:
+            label: "패널 불투명도"
+            desc: "낮추면 로그와 사이드바 등이 비쳐서 뒤의 배경이 보입니다."
+        details:
+            label: "세부 색"
+            desc: "색을 하나씩 덮어쓸 수 있습니다. 덮어쓴 색은 기본 색을 바꿔도 그대로 남습니다."
+            show: "열기"
+            hide: "닫기"
+            reset: "자동으로 되돌리기"
+            reset_all: "덮어쓰기 모두 해제"
+            accent: "강조 색의 명암"
+            neutral: "배경과 글자의 명암"
+            neutral_desc: "숫자가 작을수록 글자에 가깝고, 클수록 배경에 가까운 색입니다."
+            status: "오류와 경고"
+            error: "오류"
+            error_active: "오류 (눌렀을 때)"
+            warning_text: "경고 글자"
+            warning: "경고"
+        share:
+            label: "공유"
+            desc: "테마를 코드로 만들어 다른 사람에게 줄 수 있습니다. 배경 이미지는 포함되지 않습니다."
+            copy: "코드 복사"
+            copied: "복사했습니다"
+        delete:
+            label: "테마 삭제"
+            desc: "이 테마를 삭제하고 표준 테마로 돌아갑니다."
+            button: "이 테마 삭제"
+            confirm: "한 번 더 누르면 삭제됩니다"
 
     translation:
         ctranslate2_weight_type:

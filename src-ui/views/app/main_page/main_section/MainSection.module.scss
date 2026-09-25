@@ -6,6 +6,8 @@
     flex-direction: column;
     // justify-content: space-between;
     overflow-y: auto;
+    // 半透明のテーマでも、上部のバーの文字が背景に埋もれないようにパネルとして塗る。
+    background-color: var(--panel_888_color);
 }
 
 .language_selector_container {

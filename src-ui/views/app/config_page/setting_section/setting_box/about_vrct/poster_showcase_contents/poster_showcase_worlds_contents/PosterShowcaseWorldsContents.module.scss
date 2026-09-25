@@ -126,3 +126,8 @@ $animation_duration: .1s;
     75% { left: 48%; }
     100% { left: 51%; }
 }
+
+// 白で描かれた画像なので、明るいテーマでは濃い灰色にして背景に埋もれないようにする。
+:global(:root[data-theme-mode="light"]) .pagination_chato_img {
+    filter: brightness(0.3);
+}

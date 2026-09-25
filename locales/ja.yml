@@ -41,6 +41,8 @@ common_error:
     failed_download_cuda_pack: "GPU 高速化パックを導入できませんでした。通信と空き容量（約 3.1 GB 必要）を確かめて、もう一度試してください。"
     cuda_pack_in_use: "GPU 高速化パックが使用中のため置き換えられません。再起動してからもう一度試してください。"
     cuda_pack_not_loaded: "GPU 高速化パックを読み込めませんでした。CPU で動きます。"
+    theme_image_save_failed: "背景の画像を保存できませんでした。"
+    theme_image_load_failed: "背景の画像を読み込めませんでした。背景は単色で表示します。"
 
 common_warning:
     unable_to_use_osc_query: "OSC IP Address の設定によりOSCデータの受信ができないため、以下の機能が自動的に無効になっています。"
@@ -142,6 +144,7 @@ config_page:
     side_menu_labels:
         device: "デバイス"
         appearance: "デザイン"
+        theme: "テーマ"
         translation: "翻訳"
         transcription: "音声認識"
         others: "その他"
@@ -191,6 +194,100 @@ config_page:
             label: "使用フォント"
         ui_language:
             label: "UIの言語"
+
+    theme:
+        presets_label: "用意されたテーマ"
+        custom_label: "自分のテーマ"
+        custom_empty: "まだありません。用意されたテーマをもとに作るか、共有されたテーマを読み込んでください。"
+        untitled: "名前のないテーマ"
+        copy_name: "{{name}}のコピー"
+        imported_name: "読み込んだテーマ"
+        limit_reached: "自分のテーマは {{max}} 個までです。使わないテーマを消してください。"
+        edit_label: "テーマの編集"
+        presets:
+            standard: "標準"
+            night_sky: "夜空"
+            sakura: "桜"
+            amber: "琥珀"
+            lavender: "ラベンダー"
+            high_contrast: "ハイコントラスト"
+            light: "ライト"
+            light_sakura: "ライト・桜"
+            aurora: "オーロラ"
+            glass: "ガラス"
+        make_from_preset:
+            label: "自分のテーマを作る"
+            desc: "用意されたテーマは編集できません。選んでいるテーマをもとに自分のテーマを作ると、色や背景を変えられます。"
+            button: "このテーマをもとに作る"
+        import:
+            label: "共有されたテーマを読み込む"
+            desc: "共有の文字列を貼り付けて「読み込む」を押すと、自分のテーマに加わります。"
+            placeholder: "VRCT0-THEME:1:..."
+            button: "読み込む"
+            imported: "テーマを読み込みました。"
+            invalid: "テーマの文字列として読めませんでした。コピーした文字列を最後まで貼り付けてください。"
+        name:
+            label: "名前"
+        base_colors:
+            label: "基本の色"
+            desc: "濃淡は自動で作ります。背景を明るい色にすると、明るいテーマになります。"
+            accent: "アクセント"
+            background: "背景"
+            text: "文字"
+            sent: "送信"
+            received: "受信"
+        backdrop:
+            label: "背景"
+            desc: "画面の後ろに敷くものです。パネルの不透明度を下げると、パネル越しに見えます。"
+            solid: "単色"
+            gradient: "グラデーション"
+            image: "画像"
+        gradient:
+            colors: "グラデーションの色"
+            colors_desc: "向きに沿って、1 から順に色が変わります。色ごとに不透明度も選べます。"
+            add_color: "色を足す"
+            remove_color: "色を減らす"
+            angle: "グラデーションの向き"
+        image:
+            label: "背景の画像"
+            desc: "画面に合う大きさに縮めて保存します。"
+            none: "画像が選ばれていません。"
+            choose: "画像を選ぶ"
+            change: "画像を変える"
+            strength: "画像の濃さ"
+            blur: "画像のぼかし"
+            read_failed: "画像を読み込めませんでした。PNG・JPEG・WebP などの画像を選んでください。"
+        backdrop_opacity:
+            label: "背景の不透明度"
+            desc: "下げると、背景ごと透けてデスクトップが見えます。"
+        panel_opacity:
+            label: "パネルの不透明度"
+            desc: "下げると、ログやサイドバーなどの欄が透けて、後ろの背景が見えます。"
+        details:
+            label: "詳細な色"
+            desc: "1 色ずつ上書きできます。上書きした色は、基本の色を変えてもそのまま残ります。"
+            show: "開く"
+            hide: "閉じる"
+            reset: "自動に戻す"
+            reset_all: "上書きをすべて外す"
+            accent: "アクセントの濃淡"
+            neutral: "背景と文字の濃淡"
+            neutral_desc: "数字が小さいほど文字に近く、大きいほど背景に近い色です。"
+            status: "エラーと警告"
+            error: "エラー"
+            error_active: "エラー（押したとき）"
+            warning_text: "警告の文字"
+            warning: "警告"
+        share:
+            label: "共有"
+            desc: "テーマを文字列にして、他の人に渡せます。背景の画像は含まれません。"
+            copy: "文字列をコピー"
+            copied: "コピーしました"
+        delete:
+            label: "テーマを消す"
+            desc: "このテーマを消して、標準のテーマに戻します。"
+            button: "このテーマを消す"
+            confirm: "もう一度押すと消えます"
 
     translation:
         ctranslate2_weight_type:

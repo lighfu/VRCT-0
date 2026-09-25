@@ -1,15 +1,18 @@
 import styles from "./DownloadModelsContainer.module.scss";
-import vrct0_logo_wide from "@images/vrct0_logo_wide_for_dark.png";
+import vrct0_logo_wide_for_dark from "@images/vrct0_logo_wide_for_dark.png";
+import vrct0_logo_wide from "@images/vrct0_logo_wide.png";
 import vrct_now_downloading from "@images/VRCT_now_downloading.png";
 
 import {
     useTranslation,
     useTranscription,
 } from "@logics_configs";
+import { useResolvedUiTheme } from "@logics_common";
 
 export const DownloadModelsContainer = () => {
     const { currentCTranslate2WeightTypeStatus } = useTranslation();
     const { currentWhisperWeightTypeStatus } = useTranscription();
+    const { is_light } = useResolvedUiTheme();
 
     const downloadingCTranslate2 = currentCTranslate2WeightTypeStatus.data.filter(d => d.progress !== null);
     const downloadingWhisper = currentWhisperWeightTypeStatus.data.filter(d => d.progress !== null);
@@ -27,7 +30,7 @@ export const DownloadModelsContainer = () => {
                 ))}
             </div>
             <div className={styles.labels_wrapper}>
-                <img src={vrct0_logo_wide} className={styles.logo_img} alt="VRCT-0 logo"/>
+                <img src={is_light ? vrct0_logo_wide : vrct0_logo_wide_for_dark} className={styles.logo_img} alt="VRCT-0 logo"/>
                 <img src={vrct_now_downloading} className={styles.vrct_now_downloading_img}/>
             </div>
         </div>

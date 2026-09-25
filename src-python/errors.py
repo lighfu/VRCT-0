@@ -102,6 +102,10 @@ class ErrorCode(str, Enum):
     CUDA_PACK_IN_USE = "CUDA_PACK_IN_USE"
     CUDA_PACK_NOT_LOADED = "CUDA_PACK_NOT_LOADED"
 
+    # テーマの背景画像 (UI_THEME_*)
+    UI_THEME_IMAGE_SAVE_FAILED = "UI_THEME_IMAGE_SAVE_FAILED"
+    UI_THEME_IMAGE_LOAD_FAILED = "UI_THEME_IMAGE_LOAD_FAILED"
+
     # ============================================================================
     # バリデーションエラー (VALIDATION_*)
     # ============================================================================
@@ -437,6 +441,8 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
     ErrorCode.CUDA_PACK_DOWNLOAD: {"category": ErrorCategory.DEVICE, "message": "GPU acceleration pack download error", "severity": "error", "user_action_required": True},
     ErrorCode.CUDA_PACK_IN_USE: {"category": ErrorCategory.DEVICE, "message": "GPU acceleration pack is in use and cannot be replaced", "severity": "error", "user_action_required": True},
     ErrorCode.CUDA_PACK_NOT_LOADED: {"category": ErrorCategory.DEVICE, "message": "GPU acceleration pack could not be loaded", "severity": "warning", "user_action_required": False},
+    ErrorCode.UI_THEME_IMAGE_SAVE_FAILED: {"category": ErrorCategory.GENERAL, "message": "The background image could not be saved", "severity": "warning", "user_action_required": True},
+    ErrorCode.UI_THEME_IMAGE_LOAD_FAILED: {"category": ErrorCategory.GENERAL, "message": "The background image could not be loaded", "severity": "warning", "user_action_required": False},
 
     # バリデーションエラー
     ErrorCode.VALIDATION_MIC_THRESHOLD: {

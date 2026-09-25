@@ -20,7 +20,7 @@
     justify-content: space-between;
     height: 100%;
     width: 100%;
-    background-color: var(--dark_900_color);
+    background-color: var(--panel_900_color);
     padding-bottom: 0.8rem;
     overflow: hidden;
 }
@@ -137,4 +137,9 @@
 
 .separated_tabs_wrapper {
     margin-top: 0.8rem;
+}
+
+// 白で描かれた画像なので、明るいテーマでは濃い灰色にして背景に埋もれないようにする。
+:global(:root[data-theme-mode="light"]) .tab_icon.about_vrct_icon {
+    filter: brightness(0.3);
 }

@@ -41,6 +41,8 @@ common_error:
     failed_download_cuda_pack: "Could not install the GPU acceleration pack. Check your connection and free disk space (about 3.1 GB needed), then try again."
     cuda_pack_in_use: "The GPU acceleration pack is in use and can't be replaced. Restart the app and try again."
     cuda_pack_not_loaded: "Could not load the GPU acceleration pack. The app runs on the CPU."
+    theme_image_save_failed: "Couldn't save the background image."
+    theme_image_load_failed: "Couldn't load the background image. The background is shown as a solid color."
 
 common_warning:
     unable_to_use_osc_query: "The following functions have been automatically disabled due to the OSC IP Address settings preventing OSC data from being received."
@@ -142,6 +144,7 @@ config_page:
     side_menu_labels:
         device: "Device"
         appearance: "Appearance"
+        theme: "Theme"
         translation: "Translation"
         transcription: "Transcription"
         others: "Other"
@@ -191,6 +194,100 @@ config_page:
             label: "Font Family"
         ui_language:
             label: "UI Language"
+
+    theme:
+        presets_label: "Built-in themes"
+        custom_label: "My themes"
+        custom_empty: "None yet. Make one from a built-in theme, or import a shared theme."
+        untitled: "Untitled theme"
+        copy_name: "{{name}} copy"
+        imported_name: "Imported theme"
+        limit_reached: "You can have up to {{max}} of your own themes. Delete the ones you no longer use."
+        edit_label: "Edit theme"
+        presets:
+            standard: "Standard"
+            night_sky: "Night Sky"
+            sakura: "Sakura"
+            amber: "Amber"
+            lavender: "Lavender"
+            high_contrast: "High Contrast"
+            light: "Light"
+            light_sakura: "Light Sakura"
+            aurora: "Aurora"
+            glass: "Glass"
+        make_from_preset:
+            label: "Make your own theme"
+            desc: "Built-in themes can't be edited. Make your own theme from the selected one to change its colors and background."
+            button: "Make from this theme"
+        import:
+            label: "Import a shared theme"
+            desc: "Paste a shared theme code and press Import to add it to your themes."
+            placeholder: "VRCT0-THEME:1:..."
+            button: "Import"
+            imported: "Theme imported."
+            invalid: "This isn't a valid theme code. Paste the whole code you copied."
+        name:
+            label: "Name"
+        base_colors:
+            label: "Base colors"
+            desc: "Shades are made automatically. A light background makes a light theme."
+            accent: "Accent"
+            background: "Background"
+            text: "Text"
+            sent: "Sent"
+            received: "Received"
+        backdrop:
+            label: "Background"
+            desc: "What's laid behind the window content. It shows through the panels when you lower the panel opacity."
+            solid: "Solid color"
+            gradient: "Gradient"
+            image: "Image"
+        gradient:
+            colors: "Gradient colors"
+            colors_desc: "Colors change in order from 1 along the direction. Each color can also be see-through."
+            add_color: "Add color"
+            remove_color: "Remove color"
+            angle: "Gradient direction"
+        image:
+            label: "Background image"
+            desc: "The image is resized to fit the window before it's saved."
+            none: "No image selected."
+            choose: "Choose image"
+            change: "Change image"
+            strength: "Image strength"
+            blur: "Image blur"
+            read_failed: "Couldn't read the image. Choose a PNG, JPEG, WebP, or similar image."
+        backdrop_opacity:
+            label: "Background opacity"
+            desc: "Lower it to let the desktop show through the background."
+        panel_opacity:
+            label: "Panel opacity"
+            desc: "Lower it to let the background show through the log, sidebar, and other panels."
+        details:
+            label: "Detailed colors"
+            desc: "Override colors one at a time. Overridden colors stay the same when you change the base colors."
+            show: "Show"
+            hide: "Hide"
+            reset: "Back to automatic"
+            reset_all: "Remove all overrides"
+            accent: "Accent shades"
+            neutral: "Background and text shades"
+            neutral_desc: "Smaller numbers are closer to the text color, larger numbers closer to the background."
+            status: "Errors and warnings"
+            error: "Error"
+            error_active: "Error (pressed)"
+            warning_text: "Warning text"
+            warning: "Warning"
+        share:
+            label: "Share"
+            desc: "Turn this theme into a code you can give to others. The background image isn't included."
+            copy: "Copy code"
+            copied: "Copied"
+        delete:
+            label: "Delete theme"
+            desc: "Delete this theme and go back to the standard theme."
+            button: "Delete this theme"
+            confirm: "Press again to delete"
 
     translation:
         ctranslate2_weight_type:

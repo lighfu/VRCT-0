@@ -9,3 +9,4 @@ export { FontFamilyController } from "./FontFamilyController";
 export { TransparencyController } from "./TransparencyController";
 export { CornerRadiusController } from "./CornerRadiusController";
 export { CudaPackPromptController } from "./CudaPackPromptController";
+export { ThemeController } from "./ThemeController";

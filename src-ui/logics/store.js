@@ -12,6 +12,8 @@ import {
     translator_status,
 } from "@ui_configs";
 
+import { loadCachedUiTheme, loadCachedImages } from "./theme/theme_cache.js";
+
 export const store = {
     backend_subprocess: null,
     setting_box_scroll_container: null,
@@ -158,6 +160,10 @@ export const { atomInstance: Atom_IsLMStudioConnected, useHook: useStore_IsLMStu
 export const { atomInstance: Atom_IsOllamaConnected, useHook: useStore_IsOllamaConnected } = createAtomWithHook(false, "IsOllamaConnected");
 export const { atomInstance: Atom_IsAiCliConnected, useHook: useStore_IsAiCliConnected } = createAtomWithHook(false, "IsAiCliConnected");
 export const { atomInstance: Atom_CudaPack, useHook: useStore_CudaPack } = createAtomWithHook({ status: "no_gpu", prompted: true, progress: null }, "CudaPack", { is_state_ok: true });
+// テーマ。config の UI_THEME と同じ形 ({ selected_id, custom_themes })。起動直後は UI 側の写し。
+export const { atomInstance: Atom_UiTheme, useHook: useStore_UiTheme } = createAtomWithHook(loadCachedUiTheme(), "UiTheme", { is_state_ok: true });
+// 読み込んだ背景画像 ({ [image_id]: data_url | null })。null は「保存先に無かった」。
+export const { atomInstance: Atom_UiThemeImages, useHook: useStore_UiThemeImages } = createAtomWithHook(loadCachedImages(), "UiThemeImages", { is_state_ok: true });
 
 // Main Page
 // Common

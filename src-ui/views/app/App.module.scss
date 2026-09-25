@@ -5,8 +5,10 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    background-color: var(--dark_888_color);
     align-items: center;
+    // 地の色は ThemeBackdrop が z-index: -1 で敷く (単色・グラデーション・画像)。
+    position: relative;
+    isolation: isolate;
 }
 
 

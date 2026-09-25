@@ -41,6 +41,8 @@ common_error:
     failed_download_cuda_pack: "Could not install the GPU acceleration pack. Check your connection and free disk space (about 3.1 GB needed), then try again."
     cuda_pack_in_use: "The GPU acceleration pack is in use and can't be replaced. Restart the app and try again."
     cuda_pack_not_loaded: "Could not load the GPU acceleration pack. The app runs on the CPU."
+    theme_image_save_failed: "无法保存背景图片。"
+    theme_image_load_failed: "无法读取背景图片。背景将以纯色显示。"
 
 common_warning:
     unable_to_use_osc_query: "由于 OSC IP Address 的设置无法接收 OSC 数据，以下功能已自动禁用。"
@@ -142,6 +144,7 @@ config_page:
     side_menu_labels:
         device: "设备"
         appearance: "外观"
+        theme: "主题"
         translation: "翻译"
         transcription: "语音识别"
         others: "其他"
@@ -191,6 +194,100 @@ config_page:
             label: "字体"
         ui_language:
             label: "界面语言"
+
+    theme:
+        presets_label: "内置主题"
+        custom_label: "我的主题"
+        custom_empty: "还没有主题。可以基于内置主题创建，或导入他人分享的主题。"
+        untitled: "未命名主题"
+        copy_name: "{{name}} 副本"
+        imported_name: "导入的主题"
+        limit_reached: "我的主题最多只能有 {{max}} 个。请删除不再使用的主题。"
+        edit_label: "编辑主题"
+        presets:
+            standard: "标准"
+            night_sky: "夜空"
+            sakura: "樱花"
+            amber: "琥珀"
+            lavender: "薰衣草"
+            high_contrast: "高对比度"
+            light: "浅色"
+            light_sakura: "浅色樱花"
+            aurora: "极光"
+            glass: "玻璃"
+        make_from_preset:
+            label: "创建我的主题"
+            desc: "内置主题无法编辑。基于当前选择的主题创建我的主题后，即可更改颜色和背景。"
+            button: "基于此主题创建"
+        import:
+            label: "导入分享的主题"
+            desc: "粘贴主题代码并点击“导入”，即可加入我的主题。"
+            placeholder: "VRCT0-THEME:1:..."
+            button: "导入"
+            imported: "已导入主题。"
+            invalid: "无法识别为主题代码。请完整粘贴复制的代码。"
+        name:
+            label: "名称"
+        base_colors:
+            label: "基本颜色"
+            desc: "深浅会自动生成。将背景设为浅色即成为浅色主题。"
+            accent: "强调色"
+            background: "背景"
+            text: "文字"
+            sent: "发送"
+            received: "接收"
+        backdrop:
+            label: "背景"
+            desc: "铺在界面后方的内容。降低面板不透明度后，可以透过面板看到。"
+            solid: "纯色"
+            gradient: "渐变"
+            image: "图片"
+        gradient:
+            colors: "渐变颜色"
+            colors_desc: "沿方向从 1 开始依次变化。每种颜色都可以设置不透明度。"
+            add_color: "添加颜色"
+            remove_color: "减少颜色"
+            angle: "渐变方向"
+        image:
+            label: "背景图片"
+            desc: "图片会缩小到适合窗口的大小后保存。"
+            none: "尚未选择图片。"
+            choose: "选择图片"
+            change: "更换图片"
+            strength: "图片浓度"
+            blur: "图片模糊"
+            read_failed: "无法读取图片。请选择 PNG、JPEG、WebP 等格式的图片。"
+        backdrop_opacity:
+            label: "背景不透明度"
+            desc: "降低后，背景会变透明，可以看到桌面。"
+        panel_opacity:
+            label: "面板不透明度"
+            desc: "降低后，日志和侧边栏等区域会变透明，可以看到后方的背景。"
+        details:
+            label: "详细颜色"
+            desc: "可以逐个覆盖颜色。覆盖后的颜色在更改基本颜色时保持不变。"
+            show: "展开"
+            hide: "收起"
+            reset: "恢复自动"
+            reset_all: "取消全部覆盖"
+            accent: "强调色深浅"
+            neutral: "背景与文字深浅"
+            neutral_desc: "数字越小越接近文字颜色，越大越接近背景颜色。"
+            status: "错误与警告"
+            error: "错误"
+            error_active: "错误（按下时）"
+            warning_text: "警告文字"
+            warning: "警告"
+        share:
+            label: "分享"
+            desc: "将主题转换为代码，分享给其他人。不包含背景图片。"
+            copy: "复制代码"
+            copied: "已复制"
+        delete:
+            label: "删除主题"
+            desc: "删除此主题并恢复为标准主题。"
+            button: "删除此主题"
+            confirm: "再按一次即删除"
 
     translation:
         ctranslate2_weight_type:

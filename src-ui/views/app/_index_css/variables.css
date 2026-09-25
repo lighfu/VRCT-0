@@ -1,3 +1,5 @@
+/* 色は「標準」のテーマ。テーマの濃淡はこの色から計算するので、変えたら
+   src-ui/logics/theme/palette.js の DEFAULT_PALETTE も合わせる。 */
 :root {
     --primary_100_color: #b7ded8;
     --primary_150_color: #a1d4cc;
@@ -65,6 +67,18 @@
     --supporters_color_fuwa: #5788a2;
 
     --supporters_crown_color: #f0cb55;
+
+    /* テーマの半透明 (ThemeController が値を入れる)。
+       パネルは「パネルの不透明度」で透け、メイン画面・設定画面の地は
+       半透明のときだけ透明になって、後ろの背景 (ThemeBackdrop) をそのまま見せる。 */
+    --panel_alpha: 100%;
+    --page_alpha: 100%;
+    --panel_850_color: color-mix(in srgb, var(--dark_850_color) var(--panel_alpha), transparent);
+    --panel_875_color: color-mix(in srgb, var(--dark_875_color) var(--panel_alpha), transparent);
+    --panel_888_color: color-mix(in srgb, var(--dark_888_color) var(--panel_alpha), transparent);
+    --panel_900_color: color-mix(in srgb, var(--dark_900_color) var(--panel_alpha), transparent);
+    --page_888_color: color-mix(in srgb, var(--dark_888_color) var(--page_alpha), transparent);
+    --page_900_color: color-mix(in srgb, var(--dark_900_color) var(--page_alpha), transparent);
 
     --title_bar_height: 2rem;
     --main_page_topbar_height: 4.8rem;

@@ -1,5 +1,6 @@
 export { Device } from "./device/Device";
 export { Appearance, MessageLogUiScalingContainer } from "./appearance/Appearance";
+export { Theme } from "./theme/Theme";
 export { Translation } from "./translation/Translation";
 export { Transcription } from "./transcription/Transcription";
 export { Others, VrcMicMuteSyncContainer } from "./others/Others";

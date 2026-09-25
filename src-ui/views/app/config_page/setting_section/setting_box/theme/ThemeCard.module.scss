@@ -1,0 +1,134 @@
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: 0.6rem;
+    border-radius: 1rem;
+    text-align: left;
+    cursor: pointer;
+    border: 0.2rem solid transparent;
+    transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+
+    &:hover {
+        background-color: var(--dark_850_color);
+    }
+
+    &.is_selected {
+        border-color: var(--primary_300_color);
+        background-color: var(--dark_850_color);
+    }
+
+    &:focus-visible {
+        outline: 0.2rem solid var(--primary_300_color);
+        outline-offset: 0.2rem;
+    }
+}
+
+.preview {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 10;
+    border-radius: 0.6rem;
+    overflow: hidden;
+    isolation: isolate;
+    box-shadow: 0 0 0 0.1rem var(--dark_750_color);
+
+    // 背景が透けるテーマは、後ろのデスクトップを市松模様で表す。
+    &.see_through {
+        background: repeating-conic-gradient(#8a8a8a 0 25%, #c8c8c8 0 50%) 0 0 / 1rem 1rem;
+    }
+}
+
+.backdrop,
+.image,
+.window {
+    position: absolute;
+    inset: 0;
+}
+
+.image {
+    background-size: cover;
+    background-position: center;
+}
+
+.window {
+    display: flex;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    width: 30%;
+    padding: 1rem 0.8rem;
+}
+
+.switch {
+    position: relative;
+    display: block;
+    width: 2.4rem;
+    height: 1rem;
+    border-radius: 0.5rem;
+}
+
+.knob_on,
+.knob_off {
+    position: absolute;
+    top: 0.1rem;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+}
+
+.knob_on {
+    right: 0.1rem;
+}
+
+.knob_off {
+    left: 0.1rem;
+}
+
+.main {
+    display: flex;
+    flex: 1;
+    padding: 12% 8% 12% 6%;
+}
+
+.log {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.8rem;
+    border-radius: 0.4rem;
+}
+
+.author,
+.text {
+    display: block;
+    height: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.author {
+    width: 35%;
+}
+
+.text {
+    width: 80%;
+    opacity: 0.85;
+    margin-bottom: 0.3rem;
+
+    &.short {
+        width: 55%;
+    }
+}
+
+.name {
+    padding: 0 0.2rem;
+    font-size: 1.4rem;
+    color: var(--dark_300_color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

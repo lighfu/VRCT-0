@@ -291,6 +291,11 @@ mapping = {
     "/get/data/font_family": {"status": True, "variable":controller.getFontFamily},
     "/set/data/font_family": {"status": True, "variable":controller.setFontFamily},
 
+    "/get/data/ui_theme": {"status": True, "variable":controller.getUiTheme},
+    "/set/data/ui_theme": {"status": True, "variable":controller.setUiTheme},
+    "/run/save_ui_theme_image": {"status": True, "variable":controller.saveUiThemeImage},
+    "/run/load_ui_theme_image": {"status": True, "variable":controller.loadUiThemeImage},
+
     "/get/data/ui_language": {"status": True, "variable":controller.getUiLanguage},
     "/set/data/ui_language": {"status": True, "variable":controller.setUiLanguage},
 

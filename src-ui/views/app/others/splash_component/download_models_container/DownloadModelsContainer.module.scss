@@ -62,3 +62,8 @@
     font-size: 12px;
     color: var(--dark_400_color);
 }
+
+// 白で描かれた画像なので、明るいテーマでは濃い灰色にして背景に埋もれないようにする。
+:global(:root[data-theme-mode="light"]) .vrct_now_downloading_img {
+    filter: brightness(0.3);
+}

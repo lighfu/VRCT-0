@@ -16,3 +16,4 @@ export { useIsVrctAvailable } from "./useIsVrctAvailable";
 export { useLLMConnection } from "./useLLMConnection";
 export { useCopyToClipboard } from "./useCopyToClipboard";
 export { useCudaPack } from "./useCudaPack";
+export { useUiTheme, useResolvedUiTheme } from "./useUiTheme";

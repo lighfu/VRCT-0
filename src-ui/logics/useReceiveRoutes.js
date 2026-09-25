@@ -39,6 +39,13 @@ export const STATIC_ROUTE_META_LIST = [
     { endpoint: "/run/mark_cuda_pack_prompted", ns: null, hook_name: null, method_name: null },
     { endpoint: "/run/error_cuda_pack", ns: null, hook_name: null, method_name: null },
 
+    // テーマ (設定の「テーマ」タブ)。/set/data/ui_theme の応答は、保存待ちの新しい変更を
+    // 古い値で戻さないよう受け取らない。
+    { endpoint: "/get/data/ui_theme", ns: common, hook_name: "useUiTheme", method_name: "updateUiThemeFromBackend" },
+    { endpoint: "/set/data/ui_theme", ns: null, hook_name: null, method_name: null },
+    { endpoint: "/run/save_ui_theme_image", ns: null, hook_name: null, method_name: null },
+    { endpoint: "/run/load_ui_theme_image", ns: common, hook_name: "useUiTheme", method_name: "updateUiThemeImage" },
+
     // Software Version
     { endpoint: "/get/data/version", ns: common, hook_name: "useSoftwareVersion", method_name: "updateSoftwareVersion" },
 

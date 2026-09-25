@@ -12,6 +12,7 @@ import {
     CornerRadiusController,
     AppUpdateController,
     CudaPackPromptController,
+    ThemeController,
 } from "./_app_controllers";
 
 import styles from "./App.module.scss";
@@ -25,6 +26,7 @@ import {
     ModalController,
     SnackbarController,
     AppErrorBoundary,
+    ThemeBackdrop,
 } from "./others";
 
 import { useIsBackendReady, useIsVrctAvailable, useWindow } from "@logics_common";
@@ -36,6 +38,8 @@ export const App = () => {
 
     return (
         <div className={styles.container}>
+            <ThemeController />
+            <ThemeBackdrop />
             <AppErrorBoundary >
                 <KeyEventController />
                 <StartPythonController />

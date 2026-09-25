@@ -168,5 +168,38 @@ class PrintResponseMaskingTests(unittest.TestCase):
         self.assertEqual(sent["result"], "sk-or-REALSECRET")
 
 
+class DataUrlAbbreviationTests(unittest.TestCase):
+    """テーマの背景画像の data URL (数百 KB) をログに丸ごと書かない。"""
+
+    DATA_URL = "data:image/webp;base64," + "A" * 5000
+
+    def setUp(self):
+        self._original_logger = utils.process_logger
+        logger = logging.getLogger("test_process_logger_data_url")
+        logger.handlers.clear()
+        logger.addHandler(logging.Handler())
+        utils.process_logger = logger
+        self.addCleanup(setattr, utils, "process_logger", self._original_logger)
+
+    def test_abbreviates_nested_data_urls_only(self):
+        result = utils._abbreviateDataUrls({"image_id": "img_1", "data_url": self.DATA_URL, "list": [self.DATA_URL, "data:x"]})
+        self.assertEqual(result["image_id"], "img_1")
+        self.assertTrue(result["data_url"].endswith(f"...({len(self.DATA_URL)} chars)"))
+        self.assertLess(len(result["data_url"]), 100)
+        self.assertEqual(result["list"][1], "data:x")
+
+    def test_print_log_and_response_abbreviate_but_stdout_keeps_full_value(self):
+        logged = []
+        utils.process_logger.info = lambda response: logged.append(response)
+        written = {}
+        with patch.object(utils, "_enqueueLogLine"):
+            utils.printLog("/run/save_ui_theme_image", {"receive_data": {"image_id": "img_1", "data_url": self.DATA_URL}})
+        with patch.object(utils, "_enqueueResponseLine", lambda line: written.update(line=line)):
+            utils.printResponse(200, "/run/load_ui_theme_image", {"image_id": "img_1", "data_url": self.DATA_URL})
+        self.assertNotIn(self.DATA_URL, logged[0]["data"])
+        self.assertNotIn(self.DATA_URL, str(logged[1]["result"]))
+        self.assertEqual(json.loads(written["line"])["result"]["data_url"], self.DATA_URL)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -55,6 +55,8 @@ dist-ssr
 error.txt
 config.json
 config.json.tmp
+# テーマの背景画像 (開発中は src-python がデータの置き場になる)
+theme_images/
 
 
 # Personal Claude Code settings (not shared with the team)

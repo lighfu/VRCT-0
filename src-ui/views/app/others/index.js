@@ -3,3 +3,4 @@ export { SplashComponent } from "./splash_component/SplashComponent.jsx";
 export { ModalController } from "./modal_controller/ModalController.jsx";
 export { SnackbarController } from "./snackbar_controller/SnackbarController.jsx";
 export { AppErrorBoundary } from "./error_boundary/AppErrorBoundary.jsx";
+export { ThemeBackdrop } from "./theme_backdrop/ThemeBackdrop.jsx";

@@ -106,3 +106,14 @@
     width: 280px;
     // transform: translate(-50%, 50%);
 }
+
+// 白で描かれた画像なので、明るいテーマでは濃い灰色にして背景に埋もれないようにする。
+:global(:root[data-theme-mode="light"]) .chato_img,
+:global(:root[data-theme-mode="light"]) .vrct_starting_up_img {
+    filter: brightness(0.3);
+}
+
+// 白と青緑が混ざった画像は、明るさだけを反転して色合いを保つ (白は黒に、青緑は濃い青緑に)。
+:global(:root[data-theme-mode="light"]) .vrct_explanation_img {
+    filter: invert(1) hue-rotate(180deg);
+}

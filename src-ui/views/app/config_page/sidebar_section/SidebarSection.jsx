@@ -9,6 +9,7 @@ import {
 
 import MicSvg from "@images/mic.svg?react";
 import AppearanceSvg from "@images/mui_palette.svg?react";
+import ThemeSvg from "@images/theme_contrast.svg?react";
 import TranslationSvg from "@images/translation.svg?react";
 import GraphicEqSvg from "@images/mui_graphic_eq.svg?react";
 import HMDSvg from "@images/mui_head_mounted_device.svg?react";
@@ -44,6 +45,7 @@ export const SidebarSection = () => {
                     <div className={styles.tabs_wrapper}>
                         <Tab tab_id="device" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
                         <Tab tab_id="appearance" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
+                        <Tab tab_id="theme" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
                         <Tab tab_id="translation" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
                         <Tab tab_id="transcription" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
                         <Tab tab_id="ocr" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
@@ -68,6 +70,7 @@ const TabIcon = ({ tab_id, className }) => {
     switch (tab_id) {
         case "device": return <MicSvg className={className} />;
         case "appearance": return <AppearanceSvg className={clsx(className, styles.mui_icon)} />;
+        case "theme": return <ThemeSvg className={clsx(className, styles.mui_icon)} />;
         case "translation": return <TranslationSvg className={className} />;
         case "transcription": return <GraphicEqSvg className={clsx(className, styles.mui_icon)} />;
         case "ocr": return <ChatTranscribeSvg className={clsx(className, styles.mui_icon, styles.ocr_icon)} />;

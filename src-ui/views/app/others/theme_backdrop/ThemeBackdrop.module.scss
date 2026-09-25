@@ -1,0 +1,18 @@
+.backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.fill {
+    position: absolute;
+    inset: 0;
+}
+
+.image {
+    position: absolute;
+    background-size: cover;
+    background-position: center;
+}

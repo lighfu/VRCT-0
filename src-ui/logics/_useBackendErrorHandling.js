@@ -3,6 +3,7 @@ import { useI18n } from "@useI18n";
 import {
     useNotificationStatus,
     useLLMConnection,
+    useUiTheme,
 } from "@logics_common";
 
 import {
@@ -92,6 +93,8 @@ export const _useBackendErrorHandling = () => {
         updateIsAiCliConnected,
     } = useLLMConnection();
 
+    const { updateUiThemeImage } = useUiTheme();
+
     const errorHandling_Backend = ({error_code, message, data, endpoint, result}) => {
         switch (error_code) {
             // ============================================================================
@@ -170,6 +173,18 @@ export const _useBackendErrorHandling = () => {
                 return;
             case "CUDA_PACK_NOT_LOADED":
                 showNotification_Error(t("common_error.cuda_pack_not_loaded"), { category_id: error_code });
+                return;
+
+            // ============================================================================
+            // テーマの背景画像 (UI_THEME_*)
+            // ============================================================================
+            case "UI_THEME_IMAGE_SAVE_FAILED":
+                showNotification_Error(t("common_error.theme_image_save_failed"), { category_id: error_code });
+                return;
+            case "UI_THEME_IMAGE_LOAD_FAILED":
+                // 読めなかった画像は無いものとして扱い、背景を単色で出す。
+                updateUiThemeImage({ image_id: data?.image_id, data_url: null });
+                showNotification_Error(t("common_error.theme_image_load_failed"), { category_id: error_code });
                 return;
 
             // ============================================================================

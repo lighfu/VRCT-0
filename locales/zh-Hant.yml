@@ -41,6 +41,8 @@ common_error:
     failed_download_cuda_pack: "Could not install the GPU acceleration pack. Check your connection and free disk space (about 3.1 GB needed), then try again."
     cuda_pack_in_use: "The GPU acceleration pack is in use and can't be replaced. Restart the app and try again."
     cuda_pack_not_loaded: "Could not load the GPU acceleration pack. The app runs on the CPU."
+    theme_image_save_failed: "無法儲存背景圖片。"
+    theme_image_load_failed: "無法讀取背景圖片。背景將以純色顯示。"
 
 common_warning:
     unable_to_use_osc_query: "由於 OSC IP Address 的設定無法接收 OSC 資料，以下功能已自動停用。"
@@ -142,6 +144,7 @@ config_page:
     side_menu_labels:
         device: "裝置"
         appearance: "外觀"
+        theme: "主題"
         translation: "翻譯"
         transcription: "語音辨識"
         others: "其他"
@@ -191,6 +194,100 @@ config_page:
             label: "字型"
         ui_language:
             label: "介面語言"
+
+    theme:
+        presets_label: "內建主題"
+        custom_label: "我的主題"
+        custom_empty: "尚未建立。可以根據內建主題建立，或匯入他人分享的主題。"
+        untitled: "未命名主題"
+        copy_name: "{{name}} 副本"
+        imported_name: "匯入的主題"
+        limit_reached: "我的主題最多只能有 {{max}} 個。請刪除不再使用的主題。"
+        edit_label: "編輯主題"
+        presets:
+            standard: "標準"
+            night_sky: "夜空"
+            sakura: "櫻花"
+            amber: "琥珀"
+            lavender: "薰衣草"
+            high_contrast: "高對比"
+            light: "淺色"
+            light_sakura: "淺色櫻花"
+            aurora: "極光"
+            glass: "玻璃"
+        make_from_preset:
+            label: "建立我的主題"
+            desc: "內建主題無法編輯。根據目前選擇的主題建立我的主題後，即可變更顏色與背景。"
+            button: "根據此主題建立"
+        import:
+            label: "匯入分享的主題"
+            desc: "貼上主題代碼並按下「匯入」，即可加入我的主題。"
+            placeholder: "VRCT0-THEME:1:..."
+            button: "匯入"
+            imported: "已匯入主題。"
+            invalid: "無法辨識為主題代碼。請完整貼上複製的代碼。"
+        name:
+            label: "名稱"
+        base_colors:
+            label: "基本顏色"
+            desc: "深淺會自動產生。將背景設為淺色即成為淺色主題。"
+            accent: "強調色"
+            background: "背景"
+            text: "文字"
+            sent: "已發送"
+            received: "已接收"
+        backdrop:
+            label: "背景"
+            desc: "鋪在畫面後方的內容。降低面板不透明度後，可以透過面板看到。"
+            solid: "純色"
+            gradient: "漸層"
+            image: "圖片"
+        gradient:
+            colors: "漸層顏色"
+            colors_desc: "沿著方向從 1 開始依序變化。每種顏色都可以設定不透明度。"
+            add_color: "新增顏色"
+            remove_color: "減少顏色"
+            angle: "漸層方向"
+        image:
+            label: "背景圖片"
+            desc: "圖片會縮小到適合視窗的大小後儲存。"
+            none: "尚未選擇圖片。"
+            choose: "選擇圖片"
+            change: "更換圖片"
+            strength: "圖片濃度"
+            blur: "圖片模糊"
+            read_failed: "無法讀取圖片。請選擇 PNG、JPEG、WebP 等格式的圖片。"
+        backdrop_opacity:
+            label: "背景不透明度"
+            desc: "降低後，背景會變透明，可以看到桌面。"
+        panel_opacity:
+            label: "面板不透明度"
+            desc: "降低後，紀錄與側邊欄等區域會變透明，可以看到後方的背景。"
+        details:
+            label: "詳細顏色"
+            desc: "可以逐一覆寫顏色。覆寫後的顏色在變更基本顏色時會保持不變。"
+            show: "展開"
+            hide: "收合"
+            reset: "恢復自動"
+            reset_all: "取消全部覆寫"
+            accent: "強調色深淺"
+            neutral: "背景與文字深淺"
+            neutral_desc: "數字越小越接近文字顏色，越大越接近背景顏色。"
+            status: "錯誤與警告"
+            error: "錯誤"
+            error_active: "錯誤（按下時）"
+            warning_text: "警告文字"
+            warning: "警告"
+        share:
+            label: "分享"
+            desc: "將主題轉換為代碼，分享給其他人。不包含背景圖片。"
+            copy: "複製代碼"
+            copied: "已複製"
+        delete:
+            label: "刪除主題"
+            desc: "刪除此主題並回到標準主題。"
+            button: "刪除此主題"
+            confirm: "再按一次即刪除"
 
     translation:
         ctranslate2_weight_type:

@@ -3,6 +3,7 @@ from subprocess import Popen
 from threading import Thread, Lock, RLock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import copy
+from os import path as os_path
 import functools
 import re
 import time
@@ -16,6 +17,7 @@ from models.transcription.transcription_sensevoice import SENSEVOICE_WEIGHT_TYPE
 from models.translation.translation_providers import TRANSLATION_PROVIDER_REGISTRY, CONNECTION_PROVIDER_REGISTRY
 from models.message_pipeline import MessageDirectionSpec, MIC_MESSAGE_SPEC, SPEAKER_MESSAGE_SPEC, CHAT_MESSAGE_SPEC, OCR_MESSAGE_SPEC
 from models.cuda_pack import RESULT_IN_USE as CUDA_PACK_RESULT_IN_USE
+from models import ui_theme_images
 
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -205,6 +207,7 @@ _SIMPLE_CONFIG_GETTERS = {
     "getSendMessageButtonType": "SEND_MESSAGE_BUTTON_TYPE",
     "getShowResendButton": "SHOW_RESEND_BUTTON",
     "getFontFamily": "FONT_FAMILY",
+    "getUiTheme": "UI_THEME",
     "getUiLanguage": "UI_LANGUAGE",
     "getMainWindowGeometry": "MAIN_WINDOW_GEOMETRY",
     "getAutoMicSelect": "AUTO_MIC_SELECT",
@@ -2187,6 +2190,54 @@ class Controller:
     def setFontFamily(data, *args, **kwargs) -> dict:
         config.FONT_FAMILY = data
         return {"status":200, "result":config.FONT_FAMILY}
+
+
+    @staticmethod
+    @_configValidationErrorResponse(ErrorCode.VALIDATION_CONFIG_VALUE_INVALID)
+    def setUiTheme(data, *args, **kwargs) -> dict:
+        config.UI_THEME = data
+        return {"status":200, "result":config.UI_THEME}
+
+    @staticmethod
+    def _uiThemeImageDir() -> str:
+        return os_path.join(config.PATH_DATA, ui_theme_images.IMAGE_DIR_NAME)
+
+    @staticmethod
+    def saveUiThemeImage(data, *args, **kwargs) -> dict:
+        """テーマの背景画像を保存する。data は {"image_id": str, "data_url": str}。"""
+        image_id = data.get("image_id") if isinstance(data, dict) else None
+        try:
+            ui_theme_images.saveImage(Controller._uiThemeImageDir(), image_id, data.get("data_url"))
+        except Exception:
+            errorLogging()
+            return VRCTError.create_error_response(
+                ErrorCode.UI_THEME_IMAGE_SAVE_FAILED,
+                data={"image_id": image_id},
+            )
+        return {"status":200, "result":{"image_id": image_id}}
+
+    @staticmethod
+    def loadUiThemeImage(data, *args, **kwargs) -> dict:
+        """保存した背景画像を data URL で返す。無い画像は data_url が None。"""
+        try:
+            data_url = ui_theme_images.loadImage(Controller._uiThemeImageDir(), data)
+        except Exception:
+            errorLogging()
+            return VRCTError.create_error_response(
+                ErrorCode.UI_THEME_IMAGE_LOAD_FAILED,
+                data={"image_id": data},
+            )
+        return {"status":200, "result":{"image_id": data, "data_url": data_url}}
+
+    @staticmethod
+    def _removeUnusedUiThemeImages() -> None:
+        try:
+            ui_theme_images.removeUnusedImages(
+                Controller._uiThemeImageDir(),
+                ui_theme_images.usedImageIds(config.UI_THEME),
+            )
+        except Exception:
+            errorLogging()
 
 
     @staticmethod
@@ -4895,6 +4946,8 @@ class Controller:
         # init() をメインスレッドで実行している間も 3 本のハンドラワーカー
         # がフィードを処理できる。よってここで起動しても安全。
         self.startWatchdog()
+
+        self._removeUnusedUiThemeImages()
 
         # Network check
         connected_network = isConnectedNetwork()
