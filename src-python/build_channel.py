@@ -7,4 +7,4 @@
 develop ブランチではこの値を "beta" のまま維持し、master へマージ/
 チェリーピックする際にこの1行だけを "stable" に変更する。
 """
-BUILD_CHANNEL = "beta"  # "stable" | "beta"
+BUILD_CHANNEL = "stable"  # "stable" | "beta"
