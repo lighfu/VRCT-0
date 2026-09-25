@@ -127,6 +127,27 @@ npm run dev-fast
 
 配布用のインストーラー（Velopack）を作成するビルドです。
 
+### 公開する（おすすめ）
+
+```bash
+npm run publish-release -- --dry-run     # 何をするかだけ表示する
+npm run publish-release                  # 今日の日付で正式版を公開する
+npm run publish-release -- --beta 1      # 今日の日付のベータ版 1 を公開する
+```
+
+`utils/publish_release.py` が次を順に行います。途中で問題があれば何も push せずに止まります。
+
+1. 公開前の確認: develop ブランチにいる・コミットしていない変更が無い・origin より遅れていない・同じタグが無い・版が公開済みの版より新しい
+2. テスト: Python のテストと UI のビルド（`--skip-tests` で省く）
+3. 版（package.json など）と `BUILD_CHANNEL` を書き換えて `chore(release): v<版>` をコミットし、タグ `v<版>` を作る
+4. 確認のあと、develop とタグを一度に push する（`--yes` で確認を省く）
+5. CI の完了を待ち、公開されたリリースに Setup・nupkg・releases.win.json があるかを確かめる（`--no-watch` で待たない）
+
+CI が失敗したときは、原因を直してから、タグを消して（`git push --delete origin v<版>` と `git tag -d v<版>`）
+もう一度 `npm run publish-release` を実行します。版のコミットはもうあるので、作り直さずにタグだけを付け直します。
+
+### CI の中身
+
 タグ `v<版>` を push すると CI（`.github/workflows/release.yml`）が
 `npm run build` → `vpk pack`（`utils/pack_release.py`）→ `vpk upload github` を実行し、
 GitHub Releases に `VRCT-0-win-Setup.exe` と差分パッケージ（nupkg）を公開します。
@@ -152,19 +173,35 @@ dotnet tool install -g vpk --version 1.2.158
 
 ### バージョン管理
 
-バージョンは `package.json` で一元管理され、以下のファイルに自動で同期されます:
+VRCT-0 の版は**リリースした日付**（年.月.日）です。ベータ版は後ろに `-beta.<番号>` を付けます。
+
+- 例: `2026.9.25`（安定版）、`2026.9.25-beta.1`（ベータ版）
+- 更新の仕組み（Velopack）は SemVer の版しか受け付けないので、月と日はゼロで埋めません（`2026.09.25` は使えません）。
+- 数字は 3 つまでなので、同じ日に 2 回目の安定版は出せません。続けて直すときはベータ版（`2026.9.25-beta.2`）で出すか、翌日の日付で出します。
+
+版を決めるコマンド:
+
+```bash
+npm run set-version                 # 今日の日付を版にする (安定版)
+npm run set-version -- --beta 1     # 今日の日付のベータ版 1
+python utils/update_version.py --date 2026-09-25 --beta 2   # 日付を指定する
+```
+
+`package.json` と `package-lock.json` の版を書き換え、以下のファイルにも同期します。
+日付の形でない版のままビルドすると `update-version` が止まります。
+
+- `src-tauri/tauri.conf.json`
+- `src-python/config.py`
+
+`package.json` の版をほかのファイルへ写すだけなら:
 
 ```bash
 npm run update-version
 ```
 
-更新されるファイル:
-- `src-tauri/tauri.conf.json`
-- `src-python/config.py`
-
 ### どこにバージョンを設定すればReleaseに反映されるか
 
-- **設定箇所**: `package.json` の `version` が唯一のソース・オブ・トゥルース。
+- **設定箇所**: `package.json` の `version` が唯一のソース・オブ・トゥルース（`npm run set-version` で日付の版にする）。
 - **反映方法**: `npm run update-version`（`build`/`release`コマンド内でも自動実行）により、
 	- `src-tauri/tauri.conf.json` の `version` に同期（Tauri アプリの表示・メタデータに使用）
 	- `src-python/config.py` の `self._VERSION` に同期（ランタイム表示等に使用）
@@ -330,9 +367,9 @@ npm run task-kill
 
 ### バージョン管理フロー
 
-1. `package.json` のバージョンを更新
-2. `npm run update-version` を実行
-3. 自動的に `tauri.conf.json` と `config.py` が更新される
+1. `npm run set-version`（ベータ版は `npm run set-version -- --beta <番号>`）で `package.json` の版をリリースする日付にする
+2. 同じコマンドの中で `tauri.conf.json` と `config.py` も更新される
+3. 変更をコミットして、`v<版>` のタグを打つ
 
 ## β版リリース
 
@@ -341,18 +378,20 @@ npm run task-kill
 
 ### リリース手順
 
-1. `package.json` の `version` を `3.5.0-beta.1` のようなpre-release識別子付きの値にする
-2. `npm run update-version` を実行(通常のビルド/リリースコマンド内で自動実行されるため手動実行は不要)
-3. `v3.5.0-beta.1` のようなタグを打ってpush
+1. `npm run set-version -- --beta 1` で版を `2026.9.25-beta.1` のような今日の日付のベータ版にし、コミットする
+2. `v2026.9.25-beta.1` のようなタグを打ってpush（CI はタグが日付の形か、各ファイルの版とタグが同じかを確かめる）
 
 ```bash
-git tag v3.5.0-beta.1
-git push origin v3.5.0-beta.1
+git tag v2026.9.25-beta.1
+git push origin v2026.9.25-beta.1
 ```
+
+安定版は `npm run set-version`（`-beta` なし）で版を今日の日付にし、`src-python/build_channel.py` の
+`BUILD_CHANNEL` を `"stable"` にしてから `v2026.9.25` のようなタグを打ちます。
 
 ### 本番版との違い
 
-| 項目 | 本番版 (`v3.5.0`) | β版 (`v3.5.0-beta.1`) |
+| 項目 | 本番版 (`v2026.9.25`) | β版 (`v2026.9.25-beta.1`) |
 |---|---|---|
 | GitHub Release | `prerelease: false` | `prerelease: true` |
 

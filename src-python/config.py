@@ -1086,7 +1086,7 @@ class Config:
 
     def init_config(self):
         # Read Only
-        self._VERSION = "3.5.1-beta.1"
+        self._VERSION = "2026.9.25-beta.1"
         if getattr(sys, 'frozen', False):
             self._PATH_APP = os_path.dirname(sys.executable)
         else:

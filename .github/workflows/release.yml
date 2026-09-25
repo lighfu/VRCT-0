@@ -36,6 +36,16 @@ jobs:
             echo "is_beta=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           }
 
+      # VRCT-0 の版はリリースした日付 (年.月.日、ベータ版は -beta.N 付き)。
+      # utils/update_version.py の DATE_VERSION_RE と同じ形。
+      - name: Verify the version is a release date
+        shell: pwsh
+        run: |
+          if ($env:VERSION -notmatch '^\d{4}\.[1-9]\d?\.[1-9]\d?(-(beta|rc)\.[1-9]\d*)?$') {
+            Write-Host "::error::Version $env:VERSION is not a date version (e.g. 2026.9.25 or 2026.9.25-beta.1). Run 'npm run set-version' and commit before tagging."
+            exit 1
+          }
+
       - name: Verify version numbers match the tag
         shell: pwsh
         run: |

@@ -1,7 +1,7 @@
 {
   "name": "vrct",
   "private": true,
-  "version": "3.5.1-beta.1",
+  "version": "2026.9.25-beta.1",
   "type": "module",
   "scripts": {
     "setup-python": "bat\\install.bat",
@@ -16,12 +16,14 @@
     "clean": "python utils\\clean.py",
     "clean-soft": "python utils\\clean.py --soft",
     "update-version": "python utils\\update_version.py",
+    "set-version": "python utils\\update_version.py --date",
     "dev": "npm run task-kill && npm run clean && npm run update-version && npm run build-python && npm run dev-ui",
     "dev-fast": "set \"VRCT_DEV_VENV=.venv\" && npm run task-kill && npm run sidecar-dev && npm run dev-ui",
     "dev-ui": "npm run task-kill && npm-run-all --parallel vite tauri-dev",
     "analyze-error": "node utils/analyze_ui_error.js",
     "build": "npm run task-kill && npm run clean && npm run update-version && npm run build-python && npm run vite-build && npm run tauri build -- --no-bundle",
-    "release": "npm run build && python utils\\pack_release.py"
+    "release": "npm run build && python utils\\pack_release.py",
+    "publish-release": "python utils\\publish_release.py"
   },
   "dependencies": {
     "@tauri-apps/api": "2.5.0",
