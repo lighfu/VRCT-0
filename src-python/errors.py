@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional, Dict
 from enum import Enum
 
 
-# エラー生成時に通知される optional なフック（テレメトリ等）。
+# エラー生成時に通知される optional なフック (今は登録するものが無い)。
 # errors.py から model への逆依存を避けるため、model 側から登録する。
 _error_report_hooks: list = []
 
@@ -34,8 +34,8 @@ def report_error_code(error_code: str) -> None:
     """UI 応答を生成せず、登録済みのエラー報告フックだけを呼ぶ。
 
     デバイス tracker の後始末タイムアウトのように、ユーザー操作を要求する
-    endpoint エラーではないが telemetry で発生頻度を把握したい内部状態に
-    使用する。フックが未登録でも安全に no-op になる。
+    endpoint エラーではないが発生を記録したい内部状態に使用する。
+    フックが未登録でも安全に no-op になる。
     """
     if error_code:
         _notify_error_hooks(str(error_code))
@@ -425,7 +425,7 @@ ERROR_METADATA: Dict[ErrorCode, Dict[str, Any]] = {
     },
     ErrorCode.SENSEVOICE_RUNTIME_UNAVAILABLE: {
         "category": ErrorCategory.WEIGHT,
-        "message": "SenseVoice could not start because its runtime (sherpa-onnx) failed to load. Reinstall VRCT or install the Microsoft Visual C++ Redistributable.",
+        "message": "SenseVoice could not start because its runtime (sherpa-onnx) failed to load. Reinstall VRCT-0 or install the Microsoft Visual C++ Redistributable.",
         "severity": "error",
         "user_action_required": True,
     },

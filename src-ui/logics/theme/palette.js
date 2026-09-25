@@ -6,8 +6,6 @@
 // そのため基本の色が既定のままなら、variables.css とまったく同じ色になる。
 
 import {
-    parseHex,
-    toHex,
     withAlpha,
     hexToOklab,
     hexToOklch,
@@ -189,11 +187,6 @@ const generateNeutral = (background, text) => {
 };
 
 // ---- まとめ ------------------------------------------------------------------
-const darken = (hex, amount) => {
-    const { r, g, b, a } = parseHex(hex);
-    return toHex({ r: r * (1 - amount), g: g * (1 - amount), b: b * (1 - amount), a });
-};
-
 // 上書きを当てたあとの色から作る、透けた色などの派生の色。
 const deriveVariables = (colors) => ({
     primary_600_color_44: withAlpha(colors.primary_600_color, 0x44 / 255),
@@ -202,8 +195,6 @@ const deriveVariables = (colors) => ({
     dark_1000_color_66: withAlpha(colors.dark_1000_color, 0x66 / 255),
     dark_1000_color_aa: withAlpha(colors.dark_1000_color, 0xaa / 255),
     dark_1000_color_dd: withAlpha(colors.dark_1000_color, 0xdd / 255),
-    // variables.css のコメントどおり「送信の色に黒を 10% 混ぜた色」。
-    supporters_color_fuwa: darken(colors.sent_400_color, 0.1),
 });
 
 // base: { accent, background, text, sent, received } (どれも "#rrggbb")

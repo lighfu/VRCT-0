@@ -821,14 +821,6 @@ export const SETTINGS_ARRAY = [
         base_endpoint_name: "selected_sudachi_dict_type",
     },
     {
-        Category: "Others",
-        Base_Name: "Telemetry",
-        default_value: false,
-        ui_template_id: "toggle",
-        logics_template_id: "toggle_enable_disable",
-        base_endpoint_name: "telemetry",
-    },
-    {
         Category: "Updater",
         Base_Name: "ReleaseChannel",
         default_value: "stable",

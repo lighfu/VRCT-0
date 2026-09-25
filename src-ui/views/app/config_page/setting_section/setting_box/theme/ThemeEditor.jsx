@@ -18,10 +18,9 @@ import {
     MAX_THEME_NAME_LENGTH,
 } from "@logics/theme/theme_model.js";
 import { THEME_IMAGE_ACCEPT } from "@logics/theme/theme_image.js";
-import { SectionLabelComponent } from "../_components";
+import { SectionLabelComponent, SettingRow } from "../_components";
 import { SliderContainer, RadioButtonContainer } from "../_templates/Templates";
 import { ThemeColorPicker } from "./ThemeColorPicker";
-import { ThemeRow } from "./ThemeRow";
 import styles from "./Theme.module.scss";
 
 const PERCENT_MARKS = [0, 25, 50, 75, 100];
@@ -93,7 +92,7 @@ const NameRow = ({ theme, update }) => {
     const commit = () => update((current) => ({ ...current, name }));
 
     return (
-        <ThemeRow label={t("config_page.theme.name.label")}>
+        <SettingRow label={t("config_page.theme.name.label")}>
             <input
                 className={styles.text_input}
                 value={name}
@@ -105,14 +104,14 @@ const NameRow = ({ theme, update }) => {
                     if (event.key === "Enter" && !event.nativeEvent.isComposing) event.currentTarget.blur();
                 }}
             />
-        </ThemeRow>
+        </SettingRow>
     );
 };
 
 const BaseColorsRow = ({ theme, update }) => {
     const { t } = useI18n();
     return (
-        <ThemeRow label={t("config_page.theme.base_colors.label")} desc={t("config_page.theme.base_colors.desc")}>
+        <SettingRow label={t("config_page.theme.base_colors.label")} desc={t("config_page.theme.base_colors.desc")}>
             <div className={styles.swatch_row}>
                 {BASE_COLOR_KEYS.map((key) => (
                     <ThemeColorPicker
@@ -123,7 +122,7 @@ const BaseColorsRow = ({ theme, update }) => {
                     />
                 ))}
             </div>
-        </ThemeRow>
+        </SettingRow>
     );
 };
 
@@ -171,7 +170,7 @@ const GradientRows = ({ theme, updateBackdrop }) => {
 
     return (
         <>
-            <ThemeRow label={t("config_page.theme.gradient.colors")} desc={t("config_page.theme.gradient.colors_desc")}>
+            <SettingRow label={t("config_page.theme.gradient.colors")} desc={t("config_page.theme.gradient.colors_desc")}>
                 <div className={styles.gradient_preview} style={{ "--gradient": gradientCss(gradient) }} />
                 <div className={styles.swatch_row}>
                     {gradient.colors.map((color, index) => (
@@ -195,7 +194,7 @@ const GradientRows = ({ theme, updateBackdrop }) => {
                         </button>
                     )
                 }
-            </ThemeRow>
+            </SettingRow>
             <SliderContainer
                 label={t("config_page.theme.gradient.angle")}
                 variable={gradient.angle}
@@ -239,7 +238,7 @@ const ImageRows = ({ theme, updateBackdrop }) => {
 
     return (
         <>
-            <ThemeRow label={t("config_page.theme.image.label")} desc={t("config_page.theme.image.desc")}>
+            <SettingRow label={t("config_page.theme.image.label")} desc={t("config_page.theme.image.desc")}>
                 {data_url
                     ? <span className={styles.image_thumb} style={{ backgroundImage: `url("${data_url}")` }} />
                     : <p className={styles.status_text}>{t("config_page.theme.image.none")}</p>
@@ -248,7 +247,7 @@ const ImageRows = ({ theme, updateBackdrop }) => {
                     {data_url ? t("config_page.theme.image.change") : t("config_page.theme.image.choose")}
                 </button>
                 <input ref={input_ref} type="file" accept={THEME_IMAGE_ACCEPT} className={styles.file_input} onChange={onFileChange} />
-            </ThemeRow>
+            </SettingRow>
             <SliderContainer
                 label={t("config_page.theme.image.strength")}
                 variable={image.strength}
@@ -308,7 +307,7 @@ const DetailsRows = ({ theme, update }) => {
 
     return (
         <>
-            <ThemeRow label={t("config_page.theme.details.label")} desc={t("config_page.theme.details.desc")}>
+            <SettingRow label={t("config_page.theme.details.label")} desc={t("config_page.theme.details.desc")}>
                 {has_overrides && (
                     <button type="button" className={styles.button_secondary} onClick={() => update((current) => ({ ...current, overrides: {} }))}>
                         {t("config_page.theme.details.reset_all")}
@@ -317,7 +316,7 @@ const DetailsRows = ({ theme, update }) => {
                 <button type="button" className={styles.button_secondary} onClick={() => setIsOpen((open) => !open)} aria-expanded={is_open}>
                     {is_open ? t("config_page.theme.details.hide") : t("config_page.theme.details.show")}
                 </button>
-            </ThemeRow>
+            </SettingRow>
             {is_open && (
                 <div className={styles.details}>
                     {groups.map((group) => (
@@ -350,11 +349,11 @@ const ShareRow = ({ theme }) => {
     const { is_copied, copyToClipboard } = useCopyToClipboard({ duration: 2000 });
 
     return (
-        <ThemeRow label={t("config_page.theme.share.label")} desc={t("config_page.theme.share.desc")}>
+        <SettingRow label={t("config_page.theme.share.label")} desc={t("config_page.theme.share.desc")}>
             <button type="button" className={styles.button} onClick={() => copyToClipboard(encodeShareCode(theme))}>
                 {is_copied ? t("config_page.theme.share.copied") : t("config_page.theme.share.copy")}
             </button>
-        </ThemeRow>
+        </SettingRow>
     );
 };
 
@@ -371,7 +370,7 @@ const DeleteRow = ({ theme }) => {
     }, [is_confirming]);
 
     return (
-        <ThemeRow label={t("config_page.theme.delete.label")} desc={t("config_page.theme.delete.desc")}>
+        <SettingRow label={t("config_page.theme.delete.label")} desc={t("config_page.theme.delete.desc")}>
             <button
                 type="button"
                 className={clsx(styles.button_danger, { [styles.is_confirming]: is_confirming })}
@@ -379,6 +378,6 @@ const DeleteRow = ({ theme }) => {
             >
                 {is_confirming ? t("config_page.theme.delete.confirm") : t("config_page.theme.delete.button")}
             </button>
-        </ThemeRow>
+        </SettingRow>
     );
 };

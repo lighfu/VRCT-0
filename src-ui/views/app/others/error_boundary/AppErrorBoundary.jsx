@@ -16,9 +16,8 @@ import {
 } from "@logics_common";
 import { CloseButton } from "@common_components";
 
+import { vrct0_issues_url } from "@ui_configs";
 import styles from "./AppErrorBoundary.module.scss";
-
-const VRCT_STATUS_URL = "https://misyaguziya.github.io/VRCT-Docs/docs/faq/#vrct-status";
 
 export const AppErrorBoundary = ({children}) => {
     const [errorInfo, setErrorInfo] = useState(null);
@@ -63,7 +62,7 @@ const ErrorContainer = ({error, errorInfo}) => {
             <div className={styles.drag_able_area} data-tauri-drag-region></div>
             <CloseButton variant="active_error" onClick={asyncCloseApp} />
             <div className={styles.wrapper}>
-                <p className={styles.error_message}>An error occurred. Please restart VRCT or contact the developers.</p>
+                <p className={styles.error_message}>An error occurred. Please restart VRCT-0. If it keeps happening, copy the error below and report it on the VRCT-0 GitHub Issues.</p>
                 <SafeActionButtons />
                 {error ?
                     <div className={styles.error_detail_container}>
@@ -141,8 +140,8 @@ const ActionButtons = () => {
                     {labels[status]}
                 </button>
             )}
-            <a className={styles.status_link_button} href={VRCT_STATUS_URL} target="_blank" rel="noreferrer">
-                <span>Check VRCT Status</span>
+            <a className={styles.status_link_button} href={vrct0_issues_url} target="_blank" rel="noreferrer">
+                <span>Check Known Issues</span>
                 <ExternalLinkSvg className={styles.external_link_svg} />
             </a>
         </div>

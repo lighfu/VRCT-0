@@ -63,11 +63,6 @@
     --dark_1000_color_aa: #151517aa;
     --dark_1000_color_dd: #151517dd;
 
-    /*sent_400_color + #000 10% = */
-    --supporters_color_fuwa: #5788a2;
-
-    --supporters_crown_color: #f0cb55;
-
     /* テーマの半透明 (ThemeController が値を入れる)。
        パネルは「パネルの不透明度」で透け、メイン画面・設定画面の地は
        半透明のときだけ透明になって、後ろの背景 (ThemeBackdrop) をそのまま見せる。 */

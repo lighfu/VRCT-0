@@ -258,9 +258,6 @@ mapping = {
 
     "/run/send_text_overlay": {"status": True, "variable":controller.sendTextOverlay},
 
-    "/get/data/telemetry" : {"status": True, "variable":controller.getTelemetry},
-    "/set/enable/telemetry" : {"status": True, "variable":controller.setEnableTelemetry},
-    "/set/disable/telemetry" : {"status": True, "variable":controller.setDisableTelemetry},
     "/run/shutdown": {"status": True, "variable":shutdownThenExit},
 
     "/run/swap_your_language_and_target_language": {"status": True, "variable":controller.swapYourLanguageAndTargetLanguage},
@@ -657,8 +654,8 @@ _ENDPOINT_LOCKED_MAX_RETRIES = 300  # 0.1s × 300 ≈ 30s (初期化完了を待
 # 最大20秒 [フェーズ3項目21] + mic/speaker 停止×2 + energy 停止×2 が
 # それぞれ最大15秒の join タイムアウトを持つため) が、フリーズ検知後は
 # グレースフルさより「必ず終わる」ことを優先する。この見積もりを超える
-# 場合でもプロセスは30秒で確実に終了するが、config保存やtelemetry送信
-# が間に合わない可能性がある。
+# 場合でもプロセスは30秒で確実に終了するが、config保存が間に合わない
+# 可能性がある。
 _WATCHDOG_GRACE_PERIOD_SEC = 30
 
 class Main:
@@ -836,7 +833,7 @@ class Main:
         Args:
             wait: maximum seconds to wait for threads to join.
         """
-        # Controller 経由でシャットダウン（model.shutdown() → telemetry.shutdown() が呼ばれる）
+        # Controller 経由でシャットダウンする (設定の保存もここで行う)
         try:
             self.controller.shutdown()
         except Exception:

@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@useI18n";
 import { useUiTheme, useNotificationStatus } from "@logics_common";
 import { PRESETS, selectedTheme, MAX_CUSTOM_THEMES } from "@logics/theme/theme_model.js";
-import { SectionLabelComponent } from "../_components";
+import { SectionLabelComponent, SettingRow } from "../_components";
 import { ThemeCard } from "./ThemeCard";
 import { ThemeEditor } from "./ThemeEditor";
-import { ThemeRow, useThemeName } from "./ThemeRow";
+import { useThemeName } from "./useThemeName";
 import styles from "./Theme.module.scss";
 
 // 設定の「テーマ」タブ。
@@ -76,11 +76,11 @@ const MakeFromPresetRow = ({ preset }) => {
     };
 
     return (
-        <ThemeRow label={t("config_page.theme.make_from_preset.label")} desc={t("config_page.theme.make_from_preset.desc")}>
+        <SettingRow label={t("config_page.theme.make_from_preset.label")} desc={t("config_page.theme.make_from_preset.desc")}>
             <button type="button" className={styles.button} onClick={onClick}>
                 {t("config_page.theme.make_from_preset.button")}
             </button>
-        </ThemeRow>
+        </SettingRow>
     );
 };
 
@@ -103,7 +103,7 @@ const ImportRow = () => {
     };
 
     return (
-        <ThemeRow label={t("config_page.theme.import.label")} desc={t("config_page.theme.import.desc")}>
+        <SettingRow label={t("config_page.theme.import.label")} desc={t("config_page.theme.import.desc")}>
             <input
                 className={styles.text_input}
                 value={code}
@@ -117,6 +117,6 @@ const ImportRow = () => {
             <button type="button" className={styles.button} onClick={onImport} disabled={!code.trim()}>
                 {t("config_page.theme.import.button")}
             </button>
-        </ThemeRow>
+        </SettingRow>
     );
 };

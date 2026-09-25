@@ -16,3 +16,4 @@ export { DownloadModels } from "./download_models/DownloadModels";
 export { MessageFormat } from "./message_format/MessageFormat";
 export { ConnectionCheckButton } from "./connection_check_button/ConnectionCheckButton";
 export { CudaPack } from "./cuda_pack/CudaPack";
+export { SettingRow } from "./setting_row/SettingRow";

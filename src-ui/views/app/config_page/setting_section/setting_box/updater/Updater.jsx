@@ -4,12 +4,12 @@ import styles from "./Updater.module.scss";
 
 import { useAppUpdate, useSoftwareVersion, useWindow } from "@logics_common";
 import { useUpdater } from "@logics_configs";
+import { vrct0_releases_url } from "@ui_configs";
 import { SectionLabelComponent, LabelComponent, RadioButton } from "../_components";
 
 import CheckMarkSvg from "@images/check_mark.svg?react";
 import RefreshSvg from "@images/refresh.svg?react";
 
-const RELEASES_URL = "https://github.com/lighfu/VRCT-0/releases";
 
 const formatSize = (bytes) => {
     if (!bytes) return "";
@@ -138,7 +138,7 @@ const UpdateStatus = ({ update, current_version, channel, onClickDownload, onCli
                             size: formatSize(update.size_bytes),
                         })}
                     </p>
-                    <a className={styles.notes_link} href={`${RELEASES_URL}/tag/v${update.version}`} target="_blank" rel="noreferrer">
+                    <a className={styles.notes_link} href={`${vrct0_releases_url}/tag/v${update.version}`} target="_blank" rel="noreferrer">
                         {t("update_modal.release_notes")}
                     </a>
                     <button className={styles.install_button} onClick={onClickDownload}>

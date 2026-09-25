@@ -21,7 +21,7 @@ common_error:
     failed_download_weight_ctranslate2: "CTranslate2 模型下載失敗。"
     failed_download_weight_whisper: "Whisper 模型下載失敗。"
     failed_download_weight_sensevoice: "SenseVoice 模型下載失敗。"
-    sensevoice_runtime_unavailable: "無法載入 SenseVoice 引擎 (sherpa-onnx)。請嘗試重新安裝 VRCT，或安裝 Microsoft Visual C++ 可轉散發套件。"
+    sensevoice_runtime_unavailable: "無法載入 SenseVoice 引擎 (sherpa-onnx)。請嘗試重新安裝 VRCT-0，或安裝 Microsoft Visual C++ 可轉散發套件。"
     sensevoice_language_unsupported: "SenseVoice 無法辨識所選語言，因此不會進行轉寫。SenseVoice 僅支援日語、英語、中文、粵語、韓語。"
     failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "已達到翻譯引擎使用限制或臨時受到使用限制。"
@@ -145,6 +145,7 @@ config_page:
         device: "裝置"
         appearance: "外觀"
         theme: "主題"
+        about: "關於 VRCT-0"
         translation: "翻譯"
         transcription: "語音辨識"
         others: "其他"
@@ -288,6 +289,33 @@ config_page:
             desc: "刪除此主題並回到標準主題。"
             button: "刪除此主題"
             confirm: "再按一次即刪除"
+
+    about:
+        lead: "VRCT-0 是以 VRCT 為基礎製作的非官方衍生版，與原版 VRCT 的開發團隊分開開發。"
+        report:
+            label: "問題回報・建議"
+            desc: "請在 VRCT-0 的 GitHub Issues 回報。請不要向原版 VRCT 的開發團隊詢問 VRCT-0 的問題。"
+            button: "開啟 Issues"
+        guide:
+            label: "使用方式"
+            desc: "安裝方式與主要功能整理在 README 中。"
+            button: "開啟 README"
+        releases:
+            label: "更新紀錄"
+            desc: "以往的版本與變更內容。"
+            button: "開啟發布頁面"
+        original:
+            label: "原版 VRCT"
+            credit: "VRCT-0 以 misyaguziya 為主開發的 VRCT 為基礎。感謝 VRCT 的各位開發者與協助者。"
+            page_label: "原版 VRCT 頁面"
+            page_desc: "原版 VRCT 的開發者・協助者介紹與支持方式在這裡。"
+            button: "開啟原版 VRCT"
+        license:
+            label: "授權條款"
+            desc: "VRCT-0 與原版 VRCT 相同，以 MIT License 發布。"
+            show: "顯示"
+            hide: "收合"
+        vrchat_disclaimer: "VRCT-0 未得到 VRChat 的認可，也不反映 VRChat 或正式參與製作或管理 VRChat 財產的任何人的觀點或意見。VRChat 和所有相關財產均為 VRChat Inc. 的商標或註冊商標。VRChat © VRChat Inc."
 
     translation:
         ctranslate2_weight_type:
@@ -438,7 +466,7 @@ config_page:
             desc: "自動將對話訊息匯出為文字文件。"
         vrc_mic_mute_sync:
             label: "VRC 麥克風靜音同步"
-            desc: "當 VRChat 的麥克風靜音時，VRCT 將不會向 VRChat 發送訊息。\n*存在一些延遲且不支援按鍵發話 (PTT)。"
+            desc: "當 VRChat 的麥克風靜音時，VRCT-0 將不會向 VRChat 發送訊息。\n*存在一些延遲且不支援按鍵發話 (PTT)。"
         send_message_to_vrc:
             label: "發送訊息到 VRChat"
             desc: "當你打算向 VRChat 發送訊息時啟用此功能。"
@@ -480,10 +508,6 @@ config_page:
             desc: "\"full\" gives more accurate readings for names, places and newer words. It needs a one-time download (about 127MB, about 360MB after extraction)."
             core: "Standard"
             full: "full (more accurate)"
-        telemetry:
-            label:
-            desc:
-            aptabase_privacy_policy_label:
 
     ocr:
         section_title: "VRChat 聊天讀取"
@@ -516,7 +540,7 @@ config_page:
         error_in_use: "「{{action_name}}」的快捷鍵（{{hotkey}}）已在其他位置使用，無法註冊。"
         error_failed_to_register_at_launch: "「{{action_name}}」的快捷鍵（{{hotkey}}）正被其他應用程式使用，無法啟用。"
         toggle_vrct_visibility:
-            label: "切換 VRCT 最小化/啟動"
+            label: "切換 VRCT-0 最小化/啟動"
         toggle_translation:
             label: "切換「{{translation}}」開/關"
         toggle_transcription_send:

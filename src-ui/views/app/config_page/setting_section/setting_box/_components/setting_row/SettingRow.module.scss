@@ -1,0 +1,23 @@
+// Templates.module.scss の行と同じ見た目。
+.row {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2rem;
+    gap: 2rem;
+    border-bottom: 0.1rem solid var(--dark_800_color);
+
+    &.column {
+        flex-direction: column;
+        align-items: start;
+    }
+}
+
+.row_controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.2rem;
+}

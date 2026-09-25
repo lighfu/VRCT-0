@@ -56,9 +56,6 @@ export const Others = () => {
                 <ConvertMessageToHiraganaContainer />
                 <SudachiDictTypeContainer />
             </div>
-            <div>
-                <TelemetryContainer />
-            </div>
         </div>
     );
 };
@@ -285,22 +282,6 @@ const SudachiDictTypeContainer = () => {
             checked_variable={currentSelectedSudachiDictType}
             selectFunction={setSelectedSudachiDictType}
             downloadStartFunction={downloadStartFunction}
-        />
-    );
-};
-
-const TelemetryContainer = () => {
-    const { t } = useI18n();
-    const { currentTelemetry, toggleTelemetry } = useOthers();
-
-    return (
-        <CheckboxContainer
-            label={t("config_page.others.telemetry.label")}
-            webpage_url="https://aptabase.com/legal/privacy"
-            open_webpage_label={t("config_page.others.telemetry.aptabase_privacy_policy_label")}
-            desc={t("config_page.others.telemetry.desc")}
-            variable={currentTelemetry}
-            toggleFunction={toggleTelemetry}
         />
     );
 };

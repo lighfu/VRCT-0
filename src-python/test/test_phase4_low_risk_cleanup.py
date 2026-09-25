@@ -1,9 +1,8 @@
 """バックエンドレビュー フェーズ4項目32(小粒4件)のテスト。
 
 対象の欠陥:
-  1. Telemetry._start_event_loop() の `while self._loop is None: pass` が
-     ビジースピンで、asyncio.new_event_loop() が失敗すると CPU 1コアを
-     100%使って無限に回り続けた。
+  1. (Telemetry._start_event_loop() のビジースピン。VRCT-0 はテレメトリを
+     外したのでテストも消した)
   2. Model.startWebSocketServer()/stopWebSocketServer() が check-then-set
      (TOCTOU) で無ロックだった。2本の別エンドポイント
      (/set/enable/websocket_server と /set/enable/obs_browser_source) が
@@ -28,44 +27,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from model import Model, threadFnc
-
-
-class TelemetryEventLoopStartupTests(unittest.TestCase):
-    """models/telemetry/__init__.py の Telemetry._start_event_loop()。"""
-
-    def setUp(self) -> None:
-        from models.telemetry import Telemetry
-
-        Telemetry._instance = None
-        self.telemetry = Telemetry()
-        self.addCleanup(self._cleanup_loop)
-
-    def _cleanup_loop(self) -> None:
-        try:
-            self.telemetry._stop_event_loop(timeout=2.0)
-        except Exception:
-            pass
-
-    def test_start_event_loop_sets_loop_promptly_on_success(self) -> None:
-        start = time.monotonic()
-        self.telemetry._start_event_loop()
-        elapsed = time.monotonic() - start
-
-        self.assertIsNotNone(self.telemetry._loop)
-        self.assertLess(elapsed, 2.0)
-
-    def test_gives_up_promptly_without_hanging_when_loop_creation_fails(self) -> None:
-        with patch("asyncio.new_event_loop", side_effect=RuntimeError("boom")), \
-             patch("models.telemetry._EVENT_LOOP_READY_TIMEOUT_SEC", 0.2):
-            start = time.monotonic()
-            self.telemetry._start_event_loop()
-            elapsed = time.monotonic() - start
-
-        self.assertLess(
-            elapsed, 2.0,
-            "タイムアウトを超えて長時間ブロック(ビジースピン含む)してはいけない",
-        )
-        self.assertIsNone(self.telemetry._loop)
 
 
 class WebSocketServerLifecycleLockTests(unittest.TestCase):

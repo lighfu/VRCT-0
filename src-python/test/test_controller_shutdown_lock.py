@@ -172,7 +172,6 @@ class ShutdownStopsOscWebsocketObsOverlayTests(unittest.TestCase):
     def test_shutdown_stops_all_services_in_dependency_order(
         self, mock_config, mock_model, mock_device_manager
     ) -> None:
-        mock_model.telemetryShutdown.return_value = None
         self.controller.shutdown()
 
         stopped_fns = [call[0] for call in self.serviced_calls]
@@ -217,7 +216,6 @@ class ShutdownStopsOscWebsocketObsOverlayTests(unittest.TestCase):
         以上生き残ると「正常終了なのに freeze_trace.log へフリーズダンプが
         出る」という偽陽性になり、フリーズ調査の一次情報源が汚れる。
         """
-        mock_model.telemetryShutdown.return_value = None
         self.controller.shutdown()
 
         self.assertIn(
@@ -246,7 +244,6 @@ class ShutdownUsesLockedStopHelpersTests(unittest.TestCase):
     def test_shutdown_routes_all_four_stops_through_the_lock_helper(
         self, mock_config, mock_model, mock_device_manager
     ) -> None:
-        mock_model.telemetryShutdown.return_value = None
         result = self.controller.shutdown()
 
         self.assertEqual(
@@ -265,7 +262,6 @@ class ShutdownUsesLockedStopHelpersTests(unittest.TestCase):
         mic/speaker_lifecycle_worker.stop() の呼び出しが将来の変更で
         消えても(項目21が直そうとした「shutdown()がworkerを一切止め
         ない」バグの再発)、他のテストは何も気づけない状態だった。"""
-        mock_model.telemetryShutdown.return_value = None
         self.controller.shutdown()
 
         mock_model.mic_lifecycle_worker.stop.assert_called_once()

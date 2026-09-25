@@ -17,10 +17,9 @@ import DiscoverTuneSvg from "@images/mui_discover_tune.svg?react";
 import KeyboardAltSvg from "@images/mui_keyboard_alt.svg?react";
 import CodeBlocksSvg from "@images/mui_code_blocks.svg?react";
 import RefreshSvg from "@images/refresh.svg?react";
-import CrownSvg from "@images/mui_crown.svg?react";
 import ChatTranscribeSvg from "@images/chat_transcribe.svg?react";
 
-import chat_white_square from "@images/chato_white_square.png";
+import InfoSvg from "@images/info_circle.svg?react";
 
 import { VersionLabel } from "../version_label/VersionLabel.jsx";
 
@@ -56,8 +55,7 @@ export const SidebarSection = () => {
                         <Tab tab_id="updater" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
                     </div>
                     <div className={styles.separated_tabs_wrapper}>
-                        <Tab tab_id="supporters" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
-                        <Tab tab_id="about_vrct" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
+                        <Tab tab_id="about" isSmall={currentIsBreakPoint.data} isHovered={isHovered} />
                     </div>
                 </div>
                 <VersionLabel isCompact={isCompact} />
@@ -79,8 +77,7 @@ const TabIcon = ({ tab_id, className }) => {
         case "hotkeys": return <KeyboardAltSvg className={clsx(className, styles.mui_icon)} />;
         case "advanced_settings": return <CodeBlocksSvg className={clsx(className, styles.mui_icon)} />;
         case "updater": return <RefreshSvg className={clsx(className, styles.updater_icon)} />;
-        case "supporters": return <CrownSvg className={clsx(className, styles.mui_icon, styles.supporters_icon)} />;
-        case "about_vrct": return <img src={chat_white_square} className={clsx(className, styles.about_vrct_icon)} />;
+        case "about": return <InfoSvg className={clsx(className, styles.mui_icon)} />;
         default: return null;
     }
 };
@@ -104,8 +101,6 @@ const Tab = (props) => {
 
     const getLabel = () => {
         if (props.tab_id === "vr") return "VR";
-        if (props.tab_id === "supporters") return "Supporters";
-        if (props.tab_id === "about_vrct") return "About VRCT";
         return t(`config_page.side_menu_labels.${props.tab_id}`);
     };
 

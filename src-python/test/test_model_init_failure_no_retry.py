@@ -7,7 +7,7 @@
 スレッドを start する (`model.py` の `AudioLifecycleWorker.__init__`)。
 
 したがって後半 (`Translator()` / `Overlay()` / `OverlayImage()` /
-`Clipboard()` / `Telemetry()` など) で例外が出ると:
+`Clipboard()` など) で例外が出ると:
 
 1. `_inited` は False のまま
 2. `Controller._bootstrapModel()` は例外を握りつぶして続行

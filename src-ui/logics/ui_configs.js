@@ -119,26 +119,16 @@ export const openrouter_auth_key_url = "https://openrouter.ai/keys";
 
 
 
-export const vrct_document_home_url = "https://misyaguziya.github.io/VRCT-Docs";
-export const vrct_document_url_chunk_faq = "docs/faq";
-export const vrct_document_url_chunk_ui_guide = "docs/ui-guide";
+// VRCT-0 の案内先。VRCT-0 の不具合の報告が元の VRCT の開発チームへ行かないよう、
+// 画面からは元の VRCT のドキュメントや問い合わせ先を開かない (元の VRCT のページは
+// 「VRCT-0 について」のクレジットからだけ開ける)。
+export const vrct0_repository_url = "https://github.com/lighfu/VRCT-0";
+export const vrct0_issues_url = `${vrct0_repository_url}/issues`;
+export const vrct0_releases_url = `${vrct0_repository_url}/releases`;
+export const original_vrct_url = "https://github.com/misyaguziya/VRCT";
 
-export const generateLocalizedDocumentUrl = (lang_code = "en") => {
-    const supported_languages = ["en", "ja"];
-
-    if (supported_languages.includes(lang_code) === false) {
-        lang_code = "en";
-    }
-
-    const lang_path = (lang_code === "en") ? "" : `${lang_code}`;
-
-    return {
-        vrct_document_home_url: `${vrct_document_home_url}/${lang_path}`,
-        vrct_document_faq_url: `${vrct_document_home_url}/${lang_path}/${vrct_document_url_chunk_faq}`,
-        vrct_document_ui_guide_url: `${vrct_document_home_url}/${lang_path}/${vrct_document_url_chunk_ui_guide}`,
-    };
-};
-
-
-export const supporters_data_url = "https://shiinasakamoto.github.io/vrct_supporters/assets/supporters/data.json";
-export const supporters_images_url = "https://ShiinaSakamoto.github.io/vrct_supporters/assets/supporters";
+// 画面の言語の README。無い言語はリポジトリの先頭の README (英語) にする。
+const README_LANGUAGES = ["ja", "ko", "zh-Hant"];
+export const vrct0ReadmeUrl = (lang_code) => (README_LANGUAGES.includes(lang_code)
+    ? `${vrct0_repository_url}/blob/HEAD/docs/readmes/README.${lang_code}.md`
+    : `${vrct0_repository_url}#readme`);

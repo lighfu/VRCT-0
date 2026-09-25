@@ -57,7 +57,6 @@ from models.clipboard.clipboard import Clipboard
 from models.ocr import OcrPipeline, ocr_engine_rapidocr
 from models.ocr.ocr_languages import SELECTABLE_LANGUAGES as OCR_SELECTABLE_LANGUAGES, isSupported as isSupportedOcrLanguage
 from models import cuda_pack
-from models.telemetry import Telemetry
 from utils import errorLogging, errorLog, setupLogger, printLog
 from errors import AudioPipelineError, AudioPipelineFailure, ERROR_METADATA, ErrorCode
 
@@ -894,7 +893,7 @@ class Model:
 
         # 「成功が証明されるまで失敗扱い」にしておく。init() は途中で
         # AudioLifecycleWorker (コンストラクタが即 daemon thread を起動する)
-        # や Clipboard / Telemetry を生成するため、後半で例外が出たときに
+        # や Clipboard を生成するため、後半で例外が出たときに
         # 再実行を許すと、そのたびに新しいスレッドが生成され、前回分は
         # 誰からも参照されないまま生き残る。ensure_initialized() は
         # 例外を握りつぶして続行するので、public メソッドが呼ばれるたびに
@@ -975,7 +974,6 @@ class Model:
         self.obs_browser_source_server = None
         self.clipboard = Clipboard()
         self.ocr_pipeline: Optional[OcrPipeline] = None
-        self.telemetry = Telemetry()
 
         self._inited = True
         self._init_failed = False
@@ -2392,32 +2390,4 @@ class Model:
             errorLogging()
             return False
 
-    def telemetryInit(self, enabled: bool, app_version: str, storage_path: str = None):
-        """Model 内で Telemetry を初期化"""
-        if storage_path is None:
-            try:
-                storage_path = os_path.join(config.PATH_DATA, "telemetry_state.json")
-            except Exception:
-                storage_path = None
-        self.telemetry.init(enabled=enabled, app_version=app_version, storage_path=storage_path)
-
-    def telemetryShutdown(self):
-        """Model cleanup on application shutdown."""
-        if hasattr(self, "telemetry") and self.telemetry:
-            self.telemetry.shutdown()
-
-    def telemetryTrackError(self, error_code: str):
-        """エラーコードのテレメトリ送信 (Model ラッパー)。日次デデュープ済み。"""
-        if hasattr(self, "telemetry") and self.telemetry:
-            self.telemetry.track_error(error_code)
-
-    def telemetryTouchActivity(self):
-        """テレメトリアクティビティ更新 (Model ラッパー)"""
-        if hasattr(self, "telemetry") and self.telemetry:
-            self.telemetry.touch_activity()
-
 model = Model()
-
-# エラー生成時にテレメトリへ通知するフックを登録する（日次デデュープ済み）
-from errors import register_error_report_hook  # noqa: E402
-register_error_report_hook(model.telemetryTrackError)

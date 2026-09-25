@@ -21,7 +21,7 @@ common_error:
     failed_download_weight_ctranslate2: "CTranslate2 モデルのダウンロードに失敗しました。"
     failed_download_weight_whisper: "Whisper モデルのダウンロードに失敗しました。"
     failed_download_weight_sensevoice: "SenseVoice モデルのダウンロードに失敗しました。"
-    sensevoice_runtime_unavailable: "SenseVoice のエンジン (sherpa-onnx) を読み込めませんでした。VRCT の再インストールか、Microsoft Visual C++ 再頒布可能パッケージのインストールを試してください。"
+    sensevoice_runtime_unavailable: "SenseVoice のエンジン (sherpa-onnx) を読み込めませんでした。VRCT-0 の再インストールか、Microsoft Visual C++ 再頒布可能パッケージのインストールを試してください。"
     sensevoice_language_unsupported: "選んでいる言語は SenseVoice では認識できないため、文字起こしされません。SenseVoice が対応しているのは日本語・英語・中国語・広東語・韓国語だけです。"
     failed_download_sudachi_dict: "読みがな用の辞書のダウンロードに失敗しました。"
     translation_limit: "翻訳エンジンの使用制限に達したか、一時的に利用制限がかけられています。"
@@ -145,6 +145,7 @@ config_page:
         device: "デバイス"
         appearance: "デザイン"
         theme: "テーマ"
+        about: "VRCT-0 について"
         translation: "翻訳"
         transcription: "音声認識"
         others: "その他"
@@ -288,6 +289,33 @@ config_page:
             desc: "このテーマを消して、標準のテーマに戻します。"
             button: "このテーマを消す"
             confirm: "もう一度押すと消えます"
+
+    about:
+        lead: "VRCT-0 は、VRCT をもとに作った非公式の派生版です。元の VRCT の開発チームとは別に開発しています。"
+        report:
+            label: "不具合の報告・要望"
+            desc: "VRCT-0 の GitHub の Issues で受け付けています。VRCT-0 の不具合を、元の VRCT の開発チームに問い合わせないでください。"
+            button: "Issues を開く"
+        guide:
+            label: "使い方"
+            desc: "導入の仕方と主な機能を README にまとめています。"
+            button: "README を開く"
+        releases:
+            label: "更新履歴"
+            desc: "これまでの版と変更点です。"
+            button: "リリースを開く"
+        original:
+            label: "元の VRCT"
+            credit: "VRCT-0 は、みしゃ（misyaguziya）さんが中心になって開発している VRCT をもとにしています。VRCT の開発者と協力者のみなさんに感謝します。"
+            page_label: "元の VRCT のページ"
+            page_desc: "元の VRCT の開発者・協力者の紹介や、支援の案内はこちらです。"
+            button: "元の VRCT を開く"
+        license:
+            label: "ライセンス"
+            desc: "VRCT-0 は、元の VRCT と同じ MIT License で配布しています。"
+            show: "表示する"
+            hide: "閉じる"
+        vrchat_disclaimer: "VRCT-0 は VRChat によって承認されておらず、VRChat または VRChat の開発もしくは管理に公式に関与する者の見解や意見が反映されたものではありません。VRChat および関連するすべての財産は米国 VRChat, Inc. の商標または登録商標です。"
 
     translation:
         ctranslate2_weight_type:
@@ -486,10 +514,6 @@ config_page:
             desc: "「full」は人名・地名・新しい言葉の読みがより正確になります。初回だけダウンロード（約127MB、展開後は約360MB）が必要です。"
             core: "標準"
             full: "full（高精度）"
-        telemetry:
-            label: "製品の改善に協力する"
-            desc: "開発者が「みんな使ってくれてるんだな～」ってにやにやしながら機能改善するための使用状況データを送信します。\n※会話内容など個人情報は一切送信しません。"
-            aptabase_privacy_policy_label: "Aptabase プライバシーポリシー"
 
     ocr:
         section_title: "VRChatチャット読み取り"
@@ -522,7 +546,7 @@ config_page:
         error_in_use: "「{{action_name}}」のホットキー（{{hotkey}}）は他で使用されているため登録できません。"
         error_failed_to_register_at_launch: "「{{action_name}}」のホットキー（{{hotkey}}）は他のアプリケーションで使用されているため利用できません。"
         toggle_vrct_visibility:
-            label: "VRCTの最小化/アクティブ化の切り替え"
+            label: "VRCT-0 の最小化/アクティブ化の切り替え"
         toggle_translation:
             label: "「{{translation}}」 オン/オフの切り替え"
         toggle_transcription_send:

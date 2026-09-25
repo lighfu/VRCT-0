@@ -1,6 +1,7 @@
 import { useStore_IsVrctAvailable } from "@store";
 import { useNotificationStatus } from "@logics_common";
 import { HomepageLinkButton } from "@common_components";
+import { vrct0_issues_url } from "@ui_configs";
 
 export const useIsVrctAvailable = () => {
     const { currentIsVrctAvailable, updateIsVrctAvailable } = useStore_IsVrctAvailable();
@@ -12,11 +13,9 @@ export const useIsVrctAvailable = () => {
             const ErrorComponent = () => {
                 return (
                     <div>
-                        <p>AI models have not been detected. Check the network connection and restart VRCT (it will download automatically, normally).</p>
-                        <p>If this error occurs frequently, try the following:</p>
-                        <HomepageLinkButton
-                            homepage_link="https://github.com/misyaguziya/VRCT/wiki/Manual-Installation-of-AI-Model-Weights"
-                        />
+                        <p>AI models have not been detected. Check the network connection and restart VRCT-0 (they are normally downloaded automatically).</p>
+                        <p>If this error keeps happening, report it here:</p>
+                        <HomepageLinkButton homepage_link={vrct0_issues_url} />
                     </div>
                 );
             };

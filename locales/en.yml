@@ -21,7 +21,7 @@ common_error:
     failed_download_weight_ctranslate2: "CTranslate2 weight download error."
     failed_download_weight_whisper: "Whisper weight download error."
     failed_download_weight_sensevoice: "SenseVoice model download error."
-    sensevoice_runtime_unavailable: "Could not load the SenseVoice engine (sherpa-onnx). Try reinstalling VRCT or installing the Microsoft Visual C++ Redistributable."
+    sensevoice_runtime_unavailable: "Could not load the SenseVoice engine (sherpa-onnx). Try reinstalling VRCT-0 or installing the Microsoft Visual C++ Redistributable."
     sensevoice_language_unsupported: "SenseVoice cannot recognize your selected language, so nothing will be transcribed. It only supports Japanese, English, Chinese, Cantonese and Korean."
     failed_download_sudachi_dict: "Failed to download the reading dictionary."
     translation_limit: "Translation engine limit reached or temporarily restricted."
@@ -145,6 +145,7 @@ config_page:
         device: "Device"
         appearance: "Appearance"
         theme: "Theme"
+        about: "About VRCT-0"
         translation: "Translation"
         transcription: "Transcription"
         others: "Other"
@@ -288,6 +289,33 @@ config_page:
             desc: "Delete this theme and go back to the standard theme."
             button: "Delete this theme"
             confirm: "Press again to delete"
+
+    about:
+        lead: "VRCT-0 is an unofficial fork of VRCT. It is developed separately from the original VRCT team."
+        report:
+            label: "Bug reports and requests"
+            desc: "Please report VRCT-0 bugs on the VRCT-0 GitHub Issues. Don't contact the original VRCT team about VRCT-0 problems."
+            button: "Open Issues"
+        guide:
+            label: "How to use"
+            desc: "Installation and the main features are described in the README."
+            button: "Open README"
+        releases:
+            label: "Release notes"
+            desc: "Past versions and what changed."
+            button: "Open releases"
+        original:
+            label: "Original VRCT"
+            credit: "VRCT-0 is based on VRCT, developed mainly by misyaguziya. Thanks to everyone who develops and contributes to VRCT."
+            page_label: "Original VRCT page"
+            page_desc: "The original VRCT's developers, contributors, and ways to support them."
+            button: "Open original VRCT"
+        license:
+            label: "License"
+            desc: "VRCT-0 is distributed under the MIT License, the same as the original VRCT."
+            show: "Show"
+            hide: "Hide"
+        vrchat_disclaimer: "VRCT-0 is not endorsed by VRChat and does not reflect the views or opinions of VRChat or anyone officially involved in producing or managing VRChat properties. VRChat and all associated properties are trademarks or registered trademarks of VRChat Inc. VRChat © VRChat Inc."
 
     translation:
         ctranslate2_weight_type:
@@ -444,7 +472,7 @@ config_page:
             desc: "Automatically saves the conversation messages as text files."
         vrc_mic_mute_sync:
             label: "VRC Mic Mute Sync"
-            desc: "Messages will not be sent to VRCT while VRChat's mic is muted.\n*There may be a slight delay. Push-To-Talk is not supported."
+            desc: "Messages will not be sent to VRChat while VRChat's mic is muted.\n*There may be a slight delay. Push-To-Talk is not supported."
         send_message_to_vrc:
             label: "Send Message To VRChat"
             desc: "This feature is not supported, but there is a way to use it without sending messages to VRChat. Make sure to enable this feature when you wish to send messages to VRChat."
@@ -486,10 +514,6 @@ config_page:
             desc: "\"full\" gives more accurate readings for names, places and newer words. It needs a one-time download (about 127MB, about 360MB after extraction)."
             core: "Standard"
             full: "full (more accurate)"
-        telemetry:
-            label: "Support Our Development"
-            desc: "Sends usage data so our developers can grin and say 'Thanks for using it!' while improving the app.\n* No personal info or conversation content is ever sent."
-            aptabase_privacy_policy_label: "Aptabase Privacy Policy"
 
     ocr:
         section_title: "VRChat Chat Transcribe"
@@ -522,7 +546,7 @@ config_page:
         error_in_use: "The hotkey ({{hotkey}}) for \"{{action_name}}\" cannot be registered because it is already in use elsewhere."
         error_failed_to_register_at_launch: "The hotkey ({{hotkey}}) for \"{{action_name}}\" is unavailable because it is in use by another application."
         toggle_vrct_visibility:
-            label: "Toggle VRCT visibility"
+            label: "Toggle VRCT-0 visibility"
         toggle_translation:
             label: "Toggle {{translation}}"
         toggle_transcription_send:

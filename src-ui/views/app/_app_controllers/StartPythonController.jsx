@@ -90,7 +90,7 @@ const useStartPython = () => {
                 return;
             }
             showNotification_Error(
-                `An error occurred. Please restart VRCT or contact the developers. The last line:${JSON.stringify(line)}`, { hide_duration: null }
+                `An error occurred. Please restart VRCT-0. If it keeps happening, report it on the VRCT-0 GitHub Issues. The last line:${JSON.stringify(line)}`, { hide_duration: null }
             );
             console.error("stderr", line);
         });

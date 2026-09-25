@@ -11,37 +11,7 @@
 
 [![GitHub release](https://img.shields.io/github/v/release/lighfu/VRCT-0.svg)](https://github.com/lighfu/VRCT-0/releases)
 [![Downloads](https://img.shields.io/github/downloads/lighfu/VRCT-0/total)](https://github.com/lighfu/VRCT-0/releases)
-[![Licence](https://img.shields.io/github/license/misyaguziya/VRCT)](https://github.com/misyaguziya/VRCT/blob/master/LICENSE)
-[![Booth](https://img.shields.io/badge/Store-Booth.pm-red)](https://misyaguziya.booth.pm/items/5155325)
-[![Github Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-30363D?&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/misyaguziya)
-
-<h3>
-Become a VRCT Supporter on:
-</h3>
-
-<a href="https://vrct-dev.fanbox.cc">
-    <picture>
-        <source srcset="/docs/img/pixiv_fanbox_white.png" media="(prefers-color-scheme: dark)" height="18px">
-        <source srcset="/docs/img/pixiv_fanbox_black.png" media="(prefers-color-scheme: light)" height="18px">
-        <img src="/docs/img/pixiv_fanbox_black.png" alt="PIXIV FANBOX" height="18px">
-    </picture>
-</a>&emsp;&nbsp;
-
-<a href="https://patreon.com/vrct_dev">
-    <picture>
-        <source srcset="/docs/img/patreon_logo_white.png" media="(prefers-color-scheme: dark)" height="22px">
-        <source srcset="/docs/img/patreon_logo_black.png" media="(prefers-color-scheme: light)" height="22px">
-        <img src="/docs/img/patreon_logo_black.png" alt="Patreon" height="22px">
-    </picture>
-</a>&emsp;&nbsp;
-
-<br>
-
-<picture>
-    <source srcset="/docs/img/supporter_section_border_d.png" media="(prefers-color-scheme: dark)">
-    <source srcset="/docs/img/supporter_section_border_l.png" media="(prefers-color-scheme: light)">
-    <img src="/docs/img/supporter_section_border_d.png" alt="Supporter Section Border">
-</picture>
+[![Licence](https://img.shields.io/github/license/lighfu/VRCT-0)](https://github.com/lighfu/VRCT-0/blob/HEAD/LICENSE)
 
 <br>
 <br>
@@ -49,59 +19,58 @@ Become a VRCT Supporter on:
 | **English** | [日本語](/docs/readmes/README.ja.md) | [한국어](/docs/readmes/README.ko.md) | [繁體中文](/docs/readmes/README.zh-Hant.md) |
 
 <h3>
-VRCT is software that supports VRChat conversations with translation and transcription.
+VRCT-0 is software that supports VRChat conversations with translation and transcription.
 </h3>
 
 ![](/docs/img/main_window.png)
 
 <div align="left">
 
+> [!IMPORTANT]
+> VRCT-0 is an **unofficial fork** of [VRCT](https://github.com/misyaguziya/VRCT), developed separately from the original VRCT team.
+> Please report VRCT-0 bugs and requests on the [VRCT-0 Issues](https://github.com/lighfu/VRCT-0/issues). Don't contact the original VRCT team about VRCT-0 problems.
+
 # Download & Install
-Download from anywhere you like.
-- [Github.com](https://github.com/lighfu/VRCT-0/releases/)
-- [BOOTH.pm](https://misyaguziya.booth.pm/items/5155325)
+Download `VRCT-0-win-Setup.exe` from the [GitHub releases](https://github.com/lighfu/VRCT-0/releases/) and run it.
+It installs as a separate app from the original VRCT, so you can use both side by side.
 
-Just download and run the exe.
-
-# What is VRCT?
-VRCT is software that supports conversations between people who speak different languages by providing chat or voice translation.
+# What is VRCT-0?
+VRCT-0 is software that supports conversations between people who speak different languages by providing chat or voice translation.
 These features are designed for use within VRChat.
 *Although not supported, it is also used for other purposes such as watching movies.
 
-VRCT supports your conversations with
+VRCT-0 supports your conversations with
 - 💬 **Send chat to VRChat**
 - 🌐 **Translation**
 - 🎙 **Transcription of audio from microphone**
 - 🔈 **Transcription of audio from Speaker**
 
 # Documents
-Initial setup, basic functions, and other features are also described.
-- [Documents Link](https://misyaguziya.github.io/VRCT-Docs/)
+Most screens and controls are the same as the original VRCT, so its documents and video are also helpful.
+Please report VRCT-0 bugs on the Issues above, not to the original VRCT.
+- [Original VRCT documents](https://misyaguziya.github.io/VRCT-Docs/)
 
-# How to Use (YouTube)
+# Original VRCT introduction video (YouTube)
 <div align="center">
 
 [![](https://img.youtube.com/vi/rUTad037n8Q/0.jpg)](https://www.youtube.com/watch?v=rUTad037n8Q)
 
 <div align="left">
 
-## Author
+## Telemetry
+VRCT-0 does not send any telemetry.
+
+## Original VRCT authors
 - [みしゃ(misyaguzi)](https://github.com/misyaguziya) (Main Development)
 - [しいな(Shiina_12siy)](https://twitter.com/Shiina_12siy) (UI/UX, UI multilingual support)
 - [レラ](https://github.com/soumt-r) (Technical Advisor)
 - [どね](https://twitter.com/done_vrc) (Logo Design)
 
-## Telemetry
-
-VRCT collects anonymous telemetry data via [Aptabase](https://aptabase.com) to help improve the app. The collected data includes app starts, session duration, and feature usage. No personally identifiable information is collected.
-
-You can opt out of telemetry in the app settings at any time. See the [Aptabase Privacy Policy](https://aptabase.com/legal/privacy) for more details.
-
-## Thanks to our contributors
+## Original VRCT contributors
 <a href="https://github.com/misyaguziya/VRCT/graphs/contributors" target="_blank">
   <img src="https://contrib.rocks/image?repo=misyaguziya/VRCT" />
 </a>
 
 ---
 
-VRCT is not endorsed by VRChat and does not reflect the views or opinions of VRChat or anyone officially involved in producing or managing VRChat properties. VRChat and all associated properties are trademarks or registered trademarks of VRChat Inc. VRChat © VRChat Inc.
+VRCT-0 is not endorsed by VRChat and does not reflect the views or opinions of VRChat or anyone officially involved in producing or managing VRChat properties. VRChat and all associated properties are trademarks or registered trademarks of VRChat Inc. VRChat © VRChat Inc.

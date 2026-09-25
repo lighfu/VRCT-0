@@ -256,7 +256,6 @@ _SIMPLE_CONFIG_GETTERS = {
     "getSendReceivedMessageToVrc": "SEND_RECEIVED_MESSAGE_TO_VRC",
     "getLoggerFeature": "LOGGER_FEATURE",
     "getVrcMicMuteSync": "VRC_MIC_MUTE_SYNC",
-    "getTelemetry": "ENABLE_TELEMETRY",
     "getWebSocketHost": "WEBSOCKET_HOST",
     "getWebSocketPort": "WEBSOCKET_PORT",
     "getWebSocketServer": "WEBSOCKET_SERVER",
@@ -402,7 +401,7 @@ class Controller:
             )
 
     def shutdown(self, *args, **kwargs) -> dict:
-        """Shutdown controller and model (including telemetry).
+        """Shutdown controller and model.
 
         Returns:
             dict with status 200 and result True on success.
@@ -494,12 +493,7 @@ class Controller:
             config.saveConfigToFile()
         except Exception:
             errorLogging()
-        try:
-            model.telemetryShutdown()
-            return {"status": 200, "result": True}
-        except Exception:
-            errorLogging()
-            return {"status": 500, "result": False}
+        return {"status": 200, "result": True}
 
     # response functions
     def connectedNetwork(self) -> None:
@@ -3713,20 +3707,6 @@ class Controller:
         return {"status":200, "result":data}
 
 
-    @staticmethod
-    def setEnableTelemetry(*args, **kwargs) -> dict:
-        if config.ENABLE_TELEMETRY is False:
-            config.ENABLE_TELEMETRY = True
-            model.telemetryInit(enabled=True, app_version=config.VERSION)
-        return {"status":200, "result":config.ENABLE_TELEMETRY}
-
-    @staticmethod
-    def setDisableTelemetry(*args, **kwargs) -> dict:
-        if config.ENABLE_TELEMETRY is True:
-            config.ENABLE_TELEMETRY = False
-            model.telemetryShutdown()
-        return {"status":200, "result":config.ENABLE_TELEMETRY}
-
     def swapYourLanguageAndTargetLanguage(self, *args, **kwargs) -> dict:
         your_languages = config.SELECTED_YOUR_LANGUAGES
         your_language_temp = your_languages[config.SELECTED_TAB_NO]["1"]
@@ -5559,11 +5539,6 @@ class Controller:
         # Revalidate Selected Models
         printLog("Revalidate Selected Models")
         config.revalidate_selected_models()
-
-        # telemetry Init
-        printLog("Telemetry Init")
-        if config.ENABLE_TELEMETRY is True:
-            model.telemetryInit(enabled=config.ENABLE_TELEMETRY, app_version=config.VERSION)
 
         # Update Settings
         printLog("Update settings")

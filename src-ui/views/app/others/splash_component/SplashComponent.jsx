@@ -5,7 +5,7 @@ import { DownloadModelsContainer } from "./download_models_container/DownloadMod
 import MegaphoneSvg from "@images/megaphone.svg?react";
 import { useWindow } from "@logics_common";
 import clsx from "clsx";
-import { generateLocalizedDocumentUrl } from "@ui_configs";
+import { vrct0_issues_url } from "@ui_configs";
 import { CloseButton } from "@common_components";
 
 export const SplashComponent = () => {
@@ -58,7 +58,7 @@ const AnnouncementsContainer = () => {
                 [styles.is_shown]: is_shown,
                 [styles.is_labels_active]: is_labels_active,
             })}
-            href={generateLocalizedDocumentUrl().vrct_document_faq_url}
+            href={vrct0_issues_url}
             target="_blank"
             rel="noreferrer"
         >

@@ -17,7 +17,7 @@ import {
 import { useMainFunction } from "@logics_main";
 import { OpenQuickSettingButton } from "./_buttons/OpenQuickSettingButton";
 
-import { generateLocalizedDocumentUrl } from "@ui_configs";
+import { vrct0ReadmeUrl } from "@ui_configs";
 
 export const RightSideComponents = () => {
     const { currentUiLanguage } = useAppearance();
@@ -30,7 +30,7 @@ export const RightSideComponents = () => {
             <SoftwareUpdateAvailableButton />
             <a
                 className={styles.help_and_info_button}
-                href={generateLocalizedDocumentUrl(currentUiLanguage.data).vrct_document_ui_guide_url}
+                href={vrct0ReadmeUrl(currentUiLanguage.data)}
                 target="_blank"
                 rel="noreferrer"
             >
