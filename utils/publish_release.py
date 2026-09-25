@@ -194,20 +194,28 @@ def push(version: str) -> None:
 
 # ---- CI と公開の確認 ---------------------------------------------------------
 
-def findRun(tag: str, timeout_sec: int = 120):
+def listRunIds(tag: str) -> set:
+    """そのタグで動いた CI の実行の id (push の前に控えておき、前回の実行と取り違えないため)。"""
+    runs = json.loads(gh("run", "list", "-R", REPO, "--workflow", WORKFLOW, "--limit", "20",
+                         "--json", "databaseId,headBranch") or "[]")
+    return {item["databaseId"] for item in runs if item["headBranch"] == tag}
+
+
+def findRun(tag: str, known_ids=frozenset(), timeout_sec: int = 120):
+    """push で始まった CI の実行を探す。同じタグで前に動いた実行 (known_ids) は見ない。"""
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:
         runs = json.loads(gh("run", "list", "-R", REPO, "--workflow", WORKFLOW, "--limit", "10",
                              "--json", "databaseId,headBranch,url") or "[]")
         for item in runs:
-            if item["headBranch"] == tag:
+            if item["headBranch"] == tag and item["databaseId"] not in known_ids:
                 return item
         time.sleep(5)
     raise ReleaseError(f"{tag} の CI が見つかりません。https://github.com/{REPO}/actions を確かめてください")
 
 
-def watchRun(tag: str) -> None:
-    item = findRun(tag)
+def watchRun(tag: str, known_ids=frozenset()) -> None:
+    item = findRun(tag, known_ids)
     print(f"CI: {item['url']}")
     result = subprocess.run(["gh", "run", "watch", str(item["databaseId"]), "-R", REPO, "--exit-status",
                              "--interval", "30"], cwd=ROOT)
@@ -293,13 +301,15 @@ def main(argv=None) -> int:
         if not args.yes and not confirm(f"{REMOTE} に push して v{version} を公開しますか？"):
             print(f"push しませんでした。取り消すには: git tag -d v{version} (リリースのコミットを作った場合は、さらに git reset --hard HEAD~1)")
             return 1
+        # やり直しのときは同じタグの前の実行が残っているので、push の前に控えておく。
+        known_ids = listRunIds(f"v{version}")
         push(version)
         print(f"push しました: v{version}")
 
         if args.no_watch:
             print(f"CI: https://github.com/{REPO}/actions")
             return 0
-        watchRun(f"v{version}")
+        watchRun(f"v{version}", known_ids)
         url = checkPublished(version)
         print(f"公開しました: {url}")
         return 0

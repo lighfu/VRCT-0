@@ -66,6 +66,14 @@ class AssetTests(unittest.TestCase):
         self.assertIn("Setup", missing[0])
 
 
+class FindRunTests(unittest.TestCase):
+    def test_skips_runs_that_existed_before_the_push(self) -> None:
+        runs = '[{"databaseId": 1, "headBranch": "v2026.9.25", "url": "old"}, {"databaseId": 2, "headBranch": "v2026.9.25", "url": "new"}]'
+        with mock.patch.object(publish_release, "gh", return_value=runs):
+            self.assertEqual(publish_release.findRun("v2026.9.25", {1})["url"], "new")
+            self.assertEqual(publish_release.listRunIds("v2026.9.25"), {1, 2})
+
+
 class DryRunTests(unittest.TestCase):
     def test_dry_run_changes_nothing(self) -> None:
         with mock.patch.object(publish_release, "checkTools"), \
