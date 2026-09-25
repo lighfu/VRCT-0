@@ -241,7 +241,7 @@ def plan(version: str) -> list:
         f"版を {version} にする ({', '.join(VERSION_FILES[:-1])})",
         f"BUILD_CHANNEL を \"{channel}\" にする",
         f"コミット chore(release): v{version} と、タグ v{version} を作る",
-        f"{REMOTE} に {RELEASE_BRANCH} とタグを push する (CI が {'プレリリース' if channel == 'beta' else '正式版'} として公開する)",
+        f"{REMOTE} に {RELEASE_BRANCH} とタグを push する (CI が{'プレリリース' if channel == 'beta' else '正式版'}として公開する)",
         "CI の完了を待ち、公開されたファイルを確かめる",
     ]
 
@@ -254,6 +254,10 @@ def confirm(question: str) -> bool:
 
 
 def main(argv=None) -> int:
+    # パイプ越し (ほかのツールから動かすとき) でも日本語が化けないよう UTF-8 で出す。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="VRCT-0 を公開する (版を決めてタグを push し、CI の公開を見届ける)")
     parser.add_argument("--date", metavar="YYYY-MM-DD", help="版にする日付 (省くと今日)")
     parser.add_argument("--beta", type=int, metavar="N", help="ベータ版の番号")
