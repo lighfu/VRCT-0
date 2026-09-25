@@ -71,9 +71,14 @@ class CliSession:
     TURN_TIMEOUT = 60.0
 
     def __init__(self, command_prefix: list[str], model: str, workspace: str, base_instructions: str,
-                 client_version: str = "") -> None:
+                 client_version: str = "", effort: Optional[str] = None,
+                 service_tier: Optional[str] = None) -> None:
         self.command_prefix = list(command_prefix)
         self.model = model
+        # エフォート (考える量)。None なら CLI の既定 (codex は low)。
+        self.effort = effort
+        # codex の Fast モードの service tier の id。None なら使わない。
+        self.service_tier = service_tier
         self.workspace = workspace
         self.base_instructions = base_instructions
         self.client_version = client_version

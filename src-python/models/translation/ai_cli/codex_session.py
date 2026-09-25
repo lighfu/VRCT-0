@@ -118,9 +118,11 @@ class CodexSession(CliSession):
     def _turnMessages(self, prompt: str) -> list[dict]:
         self._messages_in_turn = []
         self._turn_request_id = self._newId()
-        return [{"method": "turn/start", "id": self._turn_request_id,
-                 "params": {"threadId": self._thread_id, "input": [{"type": "text", "text": prompt}],
-                            "effort": "low"}}]
+        params = {"threadId": self._thread_id, "input": [{"type": "text", "text": prompt}],
+                  "effort": self.effort or "low"}
+        if self.service_tier:
+            params["serviceTier"] = self.service_tier
+        return [{"method": "turn/start", "id": self._turn_request_id, "params": params}]
 
     def _finalText(self) -> str:
         """最終回答だけを返す。途中経過 (phase: commentary) は訳文に混ぜない。"""

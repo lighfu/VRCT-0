@@ -75,6 +75,10 @@ class AICliClient:
         self._lock = threading.Lock()
         self._models: dict[str, list[str]] = {}
         self._status_callback: Optional[Callable[[bool], None]] = None
+        # CLI ごとに選んだエフォートを返す関数 (config を読む)。セッションを起動するたびに読む。
+        self._effort_provider: Optional[Callable[[str], Optional[str]]] = None
+        # codex の Fast モードを使うかを返す関数 (config を読む)。
+        self._fast_provider: Optional[Callable[[], bool]] = None
         self._broken_reason: Optional[str] = None
         self._retry_at = 0.0
         self._probing = False
@@ -137,6 +141,52 @@ class AICliClient:
         if old is not None:
             old.shutdown()
         return True
+
+    def setEffortProvider(self, provider: Optional[Callable[[str], Optional[str]]]) -> None:
+        self._effort_provider = provider
+
+    def getEffortList(self) -> list[str]:
+        """今の CLI とモデルで選べるエフォート。選べないなら []。"""
+        if not self.tool or not self.model:
+            return []
+        return catalog.listEfforts(self.tool, self.model)
+
+    def getEffort(self) -> Optional[str]:
+        """実際に使うエフォート (選んでいた値がこのモデルで使えなければ low か一覧の先頭)。"""
+        preferred = None
+        if self._effort_provider is not None and self.tool:
+            try:
+                preferred = self._effort_provider(self.tool)
+            except Exception:
+                errorLogging()
+        return catalog.effectiveEffort(preferred, self.getEffortList())
+
+    def setFastProvider(self, provider: Optional[Callable[[], bool]]) -> None:
+        self._fast_provider = provider
+
+    def isFastAvailable(self) -> bool:
+        """今の CLI とモデルで Fast モードを選べるか (codex で、モデルに Fast がある)。"""
+        if not self.tool or not self.model:
+            return False
+        return catalog.fastTier(self.tool, self.model) is not None
+
+    def getServiceTier(self) -> Optional[str]:
+        """Fast モードがオンで使えるなら、その service tier の id。"""
+        if not self.isFastAvailable() or self._fast_provider is None:
+            return None
+        try:
+            enabled = bool(self._fast_provider())
+        except Exception:
+            errorLogging()
+            return None
+        return catalog.fastTier(self.tool, self.model) if enabled else None
+
+    def restartSession(self) -> None:
+        """エフォートを変えたときに呼ぶ。今のセッションを閉じ、次の翻訳か updateClient() で作り直す。"""
+        with self._lock:
+            old, self._session = self._session, None
+        if old is not None:
+            old.shutdown()
 
     def authenticationCheck(self) -> bool:
         return self.tool is not None and catalog.resolveExecutable(self.tool) is not None
@@ -217,7 +267,8 @@ class AICliClient:
                 self._session = SESSION_CLASSES[self.tool](
                     command_prefix=[executable], model=self.model,
                     workspace=self.workspace, base_instructions=BASE_INSTRUCTIONS,
-                    client_version=self.client_version,
+                    client_version=self.client_version, effort=self.getEffort(),
+                    service_tier=self.getServiceTier(),
                 )
             return self._session
 

@@ -502,6 +502,42 @@ export const SETTINGS_ARRAY = [
         add_endpoint_run_array: ["from_backend"],
         base_endpoint_name: "selected_ai_cli_model",
     },
+    // エフォート (考える量)。選べる値は CLI とモデルで違うので、画面が CLI かモデルを
+    // 替えるたびに取り直す (AiCliEffortContainer)。agy は選べない ([])。
+    {
+        Category: "Translation",
+        Base_Name: "SelectableAiCliEffortList",
+        default_value: [],
+        ui_template_id: "list",
+        logics_template_id: "get_list",
+        base_endpoint_name: "selectable_ai_cli_effort_list",
+        response_transform: "arrayToObject",
+    },
+    {
+        Category: "Translation",
+        Base_Name: "SelectedAiCliEffort",
+        default_value: "",
+        ui_template_id: "select",
+        logics_template_id: "get_set",
+        base_endpoint_name: "selected_ai_cli_effort",
+    },
+    // codex の Fast モード。Fast があるモデルでだけ欄を出す (AiCliFastModeContainer)。
+    {
+        Category: "Translation",
+        Base_Name: "AiCliFastModeAvailable",
+        default_value: false,
+        ui_template_id: "list",
+        logics_template_id: "get_only",
+        base_endpoint_name: "ai_cli_fast_mode_available",
+    },
+    {
+        Category: "Translation",
+        Base_Name: "AiCliFastMode",
+        default_value: false,
+        ui_template_id: "toggle",
+        logics_template_id: "toggle_enable_disable",
+        base_endpoint_name: "ai_cli_fast_mode",
+    },
 
     // Transcription
     // Mic

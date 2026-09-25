@@ -383,6 +383,12 @@ config_page:
         select_ai_cli_model:
             label: "AI CLI のモデルを選択"
             connection_required: "AI CLI の接続確認が必要"
+        select_ai_cli_effort:
+            label: "AI CLI のエフォート"
+            desc: "高いほど考えてから訳しますが、訳が出るまで時間がかかり、CLI の利用枠も多く使います。会話の翻訳には low がおすすめです。"
+        ai_cli_fast_mode:
+            label: "Fast モード（codex）"
+            desc: "訳が速く出ます（モデルにより約 1.5〜2 倍）。モデルによっては codex の利用枠を多く使います。"
 
     transcription:
         section_label_mic: "マイク"

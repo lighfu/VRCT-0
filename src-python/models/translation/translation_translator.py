@@ -160,6 +160,8 @@ class Translator:
         self.ai_cli_client: Optional[Any] = None
         self.ai_cli_connected: bool = False
         self._ai_cli_status_callback = None
+        self._ai_cli_effort_provider = None
+        self._ai_cli_fast_provider = None
         self.ctranslate2_translator: Any = None
         self.ctranslate2_tokenizer: Any = None
         self.is_loaded_ctranslate2_model: bool = False
@@ -500,6 +502,8 @@ class Translator:
         if self.ai_cli_client is None:
             self.ai_cli_client = AICliClient(root_path=root_path, workspace=workspace, client_version=client_version)
             self.ai_cli_client.setStatusCallback(self._onAiCliStatus)
+            self.ai_cli_client.setEffortProvider(self._ai_cli_effort_provider)
+            self.ai_cli_client.setFastProvider(self._ai_cli_fast_provider)
         result = bool(self.ai_cli_client.setTool(tool) and self.ai_cli_client.authenticationCheck())
         if result is False:
             self.ai_cli_client.close()
@@ -517,6 +521,37 @@ class Translator:
         if self.ai_cli_client is None:
             return False
         return self.ai_cli_client.setModel(model)
+
+    def setAiCliEffortProvider(self, provider) -> None:
+        """CLI ごとに選んだエフォートを返す関数を登録する (クライアントを作る前でもよい)。"""
+        self._ai_cli_effort_provider = provider
+        if self.ai_cli_client is not None:
+            self.ai_cli_client.setEffortProvider(provider)
+
+    def getAiCliEffortList(self) -> list[str]:
+        if self.ai_cli_client is None:
+            return []
+        return self.ai_cli_client.getEffortList()
+
+    def getAiCliEffort(self):
+        if self.ai_cli_client is None:
+            return None
+        return self.ai_cli_client.getEffort()
+
+    def setAiCliFastProvider(self, provider) -> None:
+        """codex の Fast モードを使うかを返す関数を登録する (クライアントを作る前でもよい)。"""
+        self._ai_cli_fast_provider = provider
+        if self.ai_cli_client is not None:
+            self.ai_cli_client.setFastProvider(provider)
+
+    def isAiCliFastAvailable(self) -> bool:
+        if self.ai_cli_client is None:
+            return False
+        return self.ai_cli_client.isFastAvailable()
+
+    def restartAiCliSession(self) -> None:
+        if self.ai_cli_client is not None:
+            self.ai_cli_client.restartSession()
 
     def updateAiCliClient(self) -> None:
         if self.ai_cli_client is not None:

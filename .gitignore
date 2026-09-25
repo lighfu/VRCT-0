@@ -57,6 +57,9 @@ config.json
 config.json.tmp
 # テーマの背景画像 (開発中は src-python がデータの置き場になる)
 theme_images/
+# AI CLI (agy) の作業フォルダ。会話の記録やインストール ID が入る
+ai_cli_agy_home/
+ai_cli_workspace/
 
 
 # Personal Claude Code settings (not shared with the team)

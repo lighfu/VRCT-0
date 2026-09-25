@@ -1249,6 +1249,30 @@ class Model:
         self.ensure_initialized()
         return self.translator.setAiCliModel(model=model)
 
+    def setTranslatorAiCliEffortProvider(self, provider) -> None:
+        self.ensure_initialized()
+        self.translator.setAiCliEffortProvider(provider)
+
+    def getTranslatorAiCliEffortList(self) -> list[str]:
+        self.ensure_initialized()
+        return self.translator.getAiCliEffortList()
+
+    def getTranslatorAiCliEffort(self):
+        self.ensure_initialized()
+        return self.translator.getAiCliEffort()
+
+    def setTranslatorAiCliFastProvider(self, provider) -> None:
+        self.ensure_initialized()
+        self.translator.setAiCliFastProvider(provider)
+
+    def isTranslatorAiCliFastAvailable(self) -> bool:
+        self.ensure_initialized()
+        return self.translator.isAiCliFastAvailable()
+
+    def restartTranslatorAiCliSession(self) -> None:
+        self.ensure_initialized()
+        self.translator.restartAiCliSession()
+
     def updateTranslatorAiCliClient(self) -> None:
         self.ensure_initialized()
         self.translator.updateAiCliClient()

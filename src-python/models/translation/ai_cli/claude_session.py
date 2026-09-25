@@ -21,12 +21,18 @@ _TOOL_BLOCK_TYPES = {"tool_use", "server_tool_use", "mcp_tool_use"}
 
 class ClaudeSession(CliSession):
     def _buildArgs(self) -> list[str]:
-        return [
+        args = [
             "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", self.model, "--tools", "", "--no-session-persistence",
             "--setting-sources", "project", "--strict-mcp-config",
             "--system-prompt", self.base_instructions,
         ]
+        if self.effort == "none":
+            # 推論しない。--effort には none が無いので、ヘルプに無い --thinking を使う。
+            args += ["--thinking", "disabled"]
+        elif self.effort:
+            args += ["--effort", self.effort]
+        return args
 
     def _turnMessages(self, prompt: str) -> list[dict]:
         return [{"type": "user", "message": {"role": "user", "content": prompt}}]

@@ -3292,6 +3292,58 @@ class Controller:
             return self._setTranslationEngineModel("AI_CLI", data)
 
     @staticmethod
+    def getSelectableAiCliEffortList(*args, **kwargs) -> dict:
+        """今の CLI とモデルで選べるエフォート。選べない (agy・モデル未選択) なら []。"""
+        return {"status":200, "result":model.getTranslatorAiCliEffortList()}
+
+    @staticmethod
+    def getSelectedAiCliEffort(*args, **kwargs) -> dict:
+        """実際に使うエフォート。選んでいた値がこのモデルで使えなければ low (無ければ先頭)。"""
+        return {"status":200, "result":model.getTranslatorAiCliEffort()}
+
+    def setSelectedAiCliEffort(self, data, *args, **kwargs) -> dict:
+        effort = str(data)
+        with _AI_CLI_LOCK:
+            if effort not in model.getTranslatorAiCliEffortList():
+                return VRCTError.create_error_response(
+                    ErrorCode.VALIDATION_CONFIG_VALUE_INVALID,
+                    data=model.getTranslatorAiCliEffort(),
+                )
+            efforts = dict(config.SELECTED_AI_CLI_EFFORTS or {})
+            efforts[config.SELECTED_AI_CLI_TOOL] = effort
+            config.SELECTED_AI_CLI_EFFORTS = efforts
+            # 常駐セッションは起動したときのエフォートのままなので作り直す。
+            model.restartTranslatorAiCliSession()
+            if "AI_CLI" in config.SELECTED_TRANSLATION_ENGINES.values():
+                model.updateTranslatorAiCliClient()
+            return {"status":200, "result":model.getTranslatorAiCliEffort()}
+
+    @staticmethod
+    def getAiCliFastModeAvailable(*args, **kwargs) -> dict:
+        """今の CLI とモデルで Fast モードを選べるか (codex で、モデルに Fast がある)。"""
+        return {"status":200, "result":model.isTranslatorAiCliFastAvailable()}
+
+    @staticmethod
+    def getAiCliFastMode(*args, **kwargs) -> dict:
+        return {"status":200, "result":config.AI_CLI_CODEX_FAST_MODE}
+
+    def setEnableAiCliFastMode(self, *args, **kwargs) -> dict:
+        return self._setAiCliFastMode(True)
+
+    def setDisableAiCliFastMode(self, *args, **kwargs) -> dict:
+        return self._setAiCliFastMode(False)
+
+    def _setAiCliFastMode(self, enabled: bool) -> dict:
+        with _AI_CLI_LOCK:
+            if config.AI_CLI_CODEX_FAST_MODE is not enabled:
+                config.AI_CLI_CODEX_FAST_MODE = enabled
+                # 常駐セッションは起動したときの設定のままなので作り直す。
+                model.restartTranslatorAiCliSession()
+                if "AI_CLI" in config.SELECTED_TRANSLATION_ENGINES.values():
+                    model.updateTranslatorAiCliClient()
+            return {"status":200, "result":config.AI_CLI_CODEX_FAST_MODE}
+
+    @staticmethod
     def getSelectableAiCliToolList(*args, **kwargs) -> dict:
         return {"status":200, "result":config.SELECTABLE_AI_CLI_TOOL_LIST}
 
@@ -4907,6 +4959,11 @@ class Controller:
         try:
             # AI CLI が使えなくなった/立ち直ったことを UI の接続表示に反映する。
             self._model.setTranslatorAiCliStatusCallback(self._onAiCliStatusChange)
+            # 常駐セッションは起動するたびに、CLI ごとに選んだエフォートを読む。
+            self._model.setTranslatorAiCliEffortProvider(
+                lambda tool: (config.SELECTED_AI_CLI_EFFORTS or {}).get(tool)
+            )
+            self._model.setTranslatorAiCliFastProvider(lambda: config.AI_CLI_CODEX_FAST_MODE is True)
         except Exception:
             errorLogging()
 

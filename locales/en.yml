@@ -383,6 +383,12 @@ config_page:
         select_ai_cli_model:
             label: "Select AI CLI Model"
             connection_required: "AI CLI Connection Check Required"
+        select_ai_cli_effort:
+            label: "AI CLI Effort"
+            desc: "Higher effort thinks more before translating, but takes longer and uses more of the CLI usage limit. low is recommended for conversation."
+        ai_cli_fast_mode:
+            label: "Fast mode (codex)"
+            desc: "Translations come back faster (about 1.5 to 2 times, depending on the model). Some models use more of the codex usage limit."
 
     transcription:
         section_label_mic: "Mic"

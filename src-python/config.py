@@ -1024,6 +1024,11 @@ class Config:
     SELECTED_OLLAMA_MODEL = ManagedProperty('SELECTED_OLLAMA_MODEL', type_=str, allowed=_allowed_in_populated('SELECTABLE_OLLAMA_MODEL_LIST'))
     SELECTED_AI_CLI_TOOL = ManagedProperty('SELECTED_AI_CLI_TOOL', type_=str, allowed=lambda v, inst: v in AI_CLI_TOOLS)
     SELECTED_AI_CLI_MODELS = ManagedProperty('SELECTED_AI_CLI_MODELS', type_=dict)
+    # CLI ごとのエフォート (考える量)。選べる値は CLI とモデルで違うので、使うときに
+    # models/translation/ai_cli/catalog.py の effectiveEffort() で確かめる。
+    SELECTED_AI_CLI_EFFORTS = ManagedProperty('SELECTED_AI_CLI_EFFORTS', type_=dict)
+    # codex の Fast モード (速いが、モデルによっては利用枠を多く使う)。Fast があるモデルでだけ効く。
+    AI_CLI_CODEX_FAST_MODE = ManagedProperty('AI_CLI_CODEX_FAST_MODE', type_=bool)
 
     @property
     def SELECTED_AI_CLI_MODEL(self):
@@ -1302,6 +1307,9 @@ class Config:
         # 起動時に保存値の CLI が見つからず別の CLI を使っている間の、保存値 (useAiCliToolFallback)。
         self._AI_CLI_TOOL_PREFERENCE = None
         self._SELECTED_AI_CLI_MODELS = {"codex": "", "claude": "haiku", "agy": ""}
+        # 翻訳は速さが大事なので、既定は一番軽い low。
+        self._SELECTED_AI_CLI_EFFORTS = {"codex": "low", "claude": "low"}
+        self._AI_CLI_CODEX_FAST_MODE = False
         self._SELECTED_GROQ_WHISPER_MODEL = None
         self._SELECTED_OPENAI_WHISPER_MODEL = None
         self._SELECTED_CUSTOM_WHISPER_MODEL = None

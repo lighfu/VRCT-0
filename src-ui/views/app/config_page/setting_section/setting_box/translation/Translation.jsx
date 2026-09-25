@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useI18n } from "@useI18n";
 
 import {
@@ -12,6 +13,7 @@ import {
     EntryWithSaveButtonContainer,
     DropdownMenuContainer,
     ConnectionCheckButtonContainer,
+    CheckboxContainer,
 } from "../_templates/Templates";
 
 import { ComputeDevice } from "../_components/compute_device/ComputeDevice";
@@ -62,6 +64,8 @@ export const Translation = () => {
             <AiCliTool_Box />
             <AiCliConnectionCheck_Box />
             <AiCliModelContainer />
+            <AiCliEffortContainer />
+            <AiCliFastModeContainer />
 
             <OpenAICompatibleURL_Box />
             <OpenAICompatibleAuthKey_Box />
@@ -659,6 +663,71 @@ const AiCliModelContainer = () => {
             selectFunction={(selected_data) => setSelectedAiCliModel(selected_data.selected_id)}
             state={currentSelectedAiCliModel.state}
             is_disabled={!currentIsAiCliConnected.data}
+        />
+    );
+};
+
+// エフォート (考える量)。選べる値は CLI とモデルで違うので、どちらかが変わるたびに取り直す。
+// 選べない CLI (agy はモデル名で決まる) では欄を出さない。
+const AiCliEffortContainer = () => {
+    const { t } = useI18n();
+    const {
+        currentSelectedAiCliTool,
+        currentSelectedAiCliModel,
+        currentSelectableAiCliEffortList,
+        getSelectableAiCliEffortList,
+        currentSelectedAiCliEffort,
+        getSelectedAiCliEffort,
+        setSelectedAiCliEffort,
+    } = useTranslation();
+    const { currentIsAiCliConnected } = useLLMConnection();
+
+    useEffect(() => {
+        getSelectableAiCliEffortList();
+        getSelectedAiCliEffort();
+    }, [currentSelectedAiCliTool.data, currentSelectedAiCliModel.data, currentIsAiCliConnected.data]);
+
+    if (Object.keys(currentSelectableAiCliEffortList.data ?? {}).length === 0) return null;
+
+    return (
+        <DropdownMenuContainer
+            dropdown_id="select_ai_cli_effort"
+            label={t("config_page.translation.select_ai_cli_effort.label")}
+            desc={t("config_page.translation.select_ai_cli_effort.desc")}
+            selected_id={currentSelectedAiCliEffort.data}
+            list={currentSelectableAiCliEffortList.data}
+            selectFunction={(selected_data) => setSelectedAiCliEffort(selected_data.selected_id)}
+            state={currentSelectedAiCliEffort.state}
+            is_disabled={!currentIsAiCliConnected.data}
+        />
+    );
+};
+
+// codex の Fast モード。使えるかはモデルで違うので、CLI かモデルが変わるたびに確かめる。
+const AiCliFastModeContainer = () => {
+    const { t } = useI18n();
+    const {
+        currentSelectedAiCliTool,
+        currentSelectedAiCliModel,
+        currentAiCliFastModeAvailable,
+        getAiCliFastModeAvailable,
+        currentAiCliFastMode,
+        toggleAiCliFastMode,
+    } = useTranslation();
+    const { currentIsAiCliConnected } = useLLMConnection();
+
+    useEffect(() => {
+        getAiCliFastModeAvailable();
+    }, [currentSelectedAiCliTool.data, currentSelectedAiCliModel.data, currentIsAiCliConnected.data]);
+
+    if (currentAiCliFastModeAvailable.data !== true) return null;
+
+    return (
+        <CheckboxContainer
+            label={t("config_page.translation.ai_cli_fast_mode.label")}
+            desc={t("config_page.translation.ai_cli_fast_mode.desc")}
+            variable={currentAiCliFastMode}
+            toggleFunction={toggleAiCliFastMode}
         />
     );
 };

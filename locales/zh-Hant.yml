@@ -383,6 +383,12 @@ config_page:
         select_ai_cli_model:
             label: "Select AI CLI Model"
             connection_required: "AI CLI Connection Check Required"
+        select_ai_cli_effort:
+            label: "AI CLI 推理強度"
+            desc: "越高翻譯前思考越多，但出結果較慢，也會消耗較多 CLI 使用額度。對話翻譯建議使用 low。"
+        ai_cli_fast_mode:
+            label: "Fast 模式（codex）"
+            desc: "翻譯更快（視模型約 1.5～2 倍）。部分模型會消耗較多 codex 使用額度。"
 
     transcription:
         section_label_mic: "麥克風"

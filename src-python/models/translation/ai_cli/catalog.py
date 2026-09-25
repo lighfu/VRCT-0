@@ -17,6 +17,16 @@ except ImportError:
 TOOLS = ("codex", "claude", "agy")
 # claude にはモデル一覧を返すコマンドが無いので別名を固定で並べる。
 CLAUDE_MODELS = ["haiku", "sonnet", "opus"]
+# エフォート (考える量)。codex はモデルごとに `codex debug models` が返す値、
+# claude は `claude --effort` が受け付ける値に、推論しない none (`--thinking disabled`。
+# ヘルプに無いフラグで、claude 2.1.282 は enabled / adaptive / disabled を受け付ける) を足したもの。
+# agy はモデル名にエフォートが入っている (gemini-...-high など) ので選ばせない。
+CLAUDE_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"]
+DEFAULT_EFFORT = "low"
+_codex_efforts: dict[str, list[str]] = {}
+# codex の Fast モード。`codex debug models` の service_tiers で名前が Fast の段の id
+# (codex 0.155.1 では "priority")。app-server の turn/start の serviceTier に渡す。
+_codex_fast_tiers: dict[str, str] = {}
 _LIST_TIMEOUT_SEC = 30
 _CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 # codex は npm のシム (codex.cmd / codex.ps1) で入るので .cmd を優先する。
@@ -72,7 +82,23 @@ def listModels(tool: str) -> list[str]:
         if tool == "codex":
             data = json.loads(_run(executable, ["debug", "models"]))
             entries = data.get("models", []) if isinstance(data, dict) else data
-            slugs = [str(entry.get("slug")) for entry in entries if isinstance(entry, dict) and entry.get("slug")]
+            slugs = []
+            for entry in entries:
+                if not isinstance(entry, dict) or not entry.get("slug"):
+                    continue
+                slug = str(entry["slug"])
+                levels = entry.get("supported_reasoning_levels") or []
+                _codex_efforts[slug] = [
+                    str(level.get("effort") if isinstance(level, dict) else level)
+                    for level in levels if (level.get("effort") if isinstance(level, dict) else level)
+                ]
+                fast = [tier.get("id") for tier in entry.get("service_tiers") or []
+                        if isinstance(tier, dict) and str(tier.get("name", "")).lower() == "fast" and tier.get("id")]
+                if fast:
+                    _codex_fast_tiers[slug] = str(fast[0])
+                else:
+                    _codex_fast_tiers.pop(slug, None)
+                slugs.append(slug)
             return [slug for slug in slugs if "review" not in slug]
         if tool == "agy":
             models = []
@@ -85,3 +111,28 @@ def listModels(tool: str) -> list[str]:
     except Exception:
         errorLogging()
     return []
+
+
+def listEfforts(tool: str, model: str) -> list[str]:
+    """その CLI とモデルで選べるエフォート。選べないなら []。codex は listModels() の後で分かる。"""
+    if tool == "claude":
+        return list(CLAUDE_EFFORTS)
+    if tool == "codex":
+        return list(_codex_efforts.get(model, []))
+    return []
+
+
+def fastTier(tool: str, model: str):
+    """Fast モードの service tier の id。そのモデルに無ければ None (codex 以外も None)。"""
+    if tool != "codex":
+        return None
+    return _codex_fast_tiers.get(model)
+
+
+def effectiveEffort(preferred, efforts: list[str]):
+    """選んでいたエフォートが使えればそれ、使えなければ low (無ければ先頭)。選べないなら None。"""
+    if not efforts:
+        return None
+    if preferred in efforts:
+        return preferred
+    return DEFAULT_EFFORT if DEFAULT_EFFORT in efforts else efforts[0]

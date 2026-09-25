@@ -383,6 +383,12 @@ config_page:
         select_ai_cli_model:
             label: "Select AI CLI Model"
             connection_required: "AI CLI Connection Check Required"
+        select_ai_cli_effort:
+            label: "AI CLI 노력 수준"
+            desc: "높을수록 더 생각한 뒤 번역하지만, 번역이 나오기까지 시간이 걸리고 CLI 사용량도 많이 씁니다. 대화 번역에는 low를 권장합니다."
+        ai_cli_fast_mode:
+            label: "Fast 모드 (codex)"
+            desc: "번역이 빨라집니다(모델에 따라 약 1.5~2배). 모델에 따라 codex 사용량을 더 많이 씁니다."
 
     transcription:
         section_label_mic: "마이크"
