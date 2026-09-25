@@ -9,6 +9,9 @@ jobs:
   release:
     name: Build and publish VRCT-0
     runs-on: windows-latest
+    env:
+      # CI の Windows の既定の文字コード (cp1252) では、スクリプトが出す日本語で止まるため。
+      PYTHONUTF8: "1"
     permissions:
       contents: write
     steps:
